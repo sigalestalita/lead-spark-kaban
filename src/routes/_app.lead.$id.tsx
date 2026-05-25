@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { PRIORITY_LABEL, PRIORITY_COLOR } from "@/lib/lead-types";
-import { ArrowLeft, MessageSquare, Linkedin, Globe, Sparkles, Wand2, Copy, Building2 } from "lucide-react";
+import { ArrowLeft, MessageSquare, Linkedin, Globe, Sparkles, Wand2, Copy, Building2, ExternalLink } from "lucide-react";
 
 export const Route = createFileRoute("/_app/lead/$id")({
   component: LeadDetailPage,
@@ -92,11 +92,40 @@ function LeadDetailPage() {
         </div>
         <div className="flex gap-2 flex-wrap">
           {whatsappUrl && <a href={whatsappUrl} target="_blank" rel="noreferrer"><Button size="sm"><MessageSquare className="h-4 w-4 mr-1" />WhatsApp</Button></a>}
-          {lead.linkedin_url && <a href={lead.linkedin_url} target="_blank" rel="noreferrer"><Button size="sm" variant="outline"><Linkedin className="h-4 w-4 mr-1" />Lead</Button></a>}
-          {lead.company_linkedin && <a href={lead.company_linkedin} target="_blank" rel="noreferrer"><Button size="sm" variant="outline"><Building2 className="h-4 w-4 mr-1" />Empresa</Button></a>}
-          {lead.company_website && <a href={lead.company_website} target="_blank" rel="noreferrer"><Button size="sm" variant="outline"><Globe className="h-4 w-4 mr-1" />Site</Button></a>}
         </div>
       </div>
+
+      <Card className="p-4 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h2 className="font-semibold text-sm flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            Pesquisa rápida para abordagem
+          </h2>
+          <Button size="sm" variant="outline" onClick={() => enrich.mutate()} disabled={enrich.isPending}>
+            <Wand2 className="h-4 w-4 mr-1" />{enrich.isPending ? "Enriquecendo…" : "Enriquecer com IA"}
+          </Button>
+        </div>
+        <div className="grid sm:grid-cols-3 gap-2">
+          <QuickLink
+            icon={<Linkedin className="h-5 w-5" />}
+            label="LinkedIn do lead"
+            sublabel={lead.name}
+            url={lead.linkedin_url}
+          />
+          <QuickLink
+            icon={<Building2 className="h-5 w-5" />}
+            label="LinkedIn da empresa"
+            sublabel={lead.company_name}
+            url={lead.company_linkedin}
+          />
+          <QuickLink
+            icon={<Globe className="h-5 w-5" />}
+            label="Site da empresa"
+            sublabel={lead.company_name}
+            url={lead.company_website}
+          />
+        </div>
+      </Card>
 
       <div className="grid md:grid-cols-2 gap-4">
         <Card className="p-5 space-y-3">
@@ -221,6 +250,35 @@ function Field({ label, value, onSave }: { label: string; value: string | null; 
     <div>
       <p className="text-xs text-muted-foreground mb-1">{label}</p>
       <Input value={v} onChange={(e) => setV(e.target.value)} onBlur={() => { if (v !== (value ?? "")) onSave(v); }} />
+    </div>
+  );
+}
+
+function QuickLink({ icon, label, sublabel, url }: { icon: React.ReactNode; label: string; sublabel: string | null; url: string | null }) {
+  if (url) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-center gap-3 rounded-lg border bg-background p-3 hover:border-primary hover:bg-primary/5 transition-colors group"
+      >
+        <div className="text-primary">{icon}</div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium">{label}</p>
+          <p className="text-xs text-muted-foreground truncate">{sublabel ?? url}</p>
+        </div>
+        <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary shrink-0" />
+      </a>
+    );
+  }
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-dashed bg-muted/30 p-3">
+      <div className="text-muted-foreground/60">{icon}</div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-muted-foreground">{label}</p>
+        <p className="text-xs text-muted-foreground/70">Não encontrado — clique em Enriquecer</p>
+      </div>
     </div>
   );
 }
