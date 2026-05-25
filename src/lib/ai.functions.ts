@@ -292,7 +292,7 @@ export const enrichLead = createServerFn({ method: "POST" })
         ...args,
         firecrawl_used: !!process.env.FIRECRAWL_API_KEY,
         applied: { linkedin_url: newLinkedin, company_linkedin: newCompanyLinkedin, company_website: newCompanyWebsite, company_name_changed: companyChanged ? { from: lead.company_name, to: currentFromLi } : null },
-        linkedin_scrape_used: !!linkedinScrape,
+        linkedin_snippets_count: linkedinSnippetsForCurrentCompany.length,
       },
     });
     await supabase.from("integration_logs").insert({
