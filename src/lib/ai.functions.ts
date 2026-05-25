@@ -77,6 +77,26 @@ async function firecrawlSearch(query: string): Promise<SearchHit[]> {
   }
 }
 
+/** Scrape um perfil de LinkedIn e devolve texto/markdown bruto + descrição (subtítulo) para a IA extrair a empresa atual. */
+async function firecrawlScrapeLinkedIn(url: string): Promise<{ markdown: string; description?: string } | null> {
+  const key = process.env.FIRECRAWL_API_KEY;
+  if (!key) return null;
+  try {
+    const { default: Firecrawl } = await import("@mendable/firecrawl-js");
+    const fc = new Firecrawl({ apiKey: key });
+    const res = await fc.scrape(url, { formats: ["markdown"], onlyMainContent: true });
+    const r = res as { markdown?: string; metadata?: { description?: string; title?: string }; data?: { markdown?: string; metadata?: { description?: string } } };
+    const markdown = (r.markdown ?? r.data?.markdown ?? "").slice(0, 4000);
+    const description = r.metadata?.description ?? r.data?.metadata?.description;
+    console.log(`[firecrawl] scrape ${url} → md=${markdown.length} chars, desc=${description?.slice(0, 80) ?? "—"}`);
+    if (!markdown && !description) return null;
+    return { markdown, description };
+  } catch (e) {
+    console.error("[firecrawl] scrape linkedin falhou", e);
+    return null;
+  }
+}
+
 /** Enriquecimento via IA — gera resumo, segmento, dor provável a partir dos dados existentes. */
 export const enrichLead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
