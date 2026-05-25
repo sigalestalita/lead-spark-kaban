@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { getSettings, updateSetting, updateIcp } from "@/lib/settings.functions";
 import { testRdConnection, getRecentSyncLogs } from "@/lib/rd-station.functions";
+import { getRdAuthUrl, getRdConnectionStatus, disconnectRd } from "@/lib/rd-oauth.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,9 +24,23 @@ function SettingsPage() {
   const updIcpFn = useServerFn(updateIcp);
   const testFn = useServerFn(testRdConnection);
   const logsFn = useServerFn(getRecentSyncLogs);
+  const authUrlFn = useServerFn(getRdAuthUrl);
+  const statusFn = useServerFn(getRdConnectionStatus);
+  const disconnectFn = useServerFn(disconnectRd);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["settings"], queryFn: () => fetchFn() });
   const { data: logs } = useQuery({ queryKey: ["sync-logs"], queryFn: () => logsFn(), refetchInterval: 30000 });
+  const { data: rdStatus } = useQuery({ queryKey: ["rd-status"], queryFn: () => statusFn(), refetchInterval: 10000 });
+
+  const connect = useMutation({
+    mutationFn: async () => authUrlFn({ data: { origin: window.location.origin } }),
+    onSuccess: (r) => { window.location.href = r.url; },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro"),
+  });
+  const disconnect = useMutation({
+    mutationFn: () => disconnectFn(),
+    onSuccess: () => { toast.success("Desconectado"); qc.invalidateQueries({ queryKey: ["rd-status"] }); },
+  });
 
   const test = useMutation({
     mutationFn: () => testFn(),
@@ -66,13 +81,26 @@ function SettingsPage() {
       <Card className="p-5 space-y-3">
         <div className="flex justify-between items-center">
           <h2 className="font-semibold">RD Station CRM</h2>
-          <Badge variant={data.rdTokenConfigured ? "default" : "destructive"}>
-            {data.rdTokenConfigured ? "Token configurado" : "Token ausente"}
+          <Badge variant={rdStatus?.connected ? "default" : "destructive"}>
+            {rdStatus?.connected ? "Conectado" : "Não conectado"}
           </Badge>
         </div>
-        <p className="text-xs text-muted-foreground">
-          O token é guardado em secrets (RD_STATION_TOKEN). Para alterar, peça ao admin para atualizar nas Configurações de Secrets do projeto.
-        </p>
+        <div className="flex items-center gap-2">
+          {rdStatus?.connected ? (
+            <>
+              <p className="text-xs text-muted-foreground flex-1">
+                Conectado em {rdStatus.connectedAt ? new Date(rdStatus.connectedAt).toLocaleString("pt-BR") : "—"}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => disconnect.mutate()} disabled={disconnect.isPending}>
+                Desconectar
+              </Button>
+            </>
+          ) : (
+            <Button onClick={() => connect.mutate()} disabled={connect.isPending}>
+              Conectar ao RD Station
+            </Button>
+          )}
+        </div>
         <div>
           <label className="text-xs text-muted-foreground">Nome do funil</label>
           <div className="flex gap-2 mt-1">
