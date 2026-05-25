@@ -1,70 +1,78 @@
-## O que vai mudar na sincronização com o RD Station
+## Plano: OAuth2 com RD Station CRM
 
-Três melhorias na sync, mantendo o botão manual atual e somando filtro de data, automação por cron e importação do histórico de atividades/notas.
+### URL de callback (cole no formulário do App agora)
 
----
+```
+https://project--773e2ce3-3b97-4224-ac14-c22657fc102a.lovable.app/api/public/rd/callback
+https://project--773e2ce3-3b97-4224-ac14-c22657fc102a-dev.lovable.app/api/public/rd/callback
+```
 
-### 1. Filtro de data (configurável)
-
-Adicionar nas **Configurações → RD Station** dois campos:
-- **"Janela inicial (dias)"** — quantos dias para trás puxar na primeira sync (default: 90)
-- **"Janela incremental (minutos)"** — quanto tempo para trás varrer em cada sync automática (default: 15)
-
-O filtro é aplicado via parâmetros `start_date` / `end_date` do endpoint `/deals` do RD (data de criação do deal). Se o RD ignorar o filtro para algum deal, o upsert por `rd_deal_id` evita duplicidade.
-
-Também guardo `last_sync_at` em `app_settings` para a sync incremental saber de onde retomar.
+Uma por linha. A primeira é a URL estável de produção, a segunda serve previews. Salve o App no RD — ele vai gerar **Client ID** e **Client Secret**, que vou pedir como secrets logo abaixo.
 
 ---
 
-### 2. Importar atividades e notas do RD
+### O que muda na integração
 
-Para cada deal sincronizado, fazer duas chamadas extras:
-- `GET /deals/:id/activities` — atividades (ligações, emails, reuniões)
-- `GET /deals/:id/notes` — notas internas
+Hoje o sistema usa um token estático em `?token=XXX`. O OAuth2 do RD CRM funciona diferente:
 
-Cada item vira um registro em `lead_interactions`:
-- `type`: `rd_activity` ou `rd_note`
-- `content`: texto da atividade/nota
-- `metadata`: payload original (tipo da atividade, autor RD, data)
-- `created_at`: data original do RD
-
-Dedup por uma chave composta (`lead_id` + `rd_activity_id` salvo em `metadata`) para não duplicar a cada nova sync.
-
-No card detalhado do lead (`/lead/$id`), a timeline já existente passa a mostrar atividades RD intercaladas com notas internas, ordenadas por data.
-
-**Importante:** isso multiplica o número de chamadas ao RD (1 deal = 3 requests). Vou aplicar throttle simples (50ms entre chamadas) e cap por sync. Tornar a importação de atividades/notas **opcional via toggle** nas Configurações para casos em que o usuário só queira deals.
+1. Usuário clica "Conectar RD" → redireciona para `https://api.rdstation.com.br/auth/dialog?client_id=...&redirect_uri=.../api/public/rd/callback`
+2. Usuário autoriza → RD redireciona de volta com `?code=XXX`
+3. Nosso callback troca o `code` por `access_token` (válido 24h) + `refresh_token` (perene)
+4. Guardamos os dois no banco
+5. Em toda chamada à API, mandamos `Authorization: Bearer <access_token>`
+6. Quando der 401, refrescamos automaticamente usando o `refresh_token`
 
 ---
 
-### 3. Sync automática (cron a cada 15 min)
+### Mudanças no banco
 
-- Criar endpoint público `POST /api/public/hooks/sync-rd` que roda a mesma lógica do `syncRdLeads`, autenticado via header `apikey` (anon key) — o prefixo `/api/public/*` já bypassa auth do site publicado.
-- Habilitar extensões `pg_cron` + `pg_net` e agendar job rodando a cada 15 min apontando para esse endpoint.
-- Cada execução grava em `integration_logs` (já existe a tabela) com `fetched/created/updated` e duração — visível em uma nova aba **"Logs"** nas Configurações.
-- Botão **"Sincronizar agora"** continua existindo no Kanban (sync manual completo, ignora janela incremental).
+Nova tabela `rd_oauth_tokens` (single-row, gerenciada pelo admin):
+- `access_token` (text)
+- `refresh_token` (text)
+- `expires_at` (timestamptz)
+- `connected_by` (uuid, quem autorizou)
+- `connected_at`, `updated_at`
 
----
-
-### Mudanças por arquivo
-
-**Banco (migration):**
-- `app_settings`: novas chaves `rd_sync_window_days` (90), `rd_sync_incremental_minutes` (15), `rd_import_activities` (true), `rd_last_sync_at`
-- Habilitar `pg_cron` e `pg_net`
-- Job cron `sync-rd-incremental` a cada 15 min
-
-**Código:**
-- `src/lib/rd-station.functions.ts` — adicionar `start_date/end_date` no fetch, importar activities/notes, escrever `rd_last_sync_at`, novo modo `incremental` vs `full`
-- `src/routes/api/public/hooks/sync-rd.ts` — novo endpoint chamado pelo cron
-- `src/routes/_app.configuracoes.tsx` — novos campos (janela, toggle activities) + aba de logs de sync
-- `src/routes/_app.lead.$id.tsx` — timeline passa a renderizar `lead_interactions` do tipo `rd_activity`/`rd_note`
+RLS: leitura apenas para `authenticated`, escrita apenas via server functions (com `supabaseAdmin`).
 
 ---
 
-### Como vai se comportar na prática
+### Arquivos novos / alterados
 
-- **Primeira sync (manual, agora):** traz tudo dos últimos 90 dias do funil "Leads - Empresas" + atividades/notas de cada deal
-- **A partir daí:** cron a cada 15 min puxa só o que mudou nos últimos 15 min
-- **Forçar refresh total:** botão "Sincronizar agora" no Kanban
-- **Histórico do RD:** aparece automaticamente na timeline do lead, junto com notas que o SDR adicionar no sistema
+**Novos:**
+- `src/routes/api/public/rd/callback.ts` — server route que recebe o `code`, troca por tokens e salva no banco, depois redireciona para `/configuracoes?rd=connected`
+- `src/lib/rd-oauth.server.ts` — helpers: `getValidAccessToken()` (lê do banco, refresca se expirado), `exchangeCode()`, `refreshToken()`
+- `src/lib/rd-oauth.functions.ts` — server fn `getRdConnectionStatus()` e `disconnectRd()`
 
-Vou pedir aprovação antes de rodar a migration e começar a implementação.
+**Alterados:**
+- `src/lib/rd-station.functions.ts` — todas as chamadas passam a usar `Bearer` e `getValidAccessToken()`; endpoints do CRM continuam os mesmos (`/api/v1/deals`, `/deals/:id/activities`, `/deals/:id/notes`); remove o uso de `RD_STATION_TOKEN`
+- `src/routes/_app.configuracoes.tsx` — substitui o campo "Token RD" pelo botão **"Conectar ao RD Station"** que abre o popup OAuth + estado "Conectado como X / Desconectar"
+
+**Secrets a adicionar:**
+- `RD_CLIENT_ID`
+- `RD_CLIENT_SECRET`
+
+(O `RD_STATION_TOKEN` antigo pode ser removido depois que a nova conexão estiver funcionando.)
+
+---
+
+### Detalhes técnicos
+
+- **Endpoints OAuth do RD CRM**:
+  - Authorize: `https://api.rdstation.com.br/auth/dialog?client_id=<id>&redirect_uri=<callback>`
+  - Token exchange / refresh: `POST https://api.rdstation.com.br/auth/token` (body `{client_id, client_secret, code}` ou `{client_id, client_secret, refresh_token}`)
+- **Chamadas API**: header `Authorization: Bearer <access_token>` em vez de `?token=`
+- **Refresh automático**: `getValidAccessToken()` checa `expires_at`. Se faltar < 5 min, chama refresh antes de devolver. Em caso de 401 da API, força refresh + 1 retry.
+- **Segurança do callback**: o endpoint `/api/public/rd/callback` é público (precisa ser, o RD chama sem auth), mas valida `state` (gerado quando o usuário inicia o fluxo, guardado em cookie httpOnly) para evitar CSRF.
+
+---
+
+### Como vai ficar para o usuário
+
+1. Vai em **Configurações → RD Station**
+2. Clica em **"Conectar ao RD Station"**
+3. Faz login no RD e autoriza o app "LEADS SDR"
+4. Volta pro sistema com mensagem "Conectado ✓"
+5. A partir daí, sync manual + cron a cada 15 min funcionam normalmente, sem token estático
+
+Posso prosseguir?

@@ -314,6 +314,36 @@ export type Database = {
         }
         Relationships: []
       }
+      rd_oauth_tokens: {
+        Row: {
+          access_token: string
+          connected_at: string
+          connected_by: string | null
+          expires_at: string
+          id: boolean
+          refresh_token: string
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          connected_at?: string
+          connected_by?: string | null
+          expires_at: string
+          id?: boolean
+          refresh_token: string
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          connected_at?: string
+          connected_by?: string | null
+          expires_at?: string
+          id?: boolean
+          refresh_token?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       stages: {
         Row: {
           color: string
