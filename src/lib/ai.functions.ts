@@ -67,8 +67,10 @@ async function firecrawlSearch(query: string): Promise<SearchHit[]> {
   try {
     const { default: Firecrawl } = await import("@mendable/firecrawl-js");
     const fc = new Firecrawl({ apiKey: key });
-    const res = await fc.search(query, { limit: 5 });
-    return normalizeFirecrawlResults(res);
+    const res = await fc.search(query, { limit: 5, lang: "pt", country: "br" });
+    const hits = normalizeFirecrawlResults(res);
+    console.log(`[firecrawl] "${query}" → ${hits.length} hits`, hits.map((h) => h.url));
+    return hits;
   } catch (e) {
     console.error("[firecrawl] busca falhou", e);
     return [];
@@ -92,10 +94,10 @@ export const enrichLead = createServerFn({ method: "POST" })
         ? firecrawlSearch(`${person} ${company} site:linkedin.com/in`)
         : Promise.resolve([] as SearchHit[]),
       company
-        ? firecrawlSearch(`${company} site:linkedin.com/company`)
+        ? firecrawlSearch(`"${company}" linkedin empresa`)
         : Promise.resolve([] as SearchHit[]),
       company
-        ? firecrawlSearch(`${company} site oficial -site:linkedin.com -site:facebook.com`)
+        ? firecrawlSearch(`"${company}" -site:linkedin.com -site:facebook.com -site:instagram.com`)
         : Promise.resolve([] as SearchHit[]),
     ]);
 
