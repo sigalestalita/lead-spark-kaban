@@ -155,6 +155,15 @@ function LeadDetailPage() {
           <Field label="Segmento" value={lead.company_segment} onSave={(v) => update.mutate({ company_segment: v })} />
           <Field label="Tamanho" value={lead.company_size} onSave={(v) => update.mutate({ company_size: v })} />
           <Field label="Localização" value={lead.company_location} onSave={(v) => update.mutate({ company_location: v })} />
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Análise da empresa (IA)</p>
+            <Textarea
+              value={lead.company_summary ?? ""}
+              onChange={(e) => update.mutate({ company_summary: e.target.value })}
+              rows={4}
+              placeholder="Clique em Enriquecer com IA para gerar a análise."
+            />
+          </div>
         </Card>
       </div>
 
@@ -175,7 +184,7 @@ function LeadDetailPage() {
 
       <Card className="p-5 space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold">Enriquecimento & abordagem</h2>
+          <h2 className="font-semibold">Abordagem</h2>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={() => enrich.mutate()} disabled={enrich.isPending}>
               <Wand2 className="h-4 w-4 mr-1" />{enrich.isPending ? "Enriquecendo…" : "Enriquecer com IA"}
@@ -183,16 +192,6 @@ function LeadDetailPage() {
             <Button size="sm" onClick={() => suggest.mutate()} disabled={suggest.isPending}>
               <Sparkles className="h-4 w-4 mr-1" />{suggest.isPending ? "Gerando…" : "Sugerir mensagem"}
             </Button>
-          </div>
-        </div>
-        <div className="grid sm:grid-cols-2 gap-3">
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Resumo da empresa</p>
-            <Textarea value={lead.company_summary ?? ""} onChange={(e) => update.mutate({ company_summary: e.target.value })} rows={3} />
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Dor provável</p>
-            <Textarea value={lead.probable_pain ?? ""} onChange={(e) => update.mutate({ probable_pain: e.target.value })} rows={3} />
           </div>
         </div>
         {suggestion && (
