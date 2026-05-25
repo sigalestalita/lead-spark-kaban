@@ -254,6 +254,35 @@ function Field({ label, value, onSave }: { label: string; value: string | null; 
   );
 }
 
+function QuickLink({ icon, label, sublabel, url }: { icon: React.ReactNode; label: string; sublabel: string | null; url: string | null }) {
+  if (url) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-center gap-3 rounded-lg border bg-background p-3 hover:border-primary hover:bg-primary/5 transition-colors group"
+      >
+        <div className="text-primary">{icon}</div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium">{label}</p>
+          <p className="text-xs text-muted-foreground truncate">{sublabel ?? url}</p>
+        </div>
+        <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary shrink-0" />
+      </a>
+    );
+  }
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-dashed bg-muted/30 p-3">
+      <div className="text-muted-foreground/60">{icon}</div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-muted-foreground">{label}</p>
+        <p className="text-xs text-muted-foreground/70">Não encontrado — clique em Enriquecer</p>
+      </div>
+    </div>
+  );
+}
+
 function Info({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
