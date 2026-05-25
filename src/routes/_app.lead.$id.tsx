@@ -192,7 +192,7 @@ function LeadDetailPage() {
             {data.interactions.map((i) => (
               <div key={i.id} className="text-sm border-b pb-2 last:border-0">
                 <div className="flex justify-between">
-                  <span className="text-xs font-semibold text-primary">{i.type}</span>
+                  <span className="text-xs font-semibold text-primary">{labelForInteraction(i.type)}</span>
                   <span className="text-[10px] text-muted-foreground">{new Date(i.created_at).toLocaleString("pt-BR")}</span>
                 </div>
                 {i.content && <p className="text-xs mt-1 whitespace-pre-wrap">{i.content}</p>}
@@ -232,4 +232,15 @@ function Info({ label, value }: { label: string; value: string | null }) {
       <p>{value ?? "—"}</p>
     </div>
   );
+}
+
+function labelForInteraction(type: string) {
+  switch (type) {
+    case "rd_activity": return "Atividade RD";
+    case "rd_note": return "Nota RD";
+    case "whatsapp": return "WhatsApp";
+    case "email": return "Email";
+    case "call": return "Ligação";
+    default: return type;
+  }
 }

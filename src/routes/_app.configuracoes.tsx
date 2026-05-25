@@ -3,12 +3,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { getSettings, updateSetting, updateIcp } from "@/lib/settings.functions";
-import { testRdConnection } from "@/lib/rd-station.functions";
+import { testRdConnection, getRecentSyncLogs } from "@/lib/rd-station.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/configuracoes")({
@@ -21,8 +22,10 @@ function SettingsPage() {
   const updFn = useServerFn(updateSetting);
   const updIcpFn = useServerFn(updateIcp);
   const testFn = useServerFn(testRdConnection);
+  const logsFn = useServerFn(getRecentSyncLogs);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["settings"], queryFn: () => fetchFn() });
+  const { data: logs } = useQuery({ queryKey: ["sync-logs"], queryFn: () => logsFn(), refetchInterval: 30000 });
 
   const test = useMutation({
     mutationFn: () => testFn(),
@@ -48,6 +51,10 @@ function SettingsPage() {
   const tplText = (tplSetting?.value as { text?: string } | null)?.text ?? "";
   const slaSetting = data.settings.find((s) => s.key === "sla");
   const sla = (slaSetting?.value as { first_approach_minutes?: number; stalled_days?: number } | null) ?? { first_approach_minutes: 60, stalled_days: 3 };
+  const windowDays = (data.settings.find((s) => s.key === "rd_sync_window_days")?.value as { days?: number } | null)?.days ?? 90;
+  const incMinutes = (data.settings.find((s) => s.key === "rd_sync_incremental_minutes")?.value as { minutes?: number } | null)?.minutes ?? 15;
+  const importAct = (data.settings.find((s) => s.key === "rd_import_activities")?.value as { enabled?: boolean } | null)?.enabled !== false;
+  const lastSync = (data.settings.find((s) => s.key === "rd_last_sync_at")?.value as { value?: string } | null)?.value ?? null;
 
   const rules = (data.icp?.rules ?? {}) as Record<string, unknown>;
   const thresholds = (data.icp?.thresholds ?? { high: 70, medium: 40, low: 15 }) as { high: number; medium: number; low: number };
@@ -79,6 +86,50 @@ function SettingsPage() {
               Testar conexão
             </Button>
           </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-muted-foreground">Janela inicial (dias) — sync manual</label>
+            <Input type="number" defaultValue={windowDays} onBlur={(e) => { const v = Number(e.target.value); if (v !== windowDays) save.mutate({ key: "rd_sync_window_days", value: { days: v } }); }} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Janela incremental (minutos) — cron a cada 15min</label>
+            <Input type="number" defaultValue={incMinutes} onBlur={(e) => { const v = Number(e.target.value); if (v !== incMinutes) save.mutate({ key: "rd_sync_incremental_minutes", value: { minutes: v } }); }} />
+          </div>
+        </div>
+        <div className="flex items-center justify-between pt-2 border-t">
+          <div>
+            <p className="text-sm font-medium">Importar atividades e notas do RD</p>
+            <p className="text-xs text-muted-foreground">Traz histórico de interações para a timeline do lead</p>
+          </div>
+          <Switch checked={importAct} onCheckedChange={(v) => save.mutate({ key: "rd_import_activities", value: { enabled: v } })} />
+        </div>
+        <div className="text-xs text-muted-foreground pt-2 border-t">
+          Última sincronização: {lastSync ? new Date(lastSync).toLocaleString("pt-BR") : "nunca"} · Cron automático rodando a cada 15 min
+        </div>
+      </Card>
+
+      <Card className="p-5 space-y-2">
+        <h2 className="font-semibold">Logs de sincronização</h2>
+        <div className="text-xs space-y-1 max-h-64 overflow-auto">
+          {(logs?.logs ?? []).map((l) => {
+            const d = (l.detail ?? {}) as { fetched?: number; created?: number; updated?: number; interactions?: number; error?: string };
+            return (
+              <div key={l.id} className="flex items-center justify-between border-b pb-1">
+                <div className="flex items-center gap-2">
+                  <Badge variant={l.status === "ok" ? "default" : "destructive"} className="text-[10px]">{l.status}</Badge>
+                  <span className="font-mono text-[11px]">{l.action}</span>
+                  {l.status === "ok" ? (
+                    <span className="text-muted-foreground">{d.fetched ?? 0} deals · +{d.created ?? 0} novos · ~{d.updated ?? 0} atualizados · {d.interactions ?? 0} interações</span>
+                  ) : (
+                    <span className="text-destructive truncate max-w-md">{d.error}</span>
+                  )}
+                </div>
+                <span className="text-muted-foreground">{new Date(l.created_at).toLocaleString("pt-BR")}</span>
+              </div>
+            );
+          })}
+          {(logs?.logs ?? []).length === 0 && <p className="text-muted-foreground">Nenhuma sincronização ainda.</p>}
         </div>
       </Card>
 
