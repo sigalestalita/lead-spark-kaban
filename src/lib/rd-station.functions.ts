@@ -1,8 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { calculateScore, type IcpRules, type IcpThresholds } from "./icp-score";
 
 const RD_BASE = "https://crm.rdstation.com/api/v1";
+
+async function getRdToken(): Promise<string | null> {
+  const { data } = await supabaseAdmin
+    .from("rd_oauth_tokens")
+    .select("access_token")
+    .eq("id", true)
+    .maybeSingle();
+  if (data?.access_token) return data.access_token;
+  return process.env.RD_STATION_TOKEN ?? null;
+}
 
 interface RdDeal {
   _id?: string;
@@ -98,9 +109,9 @@ export type SyncMode = "full" | "incremental";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function runRdSync(supabase: any, mode: SyncMode) {
-  const token = process.env.RD_STATION_TOKEN;
+  const token = await getRdToken();
   if (!token) {
-    throw new Error("RD_STATION_TOKEN não configurado.");
+    throw new Error("RD Station não conectado. Conecte em Configurações.");
   }
 
   // load settings
@@ -303,8 +314,8 @@ export const syncRdLeads = createServerFn({ method: "POST" })
 export const testRdConnection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
-    const token = process.env.RD_STATION_TOKEN;
-    if (!token) return { ok: false, message: "Token não configurado" };
+    const token = await getRdToken();
+    if (!token) return { ok: false, message: "RD Station não conectado" };
     const res = await fetch(
       `${RD_BASE}/deal_pipelines?token=${encodeURIComponent(token)}`
     );
