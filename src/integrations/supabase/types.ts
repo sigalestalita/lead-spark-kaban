@@ -14,7 +14,333 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
+      icp_config: {
+        Row: {
+          id: string
+          is_active: boolean
+          name: string
+          rules: Json
+          thresholds: Json
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          is_active?: boolean
+          name?: string
+          rules?: Json
+          thresholds?: Json
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          is_active?: boolean
+          name?: string
+          rules?: Json
+          thresholds?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      integration_logs: {
+        Row: {
+          action: string
+          created_at: string
+          detail: Json | null
+          id: string
+          provider: string
+          status: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          detail?: Json | null
+          id?: string
+          provider: string
+          status: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          detail?: Json | null
+          id?: string
+          provider?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      lead_interactions: {
+        Row: {
+          author_id: string | null
+          content: string | null
+          created_at: string
+          id: string
+          lead_id: string
+          metadata: Json | null
+          type: string
+        }
+        Insert: {
+          author_id?: string | null
+          content?: string | null
+          created_at?: string
+          id?: string
+          lead_id: string
+          metadata?: Json | null
+          type: string
+        }
+        Update: {
+          author_id?: string | null
+          content?: string | null
+          created_at?: string
+          id?: string
+          lead_id?: string
+          metadata?: Json | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_interactions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_notes: {
+        Row: {
+          author_id: string | null
+          content: string
+          created_at: string
+          id: string
+          lead_id: string
+        }
+        Insert: {
+          author_id?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          lead_id: string
+        }
+        Update: {
+          author_id?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          lead_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_notes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          ad_name: string | null
+          approach_result: string | null
+          assigned_to: string | null
+          campaign: string | null
+          channel: string | null
+          company_description: string | null
+          company_linkedin: string | null
+          company_location: string | null
+          company_name: string | null
+          company_segment: string | null
+          company_size: string | null
+          company_summary: string | null
+          company_website: string | null
+          converted_at: string | null
+          created_at: string
+          email: string | null
+          enriched_at: string | null
+          enrichment_status: Database["public"]["Enums"]["enrichment_status"]
+          first_approach_at: string | null
+          form_name: string | null
+          form_payload: Json | null
+          icp_signals: Json | null
+          id: string
+          last_action_at: string | null
+          linkedin_url: string | null
+          name: string
+          next_action: string | null
+          phone: string | null
+          position: string | null
+          priority: Database["public"]["Enums"]["lead_priority"]
+          probable_pain: string | null
+          rd_deal_id: string | null
+          rd_owner: string | null
+          rd_status: string | null
+          score: number
+          source: string | null
+          stage_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          ad_name?: string | null
+          approach_result?: string | null
+          assigned_to?: string | null
+          campaign?: string | null
+          channel?: string | null
+          company_description?: string | null
+          company_linkedin?: string | null
+          company_location?: string | null
+          company_name?: string | null
+          company_segment?: string | null
+          company_size?: string | null
+          company_summary?: string | null
+          company_website?: string | null
+          converted_at?: string | null
+          created_at?: string
+          email?: string | null
+          enriched_at?: string | null
+          enrichment_status?: Database["public"]["Enums"]["enrichment_status"]
+          first_approach_at?: string | null
+          form_name?: string | null
+          form_payload?: Json | null
+          icp_signals?: Json | null
+          id?: string
+          last_action_at?: string | null
+          linkedin_url?: string | null
+          name: string
+          next_action?: string | null
+          phone?: string | null
+          position?: string | null
+          priority?: Database["public"]["Enums"]["lead_priority"]
+          probable_pain?: string | null
+          rd_deal_id?: string | null
+          rd_owner?: string | null
+          rd_status?: string | null
+          score?: number
+          source?: string | null
+          stage_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ad_name?: string | null
+          approach_result?: string | null
+          assigned_to?: string | null
+          campaign?: string | null
+          channel?: string | null
+          company_description?: string | null
+          company_linkedin?: string | null
+          company_location?: string | null
+          company_name?: string | null
+          company_segment?: string | null
+          company_size?: string | null
+          company_summary?: string | null
+          company_website?: string | null
+          converted_at?: string | null
+          created_at?: string
+          email?: string | null
+          enriched_at?: string | null
+          enrichment_status?: Database["public"]["Enums"]["enrichment_status"]
+          first_approach_at?: string | null
+          form_name?: string | null
+          form_payload?: Json | null
+          icp_signals?: Json | null
+          id?: string
+          last_action_at?: string | null
+          linkedin_url?: string | null
+          name?: string
+          next_action?: string | null
+          phone?: string | null
+          position?: string | null
+          priority?: Database["public"]["Enums"]["lead_priority"]
+          probable_pain?: string | null
+          rd_deal_id?: string | null
+          rd_owner?: string | null
+          rd_status?: string | null
+          score?: number
+          source?: string | null
+          stage_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      stages: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          is_terminal: boolean
+          name: string
+          position: number
+          slug: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          is_terminal?: boolean
+          name: string
+          position: number
+          slug: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          is_terminal?: boolean
+          name?: string
+          position?: number
+          slug?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +349,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      enrichment_status: "pending" | "found" | "not_found" | "manual"
+      lead_priority: "alta" | "media" | "baixa" | "fora_icp" | "pendente"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +477,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      enrichment_status: ["pending", "found", "not_found", "manual"],
+      lead_priority: ["alta", "media", "baixa", "fora_icp", "pendente"],
+    },
   },
 } as const
