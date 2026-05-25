@@ -77,7 +77,7 @@ export const moveLeadStage = createServerFn({ method: "POST" })
       patch.first_approach_at = new Date().toISOString();
     }
 
-    const { error } = await supabase.from("leads").update(patch).eq("id", data.leadId);
+    const { error } = await supabase.from("leads").update(patch as never).eq("id", data.leadId);
     if (error) throw new Error(error.message);
 
     await supabase.from("lead_interactions").insert({
@@ -128,7 +128,7 @@ export const updateLead = createServerFn({ method: "POST" })
     }
     allowed.last_action_at = new Date().toISOString();
 
-    const { error } = await supabase.from("leads").update(allowed).eq("id", data.id);
+    const { error } = await supabase.from("leads").update(allowed as never).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -162,12 +162,12 @@ export const recalcLeadScore = createServerFn({ method: "POST" })
       .eq("is_active", true)
       .limit(1)
       .maybeSingle();
-    const rules = (icp?.rules ?? {}) as IcpRules;
-    const thresholds = (icp?.thresholds ?? { high: 70, medium: 40, low: 15 }) as IcpThresholds;
+    const rules = (icp?.rules ?? {}) as unknown as IcpRules;
+    const thresholds = (icp?.thresholds ?? { high: 70, medium: 40, low: 15 }) as unknown as IcpThresholds;
     const { score, priority, signals } = calculateScore(lead, rules, thresholds);
     await supabase
       .from("leads")
-      .update({ score, priority, icp_signals: signals })
+      .update({ score, priority, icp_signals: signals as never })
       .eq("id", data.id);
     return { score, priority };
   });

@@ -79,8 +79,8 @@ export const syncRdLeads = createServerFn({ method: "POST" })
       .eq("is_active", true)
       .limit(1)
       .maybeSingle();
-    const rules = (icp?.rules ?? {}) as IcpRules;
-    const thresholds = (icp?.thresholds ?? { high: 70, medium: 40, low: 15 }) as IcpThresholds;
+    const rules = (icp?.rules ?? {}) as unknown as IcpRules;
+    const thresholds = (icp?.thresholds ?? { high: 70, medium: 40, low: 15 }) as unknown as IcpThresholds;
 
     const { data: stages } = await supabase.from("stages").select("id, slug");
     const newStageId = stages?.find((s) => s.slug === "novo")?.id;
@@ -138,7 +138,7 @@ export const syncRdLeads = createServerFn({ method: "POST" })
       if (existing) {
         await supabase
           .from("leads")
-          .update({ ...candidate, score, priority, icp_signals: signals })
+          .update({ ...candidate, score, priority, icp_signals: signals as never })
           .eq("id", existing.id);
         updated++;
       } else {
@@ -155,7 +155,7 @@ export const syncRdLeads = createServerFn({ method: "POST" })
         if (existingByEmail) {
           await supabase
             .from("leads")
-            .update({ ...candidate, score, priority, icp_signals: signals })
+            .update({ ...candidate, score, priority, icp_signals: signals as never })
             .eq("id", existingByEmail.id);
           updated++;
         } else {
@@ -164,7 +164,7 @@ export const syncRdLeads = createServerFn({ method: "POST" })
             stage_id: newStageId ?? null,
             score,
             priority,
-            icp_signals: signals,
+            icp_signals: signals as never,
             last_action_at: new Date().toISOString(),
           });
           created++;
