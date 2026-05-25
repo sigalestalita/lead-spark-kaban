@@ -131,7 +131,6 @@ export const enrichLead = createServerFn({ method: "POST" })
             company_summary: { type: "string", description: "Resumo de 1-2 frases sobre a empresa" },
             company_segment: { type: "string", description: "Segmento estimado (ex.: SaaS B2B, Indústria, Educação)" },
             company_size: { type: "string", enum: ["1-10", "11-50", "51-200", "201-500", "500+", "desconhecido"] },
-            probable_pain: { type: "string", description: "Dor provável que justifica a busca por SDR/comercial" },
             confidence: { type: "string", enum: ["alta", "media", "baixa"] },
             linkedin_url: {
               type: ["string", "null"],
@@ -165,7 +164,6 @@ export const enrichLead = createServerFn({ method: "POST" })
             "company_summary",
             "company_segment",
             "company_size",
-            "probable_pain",
             "confidence",
             "linkedin_url",
             "company_linkedin",
@@ -262,7 +260,6 @@ export const enrichLead = createServerFn({ method: "POST" })
       company_summary: args.company_summary,
       company_segment: lead.company_segment || args.company_segment,
       company_size: lead.company_size || (args.company_size !== "desconhecido" ? args.company_size : lead.company_size),
-      probable_pain: args.probable_pain,
       ...(newLinkedin ? { linkedin_url: newLinkedin } : {}),
       ...(newCompanyLinkedin ? { company_linkedin: newCompanyLinkedin } : {}),
       ...(newCompanyWebsite ? { company_website: newCompanyWebsite } : {}),
