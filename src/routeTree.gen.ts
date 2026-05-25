@@ -16,6 +16,7 @@ import { Route as AppKanbanRouteImport } from './routes/_app.kanban'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppLeadIdRouteImport } from './routes/_app.lead.$id'
+import { Route as ApiPublicRdCallbackRouteImport } from './routes/api/public/rd/callback'
 import { Route as ApiPublicHooksSyncRdRouteImport } from './routes/api/public/hooks/sync-rd'
 
 const LoginRoute = LoginRouteImport.update({
@@ -52,6 +53,11 @@ const AppLeadIdRoute = AppLeadIdRouteImport.update({
   path: '/lead/$id',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiPublicRdCallbackRoute = ApiPublicRdCallbackRouteImport.update({
+  id: '/api/public/rd/callback',
+  path: '/api/public/rd/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksSyncRdRoute = ApiPublicHooksSyncRdRouteImport.update({
   id: '/api/public/hooks/sync-rd',
   path: '/api/public/hooks/sync-rd',
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/kanban': typeof AppKanbanRoute
   '/lead/$id': typeof AppLeadIdRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
+  '/api/public/rd/callback': typeof ApiPublicRdCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/kanban': typeof AppKanbanRoute
   '/lead/$id': typeof AppLeadIdRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
+  '/api/public/rd/callback': typeof ApiPublicRdCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/_app/kanban': typeof AppKanbanRoute
   '/_app/lead/$id': typeof AppLeadIdRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
+  '/api/public/rd/callback': typeof ApiPublicRdCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | '/kanban'
     | '/lead/$id'
     | '/api/public/hooks/sync-rd'
+    | '/api/public/rd/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
     | '/kanban'
     | '/lead/$id'
     | '/api/public/hooks/sync-rd'
+    | '/api/public/rd/callback'
   id:
     | '__root__'
     | '/'
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/_app/kanban'
     | '/_app/lead/$id'
     | '/api/public/hooks/sync-rd'
+    | '/api/public/rd/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -123,6 +135,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   ApiPublicHooksSyncRdRoute: typeof ApiPublicHooksSyncRdRoute
+  ApiPublicRdCallbackRoute: typeof ApiPublicRdCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -176,6 +189,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppLeadIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/public/rd/callback': {
+      id: '/api/public/rd/callback'
+      path: '/api/public/rd/callback'
+      fullPath: '/api/public/rd/callback'
+      preLoaderRoute: typeof ApiPublicRdCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/sync-rd': {
       id: '/api/public/hooks/sync-rd'
       path: '/api/public/hooks/sync-rd'
@@ -207,7 +227,18 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   ApiPublicHooksSyncRdRoute: ApiPublicHooksSyncRdRoute,
+  ApiPublicRdCallbackRoute: ApiPublicRdCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
