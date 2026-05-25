@@ -1,108 +1,70 @@
+## O que vai mudar na sincronização com o RD Station
 
-# Sistema de Qualificação de Leads Inbound — Kanban SDR (MVP)
+Três melhorias na sync, mantendo o botão manual atual e somando filtro de data, automação por cron e importação do histórico de atividades/notas.
 
-## Resumo
-Plataforma web interna integrada ao RD Station CRM (funil "Leads - Empresas") que organiza leads inbound em um Kanban, abre cards enriquecidos com contexto de conversão, calcula prioridade por ICP e gera sugestão de mensagem para WhatsApp via Lovable AI. Login simples por email/senha (sem roles ainda).
+---
 
-## O que será entregue neste MVP
+### 1. Filtro de data (configurável)
 
-### 1. Autenticação
-- Email/senha via Lovable Cloud
-- Rota `/login` pública e rotas protegidas para o resto do app
-- Trigger para criar registro em `profiles` no signup
+Adicionar nas **Configurações → RD Station** dois campos:
+- **"Janela inicial (dias)"** — quantos dias para trás puxar na primeira sync (default: 90)
+- **"Janela incremental (minutos)"** — quanto tempo para trás varrer em cada sync automática (default: 15)
 
-### 2. Banco de dados (Lovable Cloud / Supabase)
-Tabelas com RLS habilitado:
-- `profiles` — usuário (id, nome, email)
-- `leads` — dados do lead + empresa + contexto de conversão + score + status + assignee + timestamps; índice único para evitar duplicidade por email/telefone
-- `lead_interactions` — histórico (tipo, conteúdo, autor, data)
-- `lead_notes` — observações internas
-- `stages` — etapas do Kanban configuráveis (ordem, nome, cor)
-- `icp_config` — critérios e pesos do score (JSON)
-- `integration_logs` — log de chamadas RD e enriquecimento
-- `app_settings` — token RD, SLA, templates de mensagem
-- Seed das 10 etapas iniciais + ICP padrão
+O filtro é aplicado via parâmetros `start_date` / `end_date` do endpoint `/deals` do RD (data de criação do deal). Se o RD ignorar o filtro para algum deal, o upsert por `rd_deal_id` evita duplicidade.
 
-### 3. Integração RD Station CRM
-- Secret `RD_STATION_TOKEN` (token de API pessoal — pedirei via add_secret quando entrarmos em build)
-- Server function `syncRdLeads`: busca deals do funil "Leads - Empresas", normaliza para a tabela `leads`, evita duplicados (upsert por rd_deal_id + email)
-- Server function `updateRdDealStage`: ao mover card no Kanban, tenta refletir mudança no RD
-- Botão "Sincronizar agora" + cron (a configurar depois)
+Também guardo `last_sync_at` em `app_settings` para a sync incremental saber de onde retomar.
 
-### 4. Kanban
-- View principal `/kanban` com colunas dinâmicas vindas de `stages`
-- Drag-and-drop entre colunas (@dnd-kit) atualiza status no banco e dispara `updateRdDealStage`
-- Card mostra: nome, empresa, badge de prioridade (cor), origem/campanha, tempo na etapa, avatar do responsável
+---
 
-### 5. Card detalhado do lead (modal ou rota `/lead/$id`)
-- Bloco dados pessoais / empresa / conversão (campanha, anúncio, formulário, data)
-- Histórico de interações
-- Botões: WhatsApp (`https://wa.me/...`), LinkedIn pessoa, LinkedIn empresa, site
-- Campo de observações internas (autosave)
-- Campo "resultado da abordagem"
-- Botão "Enriquecer lead" (ver item 6)
-- Botão "Gerar sugestão de mensagem" (ver item 7)
+### 2. Importar atividades e notas do RD
 
-### 6. Enriquecimento (estrutura + manual + IA leve)
-- Campos no `leads`: website, descrição, segmento, tamanho, localização, linkedin pessoa, linkedin empresa, resumo, dor provável, sinais ICP, `enrichment_status` ('pending' | 'found' | 'not_found' | 'manual')
-- Server function `enrichLead` usa Lovable AI (Gemini) para gerar resumo/segmento/dor provável a partir do que já temos (nome, empresa, email corporativo). Campos não encontrados ficam editáveis manualmente.
-- Arquitetura preparada para plugar SerpAPI/Apollo/Clearbit no futuro (interface `EnrichmentProvider`)
+Para cada deal sincronizado, fazer duas chamadas extras:
+- `GET /deals/:id/activities` — atividades (ligações, emails, reuniões)
+- `GET /deals/:id/notes` — notas internas
 
-### 7. Sugestão de mensagem WhatsApp (Lovable AI)
-- Server function `suggestApproach` chama gateway com prompt consultivo usando: nome, empresa, contexto da conversão, dor provável, template configurável
-- Botão "Copiar" + "Abrir no WhatsApp"
+Cada item vira um registro em `lead_interactions`:
+- `type`: `rd_activity` ou `rd_note`
+- `content`: texto da atividade/nota
+- `metadata`: payload original (tipo da atividade, autor RD, data)
+- `created_at`: data original do RD
 
-### 8. Score ICP e priorização
-- Função pura `calculateScore(lead, icpConfig)` rodando ao criar/atualizar lead
-- Classifica em Alta / Média / Baixa / Fora de ICP, com cor no card
-- Filtro por prioridade no Kanban
+Dedup por uma chave composta (`lead_id` + `rd_activity_id` salvo em `metadata`) para não duplicar a cada nova sync.
 
-### 9. Filtros e busca
-- Barra no topo do Kanban: busca textual + filtros (origem, campanha, status, prioridade, responsável, segmento, tamanho, "sem abordagem", "aguardando retorno", "alta prioridade")
-- Estado persistido em querystring
+No card detalhado do lead (`/lead/$id`), a timeline já existente passa a mostrar atividades RD intercaladas com notas internas, ordenadas por data.
 
-### 10. Dashboard `/dashboard`
-- Cards de KPI: total recebidos, novos, abordados, qualificados, agendados, desqualificados
-- Tempo médio até primeira abordagem
-- Taxa de conversão lead → agenda
-- Gráfico de volume por origem/campanha (Recharts)
-- Distribuição por etapa do Kanban
-- Lista de "leads parados há mais de X dias"
+**Importante:** isso multiplica o número de chamadas ao RD (1 deal = 3 requests). Vou aplicar throttle simples (50ms entre chamadas) e cap por sync. Tornar a importação de atividades/notas **opcional via toggle** nas Configurações para casos em que o usuário só queira deals.
 
-### 11. Alertas / SLA (versão simples)
-- Coluna `last_action_at` + cálculo de "stalled" no servidor
-- Badge vermelho nos cards que estouraram SLA
-- Página `/alertas` com listagem (notificações por email ficam para depois)
+---
 
-### 12. Configurações `/configuracoes`
-- Etapas do Kanban (CRUD + reordenar)
-- Critérios e pesos do ICP
-- Templates de mensagem
-- SLA (minutos para primeira abordagem, dias máximos por etapa)
-- Conexão RD Station (status do token + botão testar)
+### 3. Sync automática (cron a cada 15 min)
 
-## Fora do escopo deste MVP (combinado)
-- Roles (Admin/SDR/Gestor) — todos enxergam tudo por enquanto
-- Integrações reais de enriquecimento (SerpAPI/Apollo/Clearbit) — estrutura pronta, sem chamadas externas
-- Notificações por email/push
-- OAuth do RD Station (usaremos token pessoal)
+- Criar endpoint público `POST /api/public/hooks/sync-rd` que roda a mesma lógica do `syncRdLeads`, autenticado via header `apikey` (anon key) — o prefixo `/api/public/*` já bypassa auth do site publicado.
+- Habilitar extensões `pg_cron` + `pg_net` e agendar job rodando a cada 15 min apontando para esse endpoint.
+- Cada execução grava em `integration_logs` (já existe a tabela) com `fetched/created/updated` e duração — visível em uma nova aba **"Logs"** nas Configurações.
+- Botão **"Sincronizar agora"** continua existindo no Kanban (sync manual completo, ignora janela incremental).
 
-## Notas técnicas
-- TanStack Start + Lovable Cloud (Supabase) já configurados no projeto
-- Toda lógica sensível (token RD, chamadas Lovable AI, score, sync) em `createServerFn`
-- `supabaseAdmin` apenas em rotas/server functions de webhook ou jobs administrativos
-- RLS: usuários autenticados veem todos os leads (compartilhados pelo time); writes registram `updated_by`
-- Drag-and-drop: `@dnd-kit/core` + `@dnd-kit/sortable`
-- Design system: paleta atual (azul Gerdau) será substituída por uma identidade neutra própria de produto SDR (a definir no build — posso propor direções se quiser)
+---
 
-## Ordem de implementação sugerida
-1. Auth + schema do banco + seed de etapas/ICP
-2. Settings (token RD) + server function de sync + tela básica de leads em lista
-3. Kanban com drag-and-drop
-4. Card detalhado + observações + interações + botões externos
-5. Score ICP + filtros/busca
-6. Enriquecimento via Lovable AI + sugestão de mensagem
-7. Dashboard
-8. Alertas/SLA
+### Mudanças por arquivo
 
-Posso começar pelo passo 1 assim que aprovar — vou pedir o token do RD Station no momento certo (passo 2).
+**Banco (migration):**
+- `app_settings`: novas chaves `rd_sync_window_days` (90), `rd_sync_incremental_minutes` (15), `rd_import_activities` (true), `rd_last_sync_at`
+- Habilitar `pg_cron` e `pg_net`
+- Job cron `sync-rd-incremental` a cada 15 min
+
+**Código:**
+- `src/lib/rd-station.functions.ts` — adicionar `start_date/end_date` no fetch, importar activities/notes, escrever `rd_last_sync_at`, novo modo `incremental` vs `full`
+- `src/routes/api/public/hooks/sync-rd.ts` — novo endpoint chamado pelo cron
+- `src/routes/_app.configuracoes.tsx` — novos campos (janela, toggle activities) + aba de logs de sync
+- `src/routes/_app.lead.$id.tsx` — timeline passa a renderizar `lead_interactions` do tipo `rd_activity`/`rd_note`
+
+---
+
+### Como vai se comportar na prática
+
+- **Primeira sync (manual, agora):** traz tudo dos últimos 90 dias do funil "Leads - Empresas" + atividades/notas de cada deal
+- **A partir daí:** cron a cada 15 min puxa só o que mudou nos últimos 15 min
+- **Forçar refresh total:** botão "Sincronizar agora" no Kanban
+- **Histórico do RD:** aparece automaticamente na timeline do lead, junto com notas que o SDR adicionar no sistema
+
+Vou pedir aprovação antes de rodar a migration e começar a implementação.
