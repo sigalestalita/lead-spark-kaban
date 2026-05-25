@@ -83,6 +83,11 @@ function LeadDetailPage() {
         <div>
           <h1 className="text-2xl font-bold">{lead.name}</h1>
           <p className="text-sm text-muted-foreground">{lead.position} {lead.company_name && `@ ${lead.company_name}`}</p>
+          {lead.original_company_name && lead.original_company_name !== lead.company_name && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+              ⚠️ Convertido no formulário como <span className="font-medium">{lead.original_company_name}</span> — atualizado pelo LinkedIn
+            </p>
+          )}
           <div className="flex gap-2 mt-2 items-center">
             <Badge style={{ borderColor: PRIORITY_COLOR[lead.priority], color: PRIORITY_COLOR[lead.priority] }} variant="outline">
               {PRIORITY_LABEL[lead.priority]} · {lead.score} pts
