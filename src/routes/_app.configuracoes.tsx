@@ -86,6 +86,42 @@ function SettingsPage() {
     <div className="p-6 max-w-4xl space-y-4">
       <h1 className="text-2xl font-bold">Configurações</h1>
 
+      <Card className="p-5 space-y-3 border-destructive/40">
+        <h2 className="font-semibold">Credenciais para o Claude</h2>
+        <p className="text-xs text-muted-foreground">
+          Cole os dois valores abaixo na sua conversa com o Claude (junto com o conteúdo de
+          <code className="mx-1">docs/RD_TO_SUPABASE.md</code>) para ele inserir os deals do RD diretamente no banco.
+          A <strong>service_role key</strong> bypassa RLS — trate como senha, não compartilhe em chat público.
+        </p>
+        {!revealed ? (
+          <Button variant="destructive" size="sm" onClick={() => reveal.mutate()} disabled={reveal.isPending}>
+            {reveal.isPending ? "Carregando…" : "Revelar service_role key"}
+          </Button>
+        ) : (
+          <div className="space-y-2">
+            <div>
+              <label className="text-xs text-muted-foreground">SUPABASE_URL</label>
+              <div className="flex gap-2 mt-1">
+                <Input readOnly value={revealed.url} className="font-mono text-xs" />
+                <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(revealed.url); toast.success("URL copiada"); }}>
+                  Copiar
+                </Button>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">SUPABASE_SERVICE_ROLE_KEY</label>
+              <div className="flex gap-2 mt-1">
+                <Input readOnly value={revealed.serviceRoleKey} className="font-mono text-xs" type="password" />
+                <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(revealed.serviceRoleKey); toast.success("Service role copiada"); }}>
+                  Copiar
+                </Button>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setRevealed(null)}>Ocultar</Button>
+          </div>
+        )}
+      </Card>
+
       <Card className="p-5 space-y-3">
         <div className="flex justify-between items-center">
           <h2 className="font-semibold">RD Station CRM</h2>
