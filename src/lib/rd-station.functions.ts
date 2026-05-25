@@ -43,7 +43,6 @@ async function fetchAllDeals(
   let page = 1;
   while (true) {
     const params = new URLSearchParams({
-      token,
       page: String(page),
       limit: "200",
       deal_pipeline_name: pipelineName,
@@ -51,7 +50,9 @@ async function fetchAllDeals(
     if (startDate) params.set("start_date", startDate);
     if (endDate) params.set("end_date", endDate);
     const url = `${RD_BASE}/deals?${params.toString()}`;
-    const res = await fetch(url);
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    });
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`RD Station ${res.status}: ${text.slice(0, 200)}`);
@@ -78,16 +79,20 @@ interface RdActivity {
 }
 
 async function fetchDealActivities(token: string, dealId: string): Promise<RdActivity[]> {
-  const url = `${RD_BASE}/deals/${encodeURIComponent(dealId)}/activities?token=${encodeURIComponent(token)}`;
-  const res = await fetch(url);
+  const url = `${RD_BASE}/deals/${encodeURIComponent(dealId)}/activities`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+  });
   if (!res.ok) return [];
   const json = (await res.json()) as { activities?: RdActivity[] };
   return json.activities ?? [];
 }
 
 async function fetchDealNotes(token: string, dealId: string): Promise<RdActivity[]> {
-  const url = `${RD_BASE}/deals/${encodeURIComponent(dealId)}/notes?token=${encodeURIComponent(token)}`;
-  const res = await fetch(url);
+  const url = `${RD_BASE}/deals/${encodeURIComponent(dealId)}/notes`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+  });
   if (!res.ok) return [];
   const json = (await res.json()) as { notes?: RdActivity[] };
   return json.notes ?? [];
@@ -307,7 +312,8 @@ export const testRdConnection = createServerFn({ method: "POST" })
     const token = await getRdToken();
     if (!token) return { ok: false, message: "RD Station não conectado" };
     const res = await fetch(
-      `${RD_BASE}/deal_pipelines?token=${encodeURIComponent(token)}`
+      `${RD_BASE}/deal_pipelines`,
+      { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } },
     );
     if (!res.ok) {
       const text = await res.text();
