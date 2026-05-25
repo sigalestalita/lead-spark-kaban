@@ -188,6 +188,7 @@ export type Database = {
           linkedin_url: string | null
           name: string
           next_action: string | null
+          original_company_name: string | null
           phone: string | null
           position: string | null
           priority: Database["public"]["Enums"]["lead_priority"]
@@ -228,6 +229,7 @@ export type Database = {
           linkedin_url?: string | null
           name: string
           next_action?: string | null
+          original_company_name?: string | null
           phone?: string | null
           position?: string | null
           priority?: Database["public"]["Enums"]["lead_priority"]
@@ -268,6 +270,7 @@ export type Database = {
           linkedin_url?: string | null
           name?: string
           next_action?: string | null
+          original_company_name?: string | null
           phone?: string | null
           position?: string | null
           priority?: Database["public"]["Enums"]["lead_priority"]
