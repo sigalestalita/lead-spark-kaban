@@ -182,7 +182,7 @@ export const enrichLead = createServerFn({ method: "POST" })
         {
           role: "system",
           content:
-            "Você é um analista de pré-vendas B2B. A partir do contexto fornecido produza inferências realistas e selecione URLs a partir dos resultados de busca fornecidos. REGRAS DE URL: (1) NUNCA invente URLs — escolha APENAS uma URL que aparece nos resultados de busca correspondentes (busca_linkedin_pessoal, busca_linkedin_empresa, busca_site_empresa) OU, no caso de company_website, derive do dominio_email_corporativo (https://<dominio>). (2) Para linkedin_url confirme que o resultado bate com o nome+empresa do lead, senão null. (3) Para company_linkedin confirme que é a página da empresa correta (linkedin.com/company/...), senão null. (4) Para company_website prefira domínio raiz, descarte agregadores (reclameaqui, glassdoor, wikipedia). (5) Marque confidence baixa/nenhum quando incerto — é melhor null que errado. (6) Não invente CNPJ, faturamento ou número exato de funcionários.",
+            "Você é um analista de pré-vendas B2B. A partir do contexto fornecido produza inferências realistas e selecione URLs a partir dos resultados de busca fornecidos. REGRAS DE URL: (1) NUNCA invente URLs — escolha APENAS uma URL que aparece nos resultados de busca correspondentes (busca_linkedin_pessoal, busca_linkedin_empresa, busca_site_empresa) OU, no caso de company_website, derive do dominio_email_corporativo (https://<dominio>). (2) Nomes de empresa em formulários frequentemente têm erros de grafia, plural/singular, abreviações ou faltam letras (ex.: 'Leonfort' pode ser 'Leonforte'; 'Vivo Telefônica' = 'Vivo'). Aceite matches fuzzy razoáveis — Google também corrige automaticamente. (3) Para linkedin_url pessoal seja rigoroso: confirme nome+empresa baterem, senão null (errar perfil pessoal é pior). (4) Para company_linkedin e company_website seja PRÁTICO: se houver um resultado plausível (mesmo com pequena variação no nome ou se for o primeiro resultado orgânico que claramente é a empresa), retorne — o SDR valida com 1 clique. Descarte só agregadores óbvios (reclameaqui, glassdoor, wikipedia, indeed, jusbrasil). (5) Calibre links_confidence: 'alta' = match exato e óbvio; 'media' = match com pequena variação de nome ou 1º resultado orgânico; 'baixa' = encontrei algo plausível mas com dúvida; 'nenhum' = nada nos resultados serve. (6) Não invente CNPJ, faturamento ou número exato de funcionários.",
         },
         {
           role: "user",
@@ -198,13 +198,15 @@ export const enrichLead = createServerFn({ method: "POST" })
 
     // Aplicar links só se URL válida + confiança aceitável + lead ainda sem valor
     const lc = args.links_confidence ?? {};
-    const acceptable = (c: string | undefined) => c === "alta" || c === "media";
+    // LinkedIn pessoal: rigoroso (errar perfil de pessoa é pior). Empresa: aceita até "baixa" — SDR valida com 1 clique.
+    const strict = (c: string | undefined) => c === "alta" || c === "media";
+    const lenient = (c: string | undefined) => c === "alta" || c === "media" || c === "baixa";
     const newLinkedin =
-      !lead.linkedin_url && acceptable(lc.linkedin_url) ? safeUrl(args.linkedin_url) : null;
+      !lead.linkedin_url && strict(lc.linkedin_url) ? safeUrl(args.linkedin_url) : null;
     const newCompanyLinkedin =
-      !lead.company_linkedin && acceptable(lc.company_linkedin) ? safeUrl(args.company_linkedin) : null;
+      !lead.company_linkedin && lenient(lc.company_linkedin) ? safeUrl(args.company_linkedin) : null;
     const newCompanyWebsite =
-      !lead.company_website && acceptable(lc.company_website) ? safeUrl(args.company_website) : null;
+      !lead.company_website && lenient(lc.company_website) ? safeUrl(args.company_website) : null;
 
     const patch = {
       company_summary: args.company_summary,
