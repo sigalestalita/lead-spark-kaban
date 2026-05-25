@@ -1,78 +1,61 @@
-## Plano: OAuth2 com RD Station CRM
+## Objetivo
 
-### URL de callback (cole no formulário do App agora)
+Permitir que o Claude (que já tem acesso ao RD CRM) puxe os deals e insira diretamente como leads no Kanban deste app, sem depender da sincronização OAuth que está dando 401.
 
-```
-https://project--773e2ce3-3b97-4224-ac14-c22657fc102a.lovable.app/api/public/rd/callback
-https://project--773e2ce3-3b97-4224-ac14-c22657fc102a-dev.lovable.app/api/public/rd/callback
-```
+## Como vai funcionar
 
-Uma por linha. A primeira é a URL estável de produção, a segunda serve previews. Salve o App no RD — ele vai gerar **Client ID** e **Client Secret**, que vou pedir como secrets logo abaixo.
+1. Você abre uma conversa no Claude e dá a ele:
+   - **URL do Supabase:** `https://vlfohgirjbgpqhqbnuks.supabase.co`
+   - **Service Role Key** (eu te mostro onde pegar — é uma chave secreta com permissão total no banco)
+   - O **mapeamento de campos** RD → tabela `leads` (abaixo)
+2. O Claude usa a API REST do Supabase (`POST /rest/v1/leads`) ou um script Node/Python para inserir/atualizar os deals.
+3. Os leads aparecem automaticamente no Kanban porque já lemos da tabela `leads`.
 
----
+## O que eu preciso preparar aqui
 
-### O que muda na integração
+### 1. Migration na tabela `leads`
+- Adicionar `UNIQUE (rd_deal_id)` para o Claude poder fazer **upsert** (`on_conflict=rd_deal_id`) sem duplicar leads quando rodar de novo.
+- Garantir que o `stage_id` default aponte para o primeiro estágio do Kanban (ou aceitar null e o front renderiza em "Sem estágio").
 
-Hoje o sistema usa um token estático em `?token=XXX`. O OAuth2 do RD CRM funciona diferente:
+### 2. Stages prontos
+Verificar que existem estágios na tabela `stages` casando com os do RD (ex.: "Qualificação", "Proposta", "Ganho", "Perdido"). Se faltar, crio os que faltam.
 
-1. Usuário clica "Conectar RD" → redireciona para `https://api.rdstation.com.br/auth/dialog?client_id=...&redirect_uri=.../api/public/rd/callback`
-2. Usuário autoriza → RD redireciona de volta com `?code=XXX`
-3. Nosso callback troca o `code` por `access_token` (válido 24h) + `refresh_token` (perene)
-4. Guardamos os dois no banco
-5. Em toda chamada à API, mandamos `Authorization: Bearer <access_token>`
-6. Quando der 401, refrescamos automaticamente usando o `refresh_token`
+### 3. Mapa de campos RD → `leads`
+| RD CRM                | leads (Supabase)        |
+| --------------------- | ----------------------- |
+| `deal.id`             | `rd_deal_id` (chave)    |
+| `deal.name`           | `name`                  |
+| `contacts[0].emails`  | `email`                 |
+| `contacts[0].phones`  | `phone`                 |
+| `organization.name`   | `company_name`          |
+| `deal_stage.name`     | mapear → `stage_id`     |
+| `user.name`           | `rd_owner`              |
+| `deal_source.name`    | `source`                |
+| `deal_custom_fields`  | `form_payload` (jsonb)  |
+| `win`/`hold`          | `rd_status`             |
 
----
+### 4. Snippet pronto para o Claude
+Vou gerar um `RD_TO_SUPABASE.md` (no projeto) com:
+- endpoint exato (`/rest/v1/leads?on_conflict=rd_deal_id`),
+- headers (`apikey`, `Authorization: Bearer <service_role>`, `Prefer: resolution=merge-duplicates`),
+- exemplo de body JSON com o mapa acima,
+- exemplo de query para buscar `stages.id` por `slug`.
 
-### Mudanças no banco
+Assim você só copia/cola no Claude.
 
-Nova tabela `rd_oauth_tokens` (single-row, gerenciada pelo admin):
-- `access_token` (text)
-- `refresh_token` (text)
-- `expires_at` (timestamptz)
-- `connected_by` (uuid, quem autorizou)
-- `connected_at`, `updated_at`
+### 5. Limpar / desativar a sync OAuth atual
+Deixa o botão "Conectar RD Station" escondido (ou marca como "experimental") já que vamos pela rota Claude. Não removo o código — só escondo do UI pra não confundir.
 
-RLS: leitura apenas para `authenticated`, escrita apenas via server functions (com `supabaseAdmin`).
+## Detalhes técnicos
 
----
+- **Service Role Key bypassa RLS** — necessário pro Claude inserir sem login. Você vai pegar a chave em Lovable Cloud → Settings → API Keys. Trate como senha (não cole em chat público).
+- Nada de Edge Function nem novo endpoint aqui no app — quanto menos código intermediário, menos coisa pra quebrar.
+- Realtime já tá ativado na tabela leads? Se sim, o Kanban atualiza sozinho quando o Claude inserir. Se não, vale habilitar (1 linha de SQL).
 
-### Arquivos novos / alterados
+## Não vou fazer
 
-**Novos:**
-- `src/routes/api/public/rd/callback.ts` — server route que recebe o `code`, troca por tokens e salva no banco, depois redireciona para `/configuracoes?rd=connected`
-- `src/lib/rd-oauth.server.ts` — helpers: `getValidAccessToken()` (lê do banco, refresca se expirado), `exchangeCode()`, `refreshToken()`
-- `src/lib/rd-oauth.functions.ts` — server fn `getRdConnectionStatus()` e `disconnectRd()`
+- Mexer no fluxo OAuth do RD (fica como está, escondido).
+- Criar UI nova de import — o trigger é você falar com o Claude.
+- Tocar em outras tabelas além de `leads` e `stages`.
 
-**Alterados:**
-- `src/lib/rd-station.functions.ts` — todas as chamadas passam a usar `Bearer` e `getValidAccessToken()`; endpoints do CRM continuam os mesmos (`/api/v1/deals`, `/deals/:id/activities`, `/deals/:id/notes`); remove o uso de `RD_STATION_TOKEN`
-- `src/routes/_app.configuracoes.tsx` — substitui o campo "Token RD" pelo botão **"Conectar ao RD Station"** que abre o popup OAuth + estado "Conectado como X / Desconectar"
-
-**Secrets a adicionar:**
-- `RD_CLIENT_ID`
-- `RD_CLIENT_SECRET`
-
-(O `RD_STATION_TOKEN` antigo pode ser removido depois que a nova conexão estiver funcionando.)
-
----
-
-### Detalhes técnicos
-
-- **Endpoints OAuth do RD CRM**:
-  - Authorize: `https://api.rdstation.com.br/auth/dialog?client_id=<id>&redirect_uri=<callback>`
-  - Token exchange / refresh: `POST https://api.rdstation.com.br/auth/token` (body `{client_id, client_secret, code}` ou `{client_id, client_secret, refresh_token}`)
-- **Chamadas API**: header `Authorization: Bearer <access_token>` em vez de `?token=`
-- **Refresh automático**: `getValidAccessToken()` checa `expires_at`. Se faltar < 5 min, chama refresh antes de devolver. Em caso de 401 da API, força refresh + 1 retry.
-- **Segurança do callback**: o endpoint `/api/public/rd/callback` é público (precisa ser, o RD chama sem auth), mas valida `state` (gerado quando o usuário inicia o fluxo, guardado em cookie httpOnly) para evitar CSRF.
-
----
-
-### Como vai ficar para o usuário
-
-1. Vai em **Configurações → RD Station**
-2. Clica em **"Conectar ao RD Station"**
-3. Faz login no RD e autoriza o app "LEADS SDR"
-4. Volta pro sistema com mensagem "Conectado ✓"
-5. A partir daí, sync manual + cron a cada 15 min funcionam normalmente, sem token estático
-
-Posso prosseguir?
+Confirma que posso seguir?
