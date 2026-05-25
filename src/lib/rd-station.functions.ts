@@ -1,19 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getRdToken } from "./rd-token.server";
 import { calculateScore, type IcpRules, type IcpThresholds } from "./icp-score";
 
 const RD_BASE = "https://crm.rdstation.com/api/v1";
-
-async function getRdToken(): Promise<string | null> {
-  const { data } = await supabaseAdmin
-    .from("rd_oauth_tokens")
-    .select("access_token")
-    .eq("id", true)
-    .maybeSingle();
-  if (data?.access_token) return data.access_token;
-  return process.env.RD_STATION_TOKEN ?? null;
-}
 
 interface RdDeal {
   _id?: string;
