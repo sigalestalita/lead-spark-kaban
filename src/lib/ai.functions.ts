@@ -77,6 +77,26 @@ async function firecrawlSearch(query: string): Promise<SearchHit[]> {
   }
 }
 
+/** Scrape um perfil de LinkedIn e devolve texto/markdown bruto + descrição (subtítulo) para a IA extrair a empresa atual. */
+async function firecrawlScrapeLinkedIn(url: string): Promise<{ markdown: string; description?: string } | null> {
+  const key = process.env.FIRECRAWL_API_KEY;
+  if (!key) return null;
+  try {
+    const { default: Firecrawl } = await import("@mendable/firecrawl-js");
+    const fc = new Firecrawl({ apiKey: key });
+    const res = await fc.scrape(url, { formats: ["markdown"], onlyMainContent: true });
+    const r = res as { markdown?: string; metadata?: { description?: string; title?: string }; data?: { markdown?: string; metadata?: { description?: string } } };
+    const markdown = (r.markdown ?? r.data?.markdown ?? "").slice(0, 4000);
+    const description = r.metadata?.description ?? r.data?.metadata?.description;
+    console.log(`[firecrawl] scrape ${url} → md=${markdown.length} chars, desc=${description?.slice(0, 80) ?? "—"}`);
+    if (!markdown && !description) return null;
+    return { markdown, description };
+  } catch (e) {
+    console.error("[firecrawl] scrape linkedin falhou", e);
+    return null;
+  }
+}
+
 /** Enriquecimento via IA — gera resumo, segmento, dor provável a partir dos dados existentes. */
 export const enrichLead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -135,14 +155,19 @@ export const enrichLead = createServerFn({ method: "POST" })
               type: ["string", "null"],
               description: "URL do site oficial da empresa. Use null se incerto. Prefira domínio raiz (ex.: https://empresa.com).",
             },
+            current_company_from_linkedin: {
+              type: ["string", "null"],
+              description: "Nome da EMPRESA ATUAL do lead conforme aparece no perfil do LinkedIn (campo linkedin_profile_scrape). NUNCA invente: use só se aparecer no scrape. Null se não conseguir identificar com clareza ou se o scrape estiver vazio/bloqueado.",
+            },
             links_confidence: {
               type: "object",
               properties: {
                 linkedin_url: { type: "string", enum: ["alta", "media", "baixa", "nenhum"] },
                 company_linkedin: { type: "string", enum: ["alta", "media", "baixa", "nenhum"] },
                 company_website: { type: "string", enum: ["alta", "media", "baixa", "nenhum"] },
+                current_company_from_linkedin: { type: "string", enum: ["alta", "media", "baixa", "nenhum"] },
               },
-              required: ["linkedin_url", "company_linkedin", "company_website"],
+              required: ["linkedin_url", "company_linkedin", "company_website", "current_company_from_linkedin"],
               additionalProperties: false,
             },
           },
@@ -155,6 +180,7 @@ export const enrichLead = createServerFn({ method: "POST" })
             "linkedin_url",
             "company_linkedin",
             "company_website",
+            "current_company_from_linkedin",
             "links_confidence",
           ],
           additionalProperties: false,
@@ -179,12 +205,25 @@ export const enrichLead = createServerFn({ method: "POST" })
       busca_site_empresa: websiteHits,
     };
 
+    // 2) Se já existe linkedin_url (manual) OU achamos um candidato com alta confiança nas buscas, tentamos fazer scrape para descobrir a empresa ATUAL do contato
+    const linkedinCandidateForScrape =
+      safeUrl(lead.linkedin_url) ??
+      (linkedinHits[0]?.url && /linkedin\.com\/in\//i.test(linkedinHits[0].url) ? safeUrl(linkedinHits[0].url) : null);
+    let linkedinScrape: { markdown: string; description?: string } | null = null;
+    if (linkedinCandidateForScrape) {
+      linkedinScrape = await firecrawlScrapeLinkedIn(linkedinCandidateForScrape);
+    }
+    (ctx as Record<string, unknown>).linkedin_profile_scrape = linkedinScrape
+      ? { url: linkedinCandidateForScrape, description: linkedinScrape.description, markdown_excerpt: linkedinScrape.markdown }
+      : null;
+    (ctx as Record<string, unknown>).empresa_no_formulario = lead.company_name;
+
     const result = await callAI(
       [
         {
           role: "system",
           content:
-            "Você é um analista de pré-vendas B2B. A partir do contexto fornecido produza inferências realistas e selecione URLs a partir dos resultados de busca fornecidos. REGRAS DE URL: (1) NUNCA invente URLs — escolha APENAS uma URL que aparece nos resultados de busca correspondentes (busca_linkedin_pessoal, busca_linkedin_empresa, busca_site_empresa) OU, no caso de company_website, derive do dominio_email_corporativo (https://<dominio>). (2) Nomes de empresa em formulários frequentemente têm erros de grafia, plural/singular, abreviações ou faltam letras (ex.: 'Leonfort' pode ser 'Leonforte'; 'Vivo Telefônica' = 'Vivo'). Aceite matches fuzzy razoáveis — Google também corrige automaticamente. (3) Para linkedin_url pessoal seja rigoroso: confirme nome+empresa baterem, senão null (errar perfil pessoal é pior). (4) Para company_linkedin e company_website seja PRÁTICO: se houver um resultado plausível (mesmo com pequena variação no nome ou se for o primeiro resultado orgânico que claramente é a empresa), retorne — o SDR valida com 1 clique. Descarte só agregadores óbvios (reclameaqui, glassdoor, wikipedia, indeed, jusbrasil). (5) Calibre links_confidence: 'alta' = match exato e óbvio; 'media' = match com pequena variação de nome ou 1º resultado orgânico; 'baixa' = encontrei algo plausível mas com dúvida; 'nenhum' = nada nos resultados serve. (6) Não invente CNPJ, faturamento ou número exato de funcionários.",
+            "Você é um analista de pré-vendas B2B. A partir do contexto fornecido produza inferências realistas e selecione URLs a partir dos resultados de busca fornecidos. REGRAS DE URL: (1) NUNCA invente URLs — escolha APENAS uma URL que aparece nos resultados de busca correspondentes (busca_linkedin_pessoal, busca_linkedin_empresa, busca_site_empresa) OU, no caso de company_website, derive do dominio_email_corporativo (https://<dominio>). (2) Nomes de empresa em formulários frequentemente têm erros de grafia, plural/singular, abreviações ou faltam letras (ex.: 'Leonfort' pode ser 'Leonforte'; 'Vivo Telefônica' = 'Vivo'). Aceite matches fuzzy razoáveis — Google também corrige automaticamente. (3) Para linkedin_url pessoal seja rigoroso: confirme nome+empresa baterem, senão null (errar perfil pessoal é pior). (4) Para company_linkedin e company_website seja PRÁTICO: se houver um resultado plausível (mesmo com pequena variação no nome ou se for o primeiro resultado orgânico que claramente é a empresa), retorne — o SDR valida com 1 clique. Descarte só agregadores óbvios (reclameaqui, glassdoor, wikipedia, indeed, jusbrasil). (5) Calibre links_confidence: 'alta' = match exato e óbvio; 'media' = match com pequena variação de nome ou 1º resultado orgânico; 'baixa' = encontrei algo plausível mas com dúvida; 'nenhum' = nada nos resultados serve. (6) Não invente CNPJ, faturamento ou número exato de funcionários. (7) EMPRESA ATUAL: o campo linkedin_profile_scrape contém o texto do perfil do LinkedIn quando disponível. Procure por seções 'Experiência'/'Experience' e identifique a posição mais RECENTE (geralmente 'o momento'/'Present' ou data final mais recente). Use APENAS o nome da empresa que aparece literalmente no scrape — preferindo o subtítulo/description do perfil quando ele exibe 'Cargo na Empresa'. Se o scrape estiver vazio (LinkedIn bloqueou), retorne null. Se a empresa atual identificada for praticamente igual à empresa_no_formulario (ignorando case, acentos, sufixos LTDA/SA), também pode retornar null para sinalizar que não há divergência.",
         },
         {
           role: "user",
@@ -210,6 +249,24 @@ export const enrichLead = createServerFn({ method: "POST" })
     const newCompanyWebsite =
       !lead.company_website && lenient(lc.company_website) ? safeUrl(args.company_website) : null;
 
+    // Empresa atual do LinkedIn — só atualiza se nome retornado != empresa atual (case/acento/sufixo-insensitive) e confiança decente
+    const norm = (s: string | null | undefined) =>
+      (s ?? "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\b(ltda|s\/?a|me|eireli|epp|inc|llc|corp|oficial)\b\.?/g, "")
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+    const currentFromLi: string | null =
+      typeof args.current_company_from_linkedin === "string" && args.current_company_from_linkedin.trim()
+        ? args.current_company_from_linkedin.trim()
+        : null;
+    const companyChanged =
+      !!currentFromLi &&
+      strict(lc.current_company_from_linkedin) &&
+      norm(currentFromLi) !== norm(lead.company_name);
+
     const patch = {
       company_summary: args.company_summary,
       company_segment: lead.company_segment || args.company_segment,
@@ -218,6 +275,18 @@ export const enrichLead = createServerFn({ method: "POST" })
       ...(newLinkedin ? { linkedin_url: newLinkedin } : {}),
       ...(newCompanyLinkedin ? { company_linkedin: newCompanyLinkedin } : {}),
       ...(newCompanyWebsite ? { company_website: newCompanyWebsite } : {}),
+      ...(companyChanged
+        ? {
+            company_name: currentFromLi,
+            // Preserva o nome original do form somente na primeira vez (não sobrescreve se já existir)
+            ...(lead.original_company_name ? {} : { original_company_name: lead.company_name }),
+            // Empresa mudou → limpa links/segmento/tamanho velhos para o SDR não usar dado desatualizado
+            company_linkedin: newCompanyLinkedin ?? null,
+            company_website: newCompanyWebsite ?? null,
+            company_segment: args.company_segment ?? null,
+            company_size: args.company_size && args.company_size !== "desconhecido" ? args.company_size : null,
+          }
+        : {}),
       enrichment_status: "found" as const,
       enriched_at: new Date().toISOString(),
     };
@@ -227,11 +296,12 @@ export const enrichLead = createServerFn({ method: "POST" })
       lead_id: data.id,
       author_id: userId,
       type: "enrichment",
-      content: `Enriquecimento via IA (confiança ${args.confidence}). Links: linkedin=${newLinkedin ? "✓" : "—"}, empresa-linkedin=${newCompanyLinkedin ? "✓" : "—"}, site=${newCompanyWebsite ? "✓" : "—"}`,
+      content: `Enriquecimento via IA (confiança ${args.confidence}). Links: linkedin=${newLinkedin ? "✓" : "—"}, empresa-linkedin=${newCompanyLinkedin ? "✓" : "—"}, site=${newCompanyWebsite ? "✓" : "—"}${companyChanged ? `. Empresa atualizada: "${lead.company_name}" → "${currentFromLi}" (form desatualizado)` : ""}`,
       metadata: {
         ...args,
         firecrawl_used: !!process.env.FIRECRAWL_API_KEY,
-        applied: { linkedin_url: newLinkedin, company_linkedin: newCompanyLinkedin, company_website: newCompanyWebsite },
+        applied: { linkedin_url: newLinkedin, company_linkedin: newCompanyLinkedin, company_website: newCompanyWebsite, company_name_changed: companyChanged ? { from: lead.company_name, to: currentFromLi } : null },
+        linkedin_scrape_used: !!linkedinScrape,
       },
     });
     await supabase.from("integration_logs").insert({

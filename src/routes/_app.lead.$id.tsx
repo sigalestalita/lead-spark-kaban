@@ -83,6 +83,11 @@ function LeadDetailPage() {
         <div>
           <h1 className="text-2xl font-bold">{lead.name}</h1>
           <p className="text-sm text-muted-foreground">{lead.position} {lead.company_name && `@ ${lead.company_name}`}</p>
+          {lead.original_company_name && lead.original_company_name !== lead.company_name && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+              ⚠️ Convertido no formulário como <span className="font-medium">{lead.original_company_name}</span> — atualizado pelo LinkedIn
+            </p>
+          )}
           <div className="flex gap-2 mt-2 items-center">
             <Badge style={{ borderColor: PRIORITY_COLOR[lead.priority], color: PRIORITY_COLOR[lead.priority] }} variant="outline">
               {PRIORITY_LABEL[lead.priority]} · {lead.score} pts
@@ -139,6 +144,12 @@ function LeadDetailPage() {
         <Card className="p-5 space-y-3">
           <h2 className="font-semibold flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" />Empresa</h2>
           <Field label="Empresa" value={lead.company_name} onSave={(v) => update.mutate({ company_name: v })} />
+          {lead.original_company_name && lead.original_company_name !== lead.company_name && (
+            <div className="text-xs bg-amber-500/10 border border-amber-500/30 rounded-md px-2 py-1.5 text-amber-700 dark:text-amber-400">
+              <span className="font-medium">Empresa no formulário:</span> {lead.original_company_name}
+              <p className="text-[10px] opacity-80 mt-0.5">Lead converteu com essa empresa, mas o LinkedIn mostra empresa atual diferente.</p>
+            </div>
+          )}
           <Field label="Site" value={lead.company_website} onSave={(v) => update.mutate({ company_website: v })} />
           <Field label="LinkedIn empresa" value={lead.company_linkedin} onSave={(v) => update.mutate({ company_linkedin: v })} />
           <Field label="Segmento" value={lead.company_segment} onSave={(v) => update.mutate({ company_segment: v })} />
