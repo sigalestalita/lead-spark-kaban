@@ -99,58 +99,54 @@
 
 :root {
   --radius: 0.625rem;
-  /* Gerdau brand palette */
-  --gerdau-blue: oklch(0.42 0.2 261);
-  --gerdau-blue-dark: oklch(0.31 0.18 263);
-  --gerdau-blue-light: oklch(0.65 0.16 254);
-  --gerdau-blue-soft: oklch(0.95 0.03 255);
-  --surface: oklch(0.985 0.005 247);
+  /* SDR Inbound — palette */
+  --brand: oklch(0.55 0.21 268);
+  --brand-dark: oklch(0.4 0.21 268);
+  --brand-soft: oklch(0.96 0.03 268);
+  --surface: oklch(0.985 0.005 260);
 
   --background: oklch(1 0 0);
-  --foreground: oklch(0.18 0.03 260);
+  --foreground: oklch(0.18 0.02 260);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.03 260);
+  --card-foreground: oklch(0.18 0.02 260);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.03 260);
-  --primary: var(--gerdau-blue);
+  --popover-foreground: oklch(0.18 0.02 260);
+  --primary: var(--brand);
   --primary-foreground: oklch(1 0 0);
-  --secondary: var(--gerdau-blue-soft);
-  --secondary-foreground: var(--gerdau-blue-dark);
-  --muted: oklch(0.965 0.008 247);
-  --muted-foreground: oklch(0.5 0.03 257);
-  --accent: var(--gerdau-blue-soft);
-  --accent-foreground: var(--gerdau-blue-dark);
+  --secondary: var(--brand-soft);
+  --secondary-foreground: var(--brand-dark);
+  --muted: oklch(0.97 0.005 260);
+  --muted-foreground: oklch(0.5 0.02 260);
+  --accent: var(--brand-soft);
+  --accent-foreground: var(--brand-dark);
   --destructive: oklch(0.58 0.22 28);
   --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.92 0.012 250);
-  --input: oklch(0.92 0.012 250);
-  --ring: var(--gerdau-blue);
-  --chart-1: var(--gerdau-blue);
-  --chart-2: var(--gerdau-blue-light);
-  --chart-3: oklch(0.75 0.13 220);
+  --border: oklch(0.92 0.008 260);
+  --input: oklch(0.92 0.008 260);
+  --ring: var(--brand);
+  --chart-1: var(--brand);
+  --chart-2: oklch(0.65 0.18 200);
+  --chart-3: oklch(0.7 0.18 150);
   --chart-4: oklch(0.75 0.17 70);
   --chart-5: oklch(0.58 0.22 28);
-  --sidebar: oklch(0.985 0.005 247);
-  --sidebar-foreground: oklch(0.18 0.03 260);
-  --sidebar-primary: var(--gerdau-blue);
+  --sidebar: oklch(0.985 0.005 260);
+  --sidebar-foreground: oklch(0.18 0.02 260);
+  --sidebar-primary: var(--brand);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: var(--gerdau-blue-soft);
-  --sidebar-accent-foreground: var(--gerdau-blue-dark);
-  --sidebar-border: oklch(0.92 0.012 250);
-  --sidebar-ring: var(--gerdau-blue);
+  --sidebar-accent: var(--brand-soft);
+  --sidebar-accent-foreground: var(--brand-dark);
+  --sidebar-border: oklch(0.92 0.008 260);
+  --sidebar-ring: var(--brand);
 
-  /* Faixas de compatibilidade — escala azul → vermelho */
-  --faixa-excelente: var(--gerdau-blue);
-  --faixa-muito-boa: var(--gerdau-blue-light);
-  --faixa-aceitavel: oklch(0.75 0.17 70);
-  --faixa-baixa: oklch(0.58 0.22 28);
-  --faixa-sem-dados: oklch(0.7 0.015 260);
+  /* Lead priority colors */
+  --priority-alta: oklch(0.6 0.22 25);
+  --priority-media: oklch(0.75 0.17 70);
+  --priority-baixa: oklch(0.65 0.12 220);
+  --priority-fora: oklch(0.7 0.01 260);
 
-  --gradient-brand: linear-gradient(135deg, oklch(0.31 0.18 263), oklch(0.42 0.2 261));
-  --shadow-brand: 0 1px 3px color-mix(in oklab, var(--gerdau-blue) 12%, transparent),
-    0 8px 24px -12px color-mix(in oklab, var(--gerdau-blue) 18%, transparent);
-  --font-display: "Poppins", system-ui, sans-serif;
-  --font-body: "Montserrat", system-ui, sans-serif;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 12px -4px rgb(0 0 0 / 0.06);
+  --font-display: "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
@@ -196,8 +192,6 @@
 
   body {
     background:
-      radial-gradient(1200px 600px at 100% -10%, color-mix(in oklab, var(--gerdau-blue) 7%, transparent), transparent 60%),
-      radial-gradient(900px 500px at -10% 110%, color-mix(in oklab, var(--gerdau-blue-light) 8%, transparent), transparent 60%),
       var(--surface);
     color: var(--color-foreground);
     font-family: var(--font-body);
