@@ -91,6 +91,7 @@ export type Database = {
           author_id: string | null
           content: string | null
           created_at: string
+          external_id: string | null
           id: string
           lead_id: string
           metadata: Json | null
@@ -100,6 +101,7 @@ export type Database = {
           author_id?: string | null
           content?: string | null
           created_at?: string
+          external_id?: string | null
           id?: string
           lead_id: string
           metadata?: Json | null
@@ -109,6 +111,7 @@ export type Database = {
           author_id?: string | null
           content?: string | null
           created_at?: string
+          external_id?: string | null
           id?: string
           lead_id?: string
           metadata?: Json | null
