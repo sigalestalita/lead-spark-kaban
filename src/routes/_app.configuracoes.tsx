@@ -85,6 +85,14 @@ function SettingsPage() {
             {rdStatus?.connected ? "Conectado" : "Não conectado"}
           </Badge>
         </div>
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
+          <p className="font-medium mb-1">Sync OAuth experimental</p>
+          <p>
+            A sincronização direta via OAuth está instável. O método recomendado hoje é
+            importar os deals usando o Claude (que já tem acesso ao RD CRM) e inserir direto
+            no banco. Veja o passo a passo em <code>docs/RD_TO_SUPABASE.md</code>.
+          </p>
+        </div>
         <div className="flex items-center gap-2">
           {rdStatus?.connected ? (
             <>
