@@ -67,7 +67,7 @@ async function firecrawlSearch(query: string): Promise<SearchHit[]> {
   try {
     const { default: Firecrawl } = await import("@mendable/firecrawl-js");
     const fc = new Firecrawl({ apiKey: key });
-    const res = await fc.search(query, { limit: 5, lang: "pt", country: "br" });
+    const res = await fc.search(query, { limit: 5, location: "Brazil" });
     const hits = normalizeFirecrawlResults(res);
     console.log(`[firecrawl] "${query}" → ${hits.length} hits`, hits.map((h) => h.url));
     return hits;
