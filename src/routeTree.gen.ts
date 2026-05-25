@@ -16,6 +16,7 @@ import { Route as AppKanbanRouteImport } from './routes/_app.kanban'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppLeadIdRouteImport } from './routes/_app.lead.$id'
+import { Route as ApiPublicHooksSyncRdRouteImport } from './routes/api/public/hooks/sync-rd'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -51,6 +52,11 @@ const AppLeadIdRoute = AppLeadIdRouteImport.update({
   path: '/lead/$id',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiPublicHooksSyncRdRoute = ApiPublicHooksSyncRdRouteImport.update({
+  id: '/api/public/hooks/sync-rd',
+  path: '/api/public/hooks/sync-rd',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AppDashboardRoute
   '/kanban': typeof AppKanbanRoute
   '/lead/$id': typeof AppLeadIdRoute
+  '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AppDashboardRoute
   '/kanban': typeof AppKanbanRoute
   '/lead/$id': typeof AppLeadIdRoute
+  '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/kanban': typeof AppKanbanRoute
   '/_app/lead/$id': typeof AppLeadIdRoute
+  '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -87,8 +96,16 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/kanban'
     | '/lead/$id'
+    | '/api/public/hooks/sync-rd'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/configuracoes' | '/dashboard' | '/kanban' | '/lead/$id'
+  to:
+    | '/'
+    | '/login'
+    | '/configuracoes'
+    | '/dashboard'
+    | '/kanban'
+    | '/lead/$id'
+    | '/api/public/hooks/sync-rd'
   id:
     | '__root__'
     | '/'
@@ -98,12 +115,14 @@ export interface FileRouteTypes {
     | '/_app/dashboard'
     | '/_app/kanban'
     | '/_app/lead/$id'
+    | '/api/public/hooks/sync-rd'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiPublicHooksSyncRdRoute: typeof ApiPublicHooksSyncRdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -157,6 +176,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppLeadIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/public/hooks/sync-rd': {
+      id: '/api/public/hooks/sync-rd'
+      path: '/api/public/hooks/sync-rd'
+      fullPath: '/api/public/hooks/sync-rd'
+      preLoaderRoute: typeof ApiPublicHooksSyncRdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -180,7 +206,18 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiPublicHooksSyncRdRoute: ApiPublicHooksSyncRdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
