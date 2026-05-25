@@ -155,14 +155,19 @@ export const enrichLead = createServerFn({ method: "POST" })
               type: ["string", "null"],
               description: "URL do site oficial da empresa. Use null se incerto. Prefira domínio raiz (ex.: https://empresa.com).",
             },
+            current_company_from_linkedin: {
+              type: ["string", "null"],
+              description: "Nome da EMPRESA ATUAL do lead conforme aparece no perfil do LinkedIn (campo linkedin_profile_scrape). NUNCA invente: use só se aparecer no scrape. Null se não conseguir identificar com clareza ou se o scrape estiver vazio/bloqueado.",
+            },
             links_confidence: {
               type: "object",
               properties: {
                 linkedin_url: { type: "string", enum: ["alta", "media", "baixa", "nenhum"] },
                 company_linkedin: { type: "string", enum: ["alta", "media", "baixa", "nenhum"] },
                 company_website: { type: "string", enum: ["alta", "media", "baixa", "nenhum"] },
+                current_company_from_linkedin: { type: "string", enum: ["alta", "media", "baixa", "nenhum"] },
               },
-              required: ["linkedin_url", "company_linkedin", "company_website"],
+              required: ["linkedin_url", "company_linkedin", "company_website", "current_company_from_linkedin"],
               additionalProperties: false,
             },
           },
@@ -175,6 +180,7 @@ export const enrichLead = createServerFn({ method: "POST" })
             "linkedin_url",
             "company_linkedin",
             "company_website",
+            "current_company_from_linkedin",
             "links_confidence",
           ],
           additionalProperties: false,
