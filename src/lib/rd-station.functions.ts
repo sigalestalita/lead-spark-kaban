@@ -96,16 +96,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export type SyncMode = "full" | "incremental";
 
-type SupabaseClient = Parameters<
-  Parameters<typeof requireSupabaseAuth.server>[0]["next"]
->[0] extends { context: { supabase: infer S } }
-  ? S
-  : never;
-
-export async function runRdSync(
-  supabase: SupabaseClient,
-  mode: SyncMode,
-): Promise<{ fetched: number; created: number; updated: number; interactions: number; pipeline: string; mode: SyncMode }> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function runRdSync(supabase: any, mode: SyncMode) {
   const token = process.env.RD_STATION_TOKEN;
   if (!token) {
     throw new Error("RD_STATION_TOKEN não configurado.");
@@ -113,19 +105,24 @@ export async function runRdSync(
 
   // load settings
   const { data: settingsRows } = await supabase.from("app_settings").select("key, value");
-  const settings = new Map((settingsRows ?? []).map((s) => [s.key, s.value as Record<string, unknown> | null]));
-  const pipelineName =
-    (settings.get("rd_pipeline")?.name as string | undefined) ?? "Leads - Empresas";
-  const windowDays = Number(settings.get("rd_sync_window_days")?.days ?? 90);
-  const incrementalMinutes = Number(settings.get("rd_sync_incremental_minutes")?.minutes ?? 15);
-  const importActivities = settings.get("rd_import_activities")?.enabled !== false;
+  const settings = new Map<string, Record<string, unknown>>(
+    ((settingsRows ?? []) as Array<{ key: string; value: unknown }>).map((s) => [
+      s.key,
+      (s.value ?? {}) as Record<string, unknown>,
+    ]),
+  );
+  const get = (k: string) => settings.get(k) ?? {};
+  const pipelineName = (get("rd_pipeline").name as string | undefined) ?? "Leads - Empresas";
+  const windowDays = Number((get("rd_sync_window_days").days as number | undefined) ?? 90);
+  const incrementalMinutes = Number((get("rd_sync_incremental_minutes").minutes as number | undefined) ?? 15);
+  const importActivities = (get("rd_import_activities").enabled as boolean | undefined) !== false;
 
   let startDate: string | undefined;
   const endDate = new Date().toISOString();
   if (mode === "full") {
     startDate = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString();
   } else {
-    const lastSync = settings.get("rd_last_sync_at")?.value as string | undefined;
+    const lastSync = get("rd_last_sync_at").value as string | undefined;
     const fallbackMs = incrementalMinutes * 60 * 1000;
     const fromMs = lastSync ? Math.min(new Date(lastSync).getTime(), Date.now() - fallbackMs) : Date.now() - fallbackMs;
     startDate = new Date(fromMs - 60 * 1000).toISOString(); // 1min overlap
@@ -141,7 +138,7 @@ export async function runRdSync(
   const thresholds = (icp?.thresholds ?? { high: 70, medium: 40, low: 15 }) as unknown as IcpThresholds;
 
   const { data: stages } = await supabase.from("stages").select("id, slug");
-  const newStageId = stages?.find((s) => s.slug === "novo")?.id;
+  const newStageId = (stages as Array<{ id: string; slug: string }> | null)?.find((s) => s.slug === "novo")?.id;
 
   let deals: RdDeal[] = [];
   try {
