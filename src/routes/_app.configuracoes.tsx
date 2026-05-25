@@ -5,6 +5,7 @@ import { useState } from "react";
 import { getSettings, updateSetting, updateIcp } from "@/lib/settings.functions";
 import { testRdConnection, getRecentSyncLogs } from "@/lib/rd-station.functions";
 import { getRdAuthUrl, getRdConnectionStatus, disconnectRd } from "@/lib/rd-oauth.functions";
+import { revealServiceRoleKey } from "@/lib/admin-secrets.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,13 @@ function SettingsPage() {
   const authUrlFn = useServerFn(getRdAuthUrl);
   const statusFn = useServerFn(getRdConnectionStatus);
   const disconnectFn = useServerFn(disconnectRd);
+  const revealFn = useServerFn(revealServiceRoleKey);
+  const [revealed, setRevealed] = useState<{ url: string; serviceRoleKey: string } | null>(null);
+  const reveal = useMutation({
+    mutationFn: () => revealFn(),
+    onSuccess: (r) => setRevealed(r),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro"),
+  });
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["settings"], queryFn: () => fetchFn() });
   const { data: logs } = useQuery({ queryKey: ["sync-logs"], queryFn: () => logsFn(), refetchInterval: 30000 });
