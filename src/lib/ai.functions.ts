@@ -77,25 +77,8 @@ async function firecrawlSearch(query: string): Promise<SearchHit[]> {
   }
 }
 
-/** Scrape um perfil de LinkedIn e devolve texto/markdown bruto + descrição (subtítulo) para a IA extrair a empresa atual. */
-async function firecrawlScrapeLinkedIn(url: string): Promise<{ markdown: string; description?: string } | null> {
-  const key = process.env.FIRECRAWL_API_KEY;
-  if (!key) return null;
-  try {
-    const { default: Firecrawl } = await import("@mendable/firecrawl-js");
-    const fc = new Firecrawl({ apiKey: key });
-    const res = await fc.scrape(url, { formats: ["markdown"], onlyMainContent: true });
-    const r = res as { markdown?: string; metadata?: { description?: string; title?: string }; data?: { markdown?: string; metadata?: { description?: string } } };
-    const markdown = (r.markdown ?? r.data?.markdown ?? "").slice(0, 4000);
-    const description = r.metadata?.description ?? r.data?.metadata?.description;
-    console.log(`[firecrawl] scrape ${url} → md=${markdown.length} chars, desc=${description?.slice(0, 80) ?? "—"}`);
-    if (!markdown && !description) return null;
-    return { markdown, description };
-  } catch (e) {
-    console.error("[firecrawl] scrape linkedin falhou", e);
-    return null;
-  }
-}
+// Firecrawl não suporta scrape direto de linkedin.com — usamos os SNIPPETS de busca (titles/descriptions),
+// que normalmente expõem "Nome - Cargo na Empresa - LinkedIn" mesmo quando a página em si é bloqueada.
 
 /** Enriquecimento via IA — gera resumo, segmento, dor provável a partir dos dados existentes. */
 export const enrichLead = createServerFn({ method: "POST" })
@@ -109,9 +92,16 @@ export const enrichLead = createServerFn({ method: "POST" })
     // 1) Buscas Firecrawl para descobrir URLs reais (linkedin pessoal, linkedin empresa, site)
     const company = (lead.company_name ?? "").trim();
     const person = (lead.name ?? "").trim();
-    const [linkedinHits, companyLinkedinHits, websiteHits] = await Promise.all([
+    const [linkedinHits, linkedinByNameHits, companyLinkedinHits, websiteHits] = await Promise.all([
       company && person
         ? firecrawlSearch(`${person} ${company} site:linkedin.com/in`)
+        : Promise.resolve([] as SearchHit[]),
+      // Busca "limpa" — só pelo nome — para descobrir a empresa ATUAL do contato
+      // (a empresa no form costuma estar desatualizada; os snippets do Google
+      // mostram "Nome - Cargo na Empresa - LinkedIn" mesmo quando o perfil em si
+      // está bloqueado para scrape).
+      person
+        ? firecrawlSearch(`"${person}" linkedin`)
         : Promise.resolve([] as SearchHit[]),
       company
         ? firecrawlSearch(`"${company}" linkedin empresa`)
@@ -205,17 +195,18 @@ export const enrichLead = createServerFn({ method: "POST" })
       busca_site_empresa: websiteHits,
     };
 
-    // 2) Se já existe linkedin_url (manual) OU achamos um candidato com alta confiança nas buscas, tentamos fazer scrape para descobrir a empresa ATUAL do contato
-    const linkedinCandidateForScrape =
-      safeUrl(lead.linkedin_url) ??
-      (linkedinHits[0]?.url && /linkedin\.com\/in\//i.test(linkedinHits[0].url) ? safeUrl(linkedinHits[0].url) : null);
-    let linkedinScrape: { markdown: string; description?: string } | null = null;
-    if (linkedinCandidateForScrape) {
-      linkedinScrape = await firecrawlScrapeLinkedIn(linkedinCandidateForScrape);
-    }
-    (ctx as Record<string, unknown>).linkedin_profile_scrape = linkedinScrape
-      ? { url: linkedinCandidateForScrape, description: linkedinScrape.description, markdown_excerpt: linkedinScrape.markdown }
-      : null;
+    // 2) Snippets do LinkedIn por nome — fonte primária para descobrir a empresa ATUAL.
+    // Combinamos a busca por nome+empresa e a busca só por nome; dedupe por URL.
+    const linkedinSnippetsForCurrentCompany = (() => {
+      const all = [...linkedinByNameHits, ...linkedinHits];
+      const seen = new Set<string>();
+      return all.filter((h) => {
+        if (seen.has(h.url)) return false;
+        seen.add(h.url);
+        return true;
+      }).slice(0, 8);
+    })();
+    (ctx as Record<string, unknown>).linkedin_snippets_para_empresa_atual = linkedinSnippetsForCurrentCompany;
     (ctx as Record<string, unknown>).empresa_no_formulario = lead.company_name;
 
     const result = await callAI(
@@ -223,7 +214,7 @@ export const enrichLead = createServerFn({ method: "POST" })
         {
           role: "system",
           content:
-            "Você é um analista de pré-vendas B2B. A partir do contexto fornecido produza inferências realistas e selecione URLs a partir dos resultados de busca fornecidos. REGRAS DE URL: (1) NUNCA invente URLs — escolha APENAS uma URL que aparece nos resultados de busca correspondentes (busca_linkedin_pessoal, busca_linkedin_empresa, busca_site_empresa) OU, no caso de company_website, derive do dominio_email_corporativo (https://<dominio>). (2) Nomes de empresa em formulários frequentemente têm erros de grafia, plural/singular, abreviações ou faltam letras (ex.: 'Leonfort' pode ser 'Leonforte'; 'Vivo Telefônica' = 'Vivo'). Aceite matches fuzzy razoáveis — Google também corrige automaticamente. (3) Para linkedin_url pessoal seja rigoroso: confirme nome+empresa baterem, senão null (errar perfil pessoal é pior). (4) Para company_linkedin e company_website seja PRÁTICO: se houver um resultado plausível (mesmo com pequena variação no nome ou se for o primeiro resultado orgânico que claramente é a empresa), retorne — o SDR valida com 1 clique. Descarte só agregadores óbvios (reclameaqui, glassdoor, wikipedia, indeed, jusbrasil). (5) Calibre links_confidence: 'alta' = match exato e óbvio; 'media' = match com pequena variação de nome ou 1º resultado orgânico; 'baixa' = encontrei algo plausível mas com dúvida; 'nenhum' = nada nos resultados serve. (6) Não invente CNPJ, faturamento ou número exato de funcionários. (7) EMPRESA ATUAL: o campo linkedin_profile_scrape contém o texto do perfil do LinkedIn quando disponível. Procure por seções 'Experiência'/'Experience' e identifique a posição mais RECENTE (geralmente 'o momento'/'Present' ou data final mais recente). Use APENAS o nome da empresa que aparece literalmente no scrape — preferindo o subtítulo/description do perfil quando ele exibe 'Cargo na Empresa'. Se o scrape estiver vazio (LinkedIn bloqueou), retorne null. Se a empresa atual identificada for praticamente igual à empresa_no_formulario (ignorando case, acentos, sufixos LTDA/SA), também pode retornar null para sinalizar que não há divergência.",
+            "Você é um analista de pré-vendas B2B. A partir do contexto fornecido produza inferências realistas e selecione URLs a partir dos resultados de busca fornecidos. REGRAS DE URL: (1) NUNCA invente URLs — escolha APENAS uma URL que aparece nos resultados de busca correspondentes (busca_linkedin_pessoal, busca_linkedin_empresa, busca_site_empresa) OU, no caso de company_website, derive do dominio_email_corporativo (https://<dominio>). (2) Nomes de empresa em formulários frequentemente têm erros de grafia, plural/singular, abreviações ou faltam letras. Aceite matches fuzzy razoáveis. (3) Para linkedin_url pessoal seja rigoroso: confirme nome+empresa baterem, senão null. (4) Para company_linkedin e company_website seja PRÁTICO: 1º resultado orgânico claro = aceita. Descarte agregadores (reclameaqui, glassdoor, wikipedia, indeed, jusbrasil). (5) Calibre links_confidence: 'alta' = match óbvio; 'media' = pequena variação; 'baixa' = dúvida; 'nenhum' = nada serve. (6) Não invente CNPJ/faturamento/funcionários. (7) EMPRESA ATUAL DO LEAD (CRÍTICO — esse é o foco): use linkedin_snippets_para_empresa_atual. As DESCRIPTIONS desses snippets quase sempre exibem 'Nome — Cargo na Empresa' ou 'Nome - Empresa - LinkedIn' (LinkedIn bloqueia scrape direto, mas o Google indexa esses metadados). Procure menções recorrentes de uma mesma empresa nas descriptions/titles dos perfis e posts mais recentes — essa é a empresa ATUAL. Exemplo: se vários snippets mencionam 'Canal Solar' nos posts/perfil mais novos, a empresa atual é 'Canal Solar', mesmo que o formulário diga outra coisa. Use o nome EXATAMENTE como aparece no snippet (preserve grafia/maiúsculas). Confiança 'alta' = aparece em 2+ snippets distintos; 'media' = 1 snippet claro com 'Cargo na Empresa'; 'baixa' = só inferido vagamente; 'nenhum' = snippets vazios/genéricos. Se a empresa identificada for igual à empresa_no_formulario (ignorando case/acentos/LTDA), retorne null para current_company_from_linkedin (sem divergência).",
         },
         {
           role: "user",
@@ -301,7 +292,7 @@ export const enrichLead = createServerFn({ method: "POST" })
         ...args,
         firecrawl_used: !!process.env.FIRECRAWL_API_KEY,
         applied: { linkedin_url: newLinkedin, company_linkedin: newCompanyLinkedin, company_website: newCompanyWebsite, company_name_changed: companyChanged ? { from: lead.company_name, to: currentFromLi } : null },
-        linkedin_scrape_used: !!linkedinScrape,
+        linkedin_snippets_count: linkedinSnippetsForCurrentCompany.length,
       },
     });
     await supabase.from("integration_logs").insert({
