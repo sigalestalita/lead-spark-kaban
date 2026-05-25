@@ -226,7 +226,6 @@
 
   /* Keep app content above the aurora glows */
   #root, main, aside, header { position: relative; z-index: 1; }
-  }
 
   h1, h2, h3, h4 {
     font-family: var(--font-display);
