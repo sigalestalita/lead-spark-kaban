@@ -7,6 +7,9 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Toaster } from "@/components/ui/sonner";
 
 import appCss from "../styles.css?url";
 
@@ -72,25 +75,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Grou + Gerdau — Painel de Compatibilidade x Segurança" },
-      { name: "description", content: "Painel executivo Gerdau: relação entre compatibilidade comportamental e ocorrências de segurança do trabalho." },
-      { name: "author", content: "Gerdau" },
-      { property: "og:title", content: "Grou + Gerdau — Painel de Compatibilidade x Segurança" },
-      { property: "og:description", content: "Painel executivo Gerdau: relação entre compatibilidade comportamental e ocorrências de segurança do trabalho." },
+      { title: "Inbound SDR — Qualificação de Leads" },
+      { name: "description", content: "Central de qualificação de leads inbound: Kanban, enriquecimento e priorização por ICP." },
+      { property: "og:title", content: "Inbound SDR — Qualificação de Leads" },
+      { property: "og:description", content: "Central de qualificação de leads inbound integrada ao RD Station CRM." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Gerdau" },
-      { name: "twitter:title", content: "Grou + Gerdau — Painel de Compatibilidade x Segurança" },
-      { name: "twitter:description", content: "Painel executivo Gerdau: relação entre compatibilidade comportamental e ocorrências de segurança do trabalho." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/ada98eb0-3761-42f1-9048-82b7443dc9c3" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/ada98eb0-3761-42f1-9048-82b7443dc9c3" },
+      { name: "twitter:title", content: "Inbound SDR — Qualificação de Leads" },
+      { name: "twitter:description", content: "Central de qualificação de leads inbound integrada ao RD Station CRM." },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap",
       },
       {
         rel: "stylesheet",
@@ -120,10 +119,20 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      router.invalidate();
+      queryClient.invalidateQueries();
+    });
+    return () => subscription.unsubscribe();
+  }, [router, queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
+      <Toaster richColors position="top-right" />
     </QueryClientProvider>
   );
 }
