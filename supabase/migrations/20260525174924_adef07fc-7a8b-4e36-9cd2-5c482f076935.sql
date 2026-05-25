@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "rd_oauth_read_auth" ON public.rd_oauth_tokens;
