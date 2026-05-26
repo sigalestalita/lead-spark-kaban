@@ -52,16 +52,16 @@ function KanbanPage() {
 
   // Auto-enriquecimento + recálculo de score em background.
   // - Enriquece leads com enrichment_status='pending'.
-  // - Recalcula score/priority para leads já 'found' mas com priority='pendente'
-  //   (dados antigos enriquecidos antes do recálculo automático).
+  // - Recalcula score/priority de todos os leads `found` (idempotente — só grava
+  //   quando muda). Garante que mudanças nas regras de ICP refletem nos cards.
   const enrichingRef = useRef(false);
+  const recalcRunRef = useRef(false);
   useEffect(() => {
     const leads = data?.leads ?? [];
     const pendingEnrich = leads.filter((l) => l.enrichment_status === "pending").length;
-    const pendingScore = leads.filter(
-      (l) => l.enrichment_status === "found" && l.priority === "pendente"
-    ).length;
-    if (pendingEnrich === 0 && pendingScore === 0) return;
+    const enrichedCount = leads.filter((l) => l.enrichment_status === "found").length;
+    const shouldRecalc = enrichedCount > 0 && !recalcRunRef.current;
+    if (pendingEnrich === 0 && !shouldRecalc) return;
     if (enrichingRef.current) return;
     let cancelled = false;
     const run = async () => {
@@ -69,7 +69,8 @@ function KanbanPage() {
       enrichingRef.current = true;
       try {
         let changed = 0;
-        if (pendingScore > 0) {
+        if (shouldRecalc) {
+          recalcRunRef.current = true;
           const r = await recalcFn({ data: { limit: 200 } });
           changed += r?.updated ?? 0;
         }
