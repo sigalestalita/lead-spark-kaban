@@ -57,7 +57,7 @@ function AppShell() {
               <Users className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-sm font-bold tracking-tight text-white">Inbound SDR</p>
+              <p className="text-sm font-bold tracking-tight text-white">SDR GROU</p>
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Qualificação</p>
             </div>
           </div>

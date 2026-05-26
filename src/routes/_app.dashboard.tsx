@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from "recharts";
 
 export const Route = createFileRoute("/_app/dashboard")({
-  head: () => ({ meta: [{ title: "Dashboard — Inbound SDR" }] }),
+  head: () => ({ meta: [{ title: "Dashboard — SDR GROU" }] }),
   component: DashboardPage,
 });
 
