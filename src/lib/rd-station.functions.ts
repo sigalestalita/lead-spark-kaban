@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { getRdToken, getRdTokenInfo, type RdTokenSource } from "./rd-token.server";
+import { getRdTokenInfo, type RdTokenSource } from "./rd-token.server";
 import { calculateScore, type IcpRules, type IcpThresholds } from "./icp-score";
 
 const RD_BASE = "https://crm.rdstation.com/api/v1";
