@@ -333,14 +333,14 @@ export const syncRdLeads = createServerFn({ method: "POST" })
 export const testRdConnection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
-    const token = await getRdToken();
+    const { token, source: tokenSource } = await getRdTokenInfo();
     if (!token) return { ok: false, message: "RD Station não conectado" };
     const res = await fetch(`${RD_BASE}/deal_pipelines?${new URLSearchParams({ token }).toString()}`, {
       headers: { Accept: "application/json" },
     });
     if (!res.ok) {
       const text = await res.text();
-      return { ok: false, message: `${res.status}: ${text.slice(0, 200)}` };
+      return { ok: false, message: buildRdErrorMessage(res.status, text, tokenSource) };
     }
     const json = (await res.json()) as { deal_pipelines?: Array<{ name: string }> };
     return {
