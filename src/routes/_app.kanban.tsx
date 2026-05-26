@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { listKanbanData, moveLeadStage, createManualLead, updateLead } from "@/lib/leads.functions";
 import { syncRdLeads } from "@/lib/rd-station.functions";
+import { autoEnrichPendingLeads } from "@/lib/ai.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -36,6 +37,7 @@ function KanbanPage() {
   const syncFn = useServerFn(syncRdLeads);
   const createFn = useServerFn(createManualLead);
   const updateFn = useServerFn(updateLead);
+  const autoEnrichFn = useServerFn(autoEnrichPendingLeads);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [priority, setPriority] = useState<string>("all");
