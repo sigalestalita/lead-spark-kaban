@@ -17,6 +17,30 @@ function DashboardPage() {
 
   const sourceData = Object.entries(data.bySource).map(([name, count]) => ({ name, count }));
 
+  const funnelOrder = ["novo", "qualificacao", "em_contato", "aguardando", "agendado"];
+  const funnelLabels: Record<string, string> = {
+    novo: "Novo lead",
+    qualificacao: "Em qualificação",
+    em_contato: "Em contato",
+    aguardando: "Aguardando retorno",
+    agendado: "Agenda marcada",
+  };
+  const stagesByLabel: Record<string, number> = {
+    "Novo lead": data.novos,
+    "Em qualificação": data.qualificacao,
+    "Em contato": data.em_contato,
+    "Aguardando retorno": data.aguardando,
+    "Agenda marcada": data.agendados,
+  };
+  // Cumulative funnel: each step = leads currently in this stage OR later (more downstream).
+  // Approx: count this stage + all later stages.
+  const funnelCounts = funnelOrder.map((slug, i) => {
+    const label = funnelLabels[slug];
+    const downstream = funnelOrder.slice(i).reduce((acc, s) => acc + (stagesByLabel[funnelLabels[s]] ?? 0), 0);
+    return { slug, label, count: downstream };
+  });
+  const topCount = funnelCounts[0]?.count || 1;
+
   return (
     <div className="p-6 space-y-4">
       <h1 className="text-2xl font-bold">Dashboard</h1>
@@ -33,6 +57,45 @@ function DashboardPage() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
+        <Card className="p-5 md:col-span-2">
+          <div className="flex items-baseline justify-between mb-4">
+            <h2 className="font-semibold">Funil de evolução dos leads</h2>
+            <span className="text-xs text-muted-foreground">
+              Cada etapa inclui leads que avançaram além dela
+            </span>
+          </div>
+          <div className="space-y-2">
+            {funnelCounts.map((step, i) => {
+              const pctTotal = topCount ? Math.round((step.count / topCount) * 100) : 0;
+              const prev = i > 0 ? funnelCounts[i - 1].count : null;
+              const pctPrev = prev != null && prev > 0 ? Math.round((step.count / prev) * 100) : null;
+              const widthPct = Math.max(8, pctTotal);
+              return (
+                <div key={step.slug} className="flex items-center gap-3">
+                  <div className="w-40 shrink-0 text-sm">{step.label}</div>
+                  <div className="flex-1 relative h-9 rounded-md bg-muted/40 overflow-hidden">
+                    <div
+                      className="h-full rounded-md bg-gradient-to-r from-primary to-primary/70 transition-all"
+                      style={{ width: `${widthPct}%` }}
+                    />
+                    <div className="absolute inset-0 flex items-center px-3 text-xs font-medium">
+                      <span className="tabular-nums">{step.count} leads</span>
+                      <span className="ml-2 text-muted-foreground">({pctTotal}% do topo)</span>
+                    </div>
+                  </div>
+                  <div className="w-24 text-right text-xs text-muted-foreground tabular-nums">
+                    {pctPrev != null ? `${pctPrev}% da etapa anterior` : "—"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-4 pt-4 border-t flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Desqualificados (saídos do funil)</span>
+            <span className="font-semibold">{data.desqualificados}</span>
+          </div>
+        </Card>
+
         <Card className="p-5">
           <h2 className="font-semibold mb-3">Por etapa</h2>
           <ResponsiveContainer width="100%" height={260}>
