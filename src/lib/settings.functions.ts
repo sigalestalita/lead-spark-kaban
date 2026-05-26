@@ -174,7 +174,7 @@ export const getDashboardStats = createServerFn({ method: "GET" })
     }
 
     // stalled leads (more than 3 days without action, not terminal)
-    const terminalSlugs = new Set(["comercial", "desqualificado", "perdido"]);
+    const terminalSlugs = new Set(["desqualificado"]);
     const threshold = Date.now() - 3 * 24 * 60 * 60 * 1000;
     const stalled = all.filter((l) => {
       const s = stagesMap.get(l.stage_id ?? "");
@@ -186,11 +186,11 @@ export const getDashboardStats = createServerFn({ method: "GET" })
     return {
       total,
       novos: bySlug["novo"] ?? 0,
-      abordados: bySlug["abordado"] ?? 0,
+      em_contato: bySlug["em_contato"] ?? 0,
       qualificacao: bySlug["qualificacao"] ?? 0,
       agendados,
       desqualificados: bySlug["desqualificado"] ?? 0,
-      perdidos: bySlug["perdido"] ?? 0,
+      aguardando: bySlug["aguardando"] ?? 0,
       avgFirstApproachMin,
       conversionRate,
       bySource,
