@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect, useRef } from "react";
 import { listKanbanData, moveLeadStage, createManualLead, updateLead } from "@/lib/leads.functions";
 import { syncRdLeads } from "@/lib/rd-station.functions";
-import { autoEnrichPendingLeads } from "@/lib/ai.functions";
+import { autoEnrichPendingLeads, recalculatePendingScores } from "@/lib/ai.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -38,6 +38,7 @@ function KanbanPage() {
   const createFn = useServerFn(createManualLead);
   const updateFn = useServerFn(updateLead);
   const autoEnrichFn = useServerFn(autoEnrichPendingLeads);
+  const recalcFn = useServerFn(recalculatePendingScores);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [priority, setPriority] = useState<string>("all");
@@ -49,19 +50,34 @@ function KanbanPage() {
     queryFn: () => fetchData(),
   });
 
-  // Auto-enriquecimento: dispara em background quando há leads pendentes.
-  // Roda ao abrir o Kanban e a cada 90s enquanto houver pendentes.
+  // Auto-enriquecimento + recálculo de score em background.
+  // - Enriquece leads com enrichment_status='pending'.
+  // - Recalcula score/priority para leads já 'found' mas com priority='pendente'
+  //   (dados antigos enriquecidos antes do recálculo automático).
   const enrichingRef = useRef(false);
   useEffect(() => {
-    const pendingCount = (data?.leads ?? []).filter((l) => l.enrichment_status === "pending").length;
-    if (pendingCount === 0 || enrichingRef.current) return;
+    const leads = data?.leads ?? [];
+    const pendingEnrich = leads.filter((l) => l.enrichment_status === "pending").length;
+    const pendingScore = leads.filter(
+      (l) => l.enrichment_status === "found" && l.priority === "pendente"
+    ).length;
+    if (pendingEnrich === 0 && pendingScore === 0) return;
+    if (enrichingRef.current) return;
     let cancelled = false;
     const run = async () => {
       if (enrichingRef.current) return;
       enrichingRef.current = true;
       try {
-        const res = await autoEnrichFn({ data: { limit: 5 } });
-        if (!cancelled && res?.ok) {
+        let changed = 0;
+        if (pendingScore > 0) {
+          const r = await recalcFn({ data: { limit: 200 } });
+          changed += r?.updated ?? 0;
+        }
+        if (pendingEnrich > 0) {
+          const r = await autoEnrichFn({ data: { limit: 5 } });
+          changed += r?.ok ?? 0;
+        }
+        if (!cancelled && changed > 0) {
           qc.invalidateQueries({ queryKey: ["kanban"] });
         }
       } catch {
@@ -76,7 +92,7 @@ function KanbanPage() {
       cancelled = true;
       clearInterval(t);
     };
-  }, [data?.leads, autoEnrichFn, qc]);
+  }, [data?.leads, autoEnrichFn, recalcFn, qc]);
 
   const move = useMutation({
     mutationFn: (vars: { leadId: string; stageId: string }) => moveFn({ data: vars }),
