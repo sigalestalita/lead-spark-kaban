@@ -359,6 +359,43 @@ export const autoEnrichPendingLeads = createServerFn({ method: "POST" })
     return { processed: ids.length, ok, failed };
   });
 
+/** Recalcula score/priority/icp_signals para leads já enriquecidos cujo score ficou desatualizado.
+ *  Útil para retroagir mudanças do calculador / dados que foram enriquecidos antes do recálculo
+ *  automático existir. Roda sobre todos os leads `found` que ainda estão com priority='pendente'. */
+export const recalculatePendingScores = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ limit: z.number().int().min(1).max(500).optional() }).parse(d ?? {}))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const limit = data.limit ?? 200;
+    const { data: icp } = await supabase
+      .from("icp_config")
+      .select("rules, thresholds")
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
+    const rules = (icp?.rules ?? {}) as unknown as IcpRules;
+    const thresholds = (icp?.thresholds ?? { high: 70, medium: 40, low: 15 }) as unknown as IcpThresholds;
+
+    const { data: leads } = await supabase
+      .from("leads")
+      .select("*")
+      .eq("enrichment_status", "found")
+      .eq("priority", "pendente")
+      .limit(limit);
+
+    let updated = 0;
+    for (const lead of leads ?? []) {
+      const { score, priority, signals } = calculateScore(lead, rules, thresholds);
+      const { error } = await supabase
+        .from("leads")
+        .update({ score, priority, icp_signals: signals as never })
+        .eq("id", lead.id);
+      if (!error) updated++;
+    }
+    return { scanned: leads?.length ?? 0, updated };
+  });
+
 /** Sugere mensagem de abordagem para WhatsApp */
 export const suggestApproach = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
