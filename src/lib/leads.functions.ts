@@ -123,6 +123,8 @@ export const updateLead = createServerFn({ method: "POST" })
       "approach_result",
       "assigned_to",
       "stage_id",
+      "meeting_at",
+      "lost_reason",
     ];
     for (const k of allowedKeys) {
       if (k in data.patch) allowed[k] = data.patch[k];
