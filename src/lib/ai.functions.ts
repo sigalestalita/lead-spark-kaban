@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { calculateScore, type IcpRules, type IcpThresholds } from "./icp-score";
+import { GROU_PLAYBOOK } from "./grou-playbook";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const MODEL = "google/gemini-3-flash-preview";
@@ -438,7 +439,7 @@ export const suggestApproach = createServerFn({ method: "POST" })
       {
         role: "system",
         content:
-          "Você é um SDR experiente. Gere UMA mensagem curta de WhatsApp (3-5 frases, máx 600 caracteres) em português brasileiro, tom consultivo e humano, primeira pessoa. Sem emoji exagerado, sem parecer template. Referencie o contexto da conversão e a possível dor. Termine com uma pergunta aberta convidando a uma conversa rápida. Não use saudação genérica do tipo 'Espero que esteja bem'.",
+          `Você é um SDR experiente da Grou (HR Tech de gestão comportamental, plataforma PDA). Gere UMA mensagem curta de WhatsApp (3-5 frases, máx 600 caracteres) em português brasileiro, tom consultivo e humano, primeira pessoa. Sem emoji exagerado, sem parecer template. Referencie o contexto da conversão e a possível dor. Termine com uma pergunta aberta convidando a uma conversa rápida. Não use saudação genérica do tipo 'Espero que esteja bem'. Use o playbook abaixo como base de conhecimento sobre produto, ICP, tom e objeções:\n\n${GROU_PLAYBOOK}`,
       },
       {
         role: "user",
