@@ -1,9 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { getRdToken } from "./rd-token.server";
+import { getRdTokenInfo, type RdTokenSource } from "./rd-token.server";
 import { calculateScore, type IcpRules, type IcpThresholds } from "./icp-score";
 
 const RD_BASE = "https://crm.rdstation.com/api/v1";
+
+function buildRdErrorMessage(status: number, body: string, source: RdTokenSource) {
+  const detail = body.slice(0, 200);
+  if (status === 401) {
+    return source === "env"
+      ? "RD Station recusou o token configurado. Reconecte o RD em Configurações para gerar um novo token autorizado."
+      : "RD Station recusou a conexão atual. Reconecte o RD em Configurações e tente novamente.";
+  }
+  return `RD Station ${status}: ${detail}`;
+}
 
 interface RdDeal {
   _id?: string;
@@ -35,6 +45,7 @@ function pickPhone(d: RdDeal): string | null {
 
 async function fetchAllDeals(
   token: string,
+  tokenSource: RdTokenSource,
   pipelineName: string,
   startDate?: string,
   endDate?: string,
@@ -54,7 +65,7 @@ async function fetchAllDeals(
     const res = await fetch(url, { headers: { Accept: "application/json" } });
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`RD Station ${res.status}: ${text.slice(0, 200)}`);
+      throw new Error(buildRdErrorMessage(res.status, text, tokenSource));
     }
     const json = (await res.json()) as { deals?: RdDeal[]; has_more?: boolean };
     const deals = json.deals ?? [];
@@ -101,7 +112,7 @@ export type SyncMode = "full" | "incremental";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function runRdSync(supabase: any, mode: SyncMode) {
-  const token = await getRdToken();
+  const { token, source: tokenSource } = await getRdTokenInfo();
   if (!token) {
     throw new Error("RD Station não conectado. Conecte em Configurações.");
   }
@@ -145,13 +156,13 @@ export async function runRdSync(supabase: any, mode: SyncMode) {
 
   let deals: RdDeal[] = [];
   try {
-    deals = await fetchAllDeals(token, pipelineName, startDate, endDate);
+    deals = await fetchAllDeals(token, tokenSource, pipelineName, startDate, endDate);
   } catch (e) {
     await supabase.from("integration_logs").insert({
       provider: "rd_station",
       action: `sync_${mode}`,
       status: "error",
-      detail: { error: String(e) },
+      detail: { error: e instanceof Error ? e.message : String(e), tokenSource },
     });
     throw e;
   }
@@ -300,20 +311,36 @@ export async function runRdSync(supabase: any, mode: SyncMode) {
 export const syncRdLeads = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    return runRdSync(context.supabase as never, "full");
+    try {
+      const result = await runRdSync(context.supabase as never, "full");
+      return { ok: true, ...result };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return {
+        ok: false,
+        error: message,
+        reconnectRequired: message.includes("RD Station recusou"),
+        fetched: 0,
+        created: 0,
+        updated: 0,
+        interactions: 0,
+        pipeline: null,
+        mode: "full" as const,
+      };
+    }
   });
 
 export const testRdConnection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
-    const token = await getRdToken();
+    const { token, source: tokenSource } = await getRdTokenInfo();
     if (!token) return { ok: false, message: "RD Station não conectado" };
     const res = await fetch(`${RD_BASE}/deal_pipelines?${new URLSearchParams({ token }).toString()}`, {
       headers: { Accept: "application/json" },
     });
     if (!res.ok) {
       const text = await res.text();
-      return { ok: false, message: `${res.status}: ${text.slice(0, 200)}` };
+      return { ok: false, message: buildRdErrorMessage(res.status, text, tokenSource) };
     }
     const json = (await res.json()) as { deal_pipelines?: Array<{ name: string }> };
     return {
