@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { Users } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Entrar — Inbound SDR" }] }),
+  head: () => ({ meta: [{ title: "Entrar — SDR GROU" }] }),
   component: LoginPage,
 });
 
@@ -82,7 +82,7 @@ function LoginPage() {
             <Users className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-lg font-bold tracking-tight">Inbound SDR</h1>
+            <h1 className="text-lg font-bold tracking-tight">SDR GROU</h1>
             <p className="text-xs text-muted-foreground">Qualificação de leads inbound</p>
           </div>
         </div>

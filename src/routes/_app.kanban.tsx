@@ -25,7 +25,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export const Route = createFileRoute("/_app/kanban")({
-  head: () => ({ meta: [{ title: "Kanban — Inbound SDR" }] }),
+  head: () => ({ meta: [{ title: "Kanban — SDR GROU" }] }),
   component: KanbanPage,
 });
 
