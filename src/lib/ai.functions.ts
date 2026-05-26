@@ -89,8 +89,6 @@ export const enrichLead = createServerFn({ method: "POST" })
     return runEnrichment(supabase, userId, data.id);
   });
 
-type SupaClient = Parameters<typeof requireSupabaseAuth.client>[0] extends infer _ ? any : any;
-
 async function runEnrichment(supabase: any, userId: string | null, id: string) {
     const { data: lead } = await supabase.from("leads").select("*").eq("id", id).maybeSingle();
     if (!lead) throw new Error("Lead não encontrado");
@@ -326,15 +324,13 @@ export const autoEnrichPendingLeads = createServerFn({ method: "POST" })
     let failed = 0;
     for (const id of ids) {
       try {
-        // marca como "running" para evitar dupla execução simultânea
-        await supabase.from("leads").update({ enrichment_status: "running" }).eq("id", id);
         await runEnrichment(supabase, userId, id);
         ok++;
       } catch (e) {
         failed++;
         await supabase
           .from("leads")
-          .update({ enrichment_status: "failed" })
+          .update({ enrichment_status: "not_found" })
           .eq("id", id);
         await supabase.from("integration_logs").insert({
           provider: "lovable_ai",
