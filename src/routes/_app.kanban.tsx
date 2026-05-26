@@ -49,6 +49,35 @@ function KanbanPage() {
     queryFn: () => fetchData(),
   });
 
+  // Auto-enriquecimento: dispara em background quando há leads pendentes.
+  // Roda ao abrir o Kanban e a cada 90s enquanto houver pendentes.
+  const enrichingRef = useRef(false);
+  useEffect(() => {
+    const pendingCount = (data?.leads ?? []).filter((l) => l.enrichment_status === "pending").length;
+    if (pendingCount === 0 || enrichingRef.current) return;
+    let cancelled = false;
+    const run = async () => {
+      if (enrichingRef.current) return;
+      enrichingRef.current = true;
+      try {
+        const res = await autoEnrichFn({ data: { limit: 5 } });
+        if (!cancelled && res?.ok) {
+          qc.invalidateQueries({ queryKey: ["kanban"] });
+        }
+      } catch {
+        /* silencioso */
+      } finally {
+        enrichingRef.current = false;
+      }
+    };
+    run();
+    const t = setInterval(run, 90_000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [data?.leads, autoEnrichFn, qc]);
+
   const move = useMutation({
     mutationFn: (vars: { leadId: string; stageId: string }) => moveFn({ data: vars }),
     onMutate: async (vars) => {
