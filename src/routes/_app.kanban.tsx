@@ -56,7 +56,14 @@ function KanbanPage() {
       toast.success(`Sincronizado: ${r.created} novos, ${r.updated} atualizados`);
       qc.invalidateQueries({ queryKey: ["kanban"] });
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao sincronizar"),
+    onError: (e) => {
+      const message = e instanceof Error ? e.message : "Falha ao sincronizar";
+      toast.error(message, {
+        description: message.includes("RD Station recusou")
+          ? "Vá em Configurações > RD Station CRM e conecte novamente antes de sincronizar."
+          : undefined,
+      });
+    },
   });
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
