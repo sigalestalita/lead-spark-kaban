@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PRIORITY_LABEL, PRIORITY_COLOR } from "@/lib/lead-types";
+import { evaluateIcpFit } from "@/lib/icp-fit";
 import { toast } from "sonner";
-import { RefreshCw, Plus, Search, Calendar, Clock, Timer } from "lucide-react";
+import { RefreshCw, Plus, Search, Calendar, Clock, Timer, Flame, Briefcase, Building2, Mail } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -174,9 +175,25 @@ function KanbanPage() {
       >
         <div className="flex gap-3 overflow-x-auto pb-4">
           {data.stages.map((s) => {
-            const stageLeads = filtered.filter((l) => l.stage_id === s.id);
+            let stageLeads = filtered.filter((l) => l.stage_id === s.id);
+            if (s.slug === "novo") {
+              stageLeads = [...stageLeads].sort((a, b) => {
+                const fa = evaluateIcpFit(a).score;
+                const fb = evaluateIcpFit(b).score;
+                if (fb !== fa) return fb - fa;
+                const ta = a.converted_at ? new Date(a.converted_at).getTime() : new Date(a.created_at).getTime();
+                const tb = b.converted_at ? new Date(b.converted_at).getTime() : new Date(b.created_at).getTime();
+                return tb - ta;
+              });
+            }
             return (
-              <Column key={s.id} stageId={s.id} name={s.name} color={s.color} count={stageLeads.length}>
+              <Column
+                key={s.id}
+                stageId={s.id}
+                name={s.slug === "novo" ? "Novo lead · Priorização" : s.name}
+                color={s.color}
+                count={stageLeads.length}
+              >
                 {stageLeads.map((l) => (
                   <LeadCard key={l.id} lead={l} stageSlug={s.slug} />
                 ))}
@@ -274,11 +291,16 @@ function LeadCard({
           .slice(0, 6)
       : [];
 
+  const icpFit = evaluateIcpFit(lead);
+  const isHotIcp = stageSlug === "novo" && icpFit.score >= 2;
+
   const content = (
     <Card
       className={`p-3 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${
         isDragging ? "opacity-30" : ""
-      } ${overlay ? "shadow-lg" : ""}`}
+      } ${overlay ? "shadow-lg" : ""} ${
+        isHotIcp ? "ring-2 ring-amber-500/60 bg-amber-500/[0.04]" : ""
+      }`}
     >
       <div className="flex items-start justify-between gap-2 mb-1">
         <Link
@@ -286,8 +308,9 @@ function LeadCard({
           params={{ id: lead.id }}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
-          className="text-sm font-semibold hover:underline truncate flex-1"
+          className="text-sm font-semibold hover:underline truncate flex-1 flex items-center gap-1"
         >
+          {isHotIcp && <Flame className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
           {lead.name}
         </Link>
         <Badge
@@ -302,6 +325,28 @@ function LeadCard({
 
       {stageSlug === "novo" && (
         <div className="mt-2 space-y-1">
+          <div className="flex flex-wrap gap-1">
+            {icpFit.seniorPosition && (
+              <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-600 gap-1">
+                <Briefcase className="h-3 w-3" /> Cargo decisor
+              </Badge>
+            )}
+            {icpFit.bigCompany && (
+              <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-600 gap-1">
+                <Building2 className="h-3 w-3" /> 100+ funcionários
+              </Badge>
+            )}
+            {icpFit.corporateEmail && (
+              <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-600 gap-1">
+                <Mail className="h-3 w-3" /> E-mail corporativo
+              </Badge>
+            )}
+            {icpFit.score === 0 && (
+              <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                Sem sinais de ICP
+              </Badge>
+            )}
+          </div>
           {lead.campaign && (
             <p className="text-[10px] text-muted-foreground truncate">📣 {lead.campaign}</p>
           )}
