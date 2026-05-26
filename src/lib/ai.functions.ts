@@ -285,9 +285,9 @@ async function runEnrichment(supabase: any, userId: string | null, id: string) {
       enriched_at: new Date().toISOString(),
     };
 
-    await supabase.from("leads").update(patch).eq("id", data.id);
+    await supabase.from("leads").update(patch).eq("id", id);
     await supabase.from("lead_interactions").insert({
-      lead_id: data.id,
+      lead_id: id,
       author_id: userId,
       type: "enrichment",
       content: `Enriquecimento via IA (confiança ${args.confidence}). Links: linkedin=${newLinkedin ? "✓" : "—"}, empresa-linkedin=${newCompanyLinkedin ? "✓" : "—"}, site=${newCompanyWebsite ? "✓" : "—"}${companyChanged ? `. Empresa atualizada: "${lead.company_name}" → "${currentFromLi}" (form desatualizado)` : ""}`,
@@ -302,10 +302,49 @@ async function runEnrichment(supabase: any, userId: string | null, id: string) {
       provider: "lovable_ai",
       action: "enrich_lead",
       status: "ok",
-      detail: { lead_id: data.id, confidence: args.confidence },
+      detail: { lead_id: id, confidence: args.confidence },
     });
 
     return { ok: true, ...args };
+}
+
+/** Auto-enriquecimento em lote — pega leads pendentes e enriquece em sequência. */
+export const autoEnrichPendingLeads = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ limit: z.number().int().min(1).max(20).optional() }).parse(d ?? {}))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const limit = data.limit ?? 5;
+    const { data: pending } = await supabase
+      .from("leads")
+      .select("id")
+      .eq("enrichment_status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    const ids = (pending ?? []).map((r: { id: string }) => r.id);
+    let ok = 0;
+    let failed = 0;
+    for (const id of ids) {
+      try {
+        // marca como "running" para evitar dupla execução simultânea
+        await supabase.from("leads").update({ enrichment_status: "running" }).eq("id", id);
+        await runEnrichment(supabase, userId, id);
+        ok++;
+      } catch (e) {
+        failed++;
+        await supabase
+          .from("leads")
+          .update({ enrichment_status: "failed" })
+          .eq("id", id);
+        await supabase.from("integration_logs").insert({
+          provider: "lovable_ai",
+          action: "auto_enrich_lead",
+          status: "error",
+          detail: { lead_id: id, error: (e as Error).message },
+        });
+      }
+    }
+    return { processed: ids.length, ok, failed };
   });
 
 /** Sugere mensagem de abordagem para WhatsApp */
