@@ -25,8 +25,6 @@ function DashboardPage() {
     aguardando: "Aguardando retorno",
     agendado: "Agenda marcada",
   };
-  const byStageMap = new Map(data.byStage.map((s) => [s.name, s.count] as const));
-  // We have name only, but order matches stages position 1..6. Rebuild via known label order.
   const stagesByLabel: Record<string, number> = {
     "Novo lead": data.novos,
     "Em qualificação": data.qualificacao,
