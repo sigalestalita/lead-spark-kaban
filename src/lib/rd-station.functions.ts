@@ -311,7 +311,23 @@ export async function runRdSync(supabase: any, mode: SyncMode) {
 export const syncRdLeads = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    return runRdSync(context.supabase as never, "full");
+    try {
+      const result = await runRdSync(context.supabase as never, "full");
+      return { ok: true, ...result };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return {
+        ok: false,
+        error: message,
+        reconnectRequired: message.includes("RD Station recusou"),
+        fetched: 0,
+        created: 0,
+        updated: 0,
+        interactions: 0,
+        pipeline: null,
+        mode: "full" as const,
+      };
+    }
   });
 
 export const testRdConnection = createServerFn({ method: "POST" })
