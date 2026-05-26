@@ -1,6 +1,9 @@
 import type { Lead } from "./lead-types";
 
 const SENIOR_KEYWORDS = [
+  "tomador de decisão",
+  "tomador de decisao",
+  "decisor",
   "analista",
   "gerente",
   "coordenador",
@@ -17,10 +20,17 @@ const SENIOR_KEYWORDS = [
   "cto",
   "cfo",
   "coo",
+  "cmo",
+  "chro",
   "founder",
   "owner",
   "sócio",
   "socio",
+  "hrbp",
+  "business partner",
+  " bp ",
+  "/bp",
+  "(bp)",
 ];
 
 const PERSONAL_DOMAINS = new Set([
