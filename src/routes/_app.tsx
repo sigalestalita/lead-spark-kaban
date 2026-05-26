@@ -8,6 +8,8 @@ import {
   Settings as SettingsIcon,
   LogOut,
   Users,
+  PanelLeftClose,
+  PanelLeft,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_app")({
@@ -19,6 +21,16 @@ function AppShell() {
   const navigate = useNavigate();
   const router = useRouter();
   const [redirecting, setRedirecting] = useState(false);
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("sidebar:collapsed") === "1";
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("sidebar:collapsed", collapsed ? "1" : "0");
+    }
+  }, [collapsed]);
 
   useEffect(() => {
     if (!loading && !user && !redirecting) {
@@ -50,17 +62,28 @@ function AppShell() {
 
   return (
     <div className="min-h-screen flex">
-      <aside className="w-60 shrink-0 border-r border-white/5 bg-white/[0.03] backdrop-blur-xl text-sidebar-foreground flex flex-col">
-        <div className="px-5 py-5 border-b border-white/5">
-          <div className="flex items-center gap-2">
+      <aside
+        className={`${collapsed ? "w-14" : "w-60"} shrink-0 border-r border-white/5 bg-white/[0.03] backdrop-blur-xl text-sidebar-foreground flex flex-col transition-[width] duration-200`}
+      >
+        <div className={`${collapsed ? "px-2" : "px-5"} py-5 border-b border-white/5 flex items-center justify-between gap-2`}>
+          <div className="flex items-center gap-2 min-w-0">
             <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-[oklch(0.55_0.22_260)] grid place-items-center text-primary-foreground shadow-[0_0_24px_-4px_oklch(0.78_0.13_215/0.5)]">
               <Users className="h-4 w-4" />
             </div>
-            <div>
-              <p className="text-sm font-bold tracking-tight text-white">SDR GROU</p>
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Qualificação</p>
-            </div>
+            {!collapsed && (
+              <div className="min-w-0">
+                <p className="text-sm font-bold tracking-tight text-white">SDR GROU</p>
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Qualificação</p>
+              </div>
+            )}
           </div>
+          <button
+            onClick={() => setCollapsed((v) => !v)}
+            title={collapsed ? "Expandir menu" : "Recolher menu"}
+            className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-white/5 hover:text-foreground transition-colors"
+          >
+            {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </button>
         </div>
         <nav className="p-3 space-y-1 flex-1">
           {nav.map((n) => {
@@ -70,26 +93,30 @@ function AppShell() {
               <Link
                 key={n.to}
                 to={n.to}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
+                title={collapsed ? n.label : undefined}
+                className={`flex items-center gap-2 ${collapsed ? "justify-center px-2" : "px-3"} py-2 rounded-lg text-sm transition-all ${
                   active
                     ? "bg-primary/15 text-primary font-semibold border border-primary/30"
                     : "text-muted-foreground hover:bg-white/5 hover:text-foreground border border-transparent"
                 }`}
               >
                 <Icon className="h-4 w-4" />
-                {n.label}
+                {!collapsed && n.label}
               </Link>
             );
           })}
         </nav>
         <div className="p-3 border-t border-white/5">
-          <p className="px-3 text-xs text-muted-foreground truncate">{user.email}</p>
+          {!collapsed && (
+            <p className="px-3 text-xs text-muted-foreground truncate">{user.email}</p>
+          )}
           <button
             onClick={signOut}
-            className="mt-2 flex w-full items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-white/5 hover:text-foreground transition-colors"
+            title={collapsed ? "Sair" : undefined}
+            className={`mt-2 flex w-full items-center gap-2 ${collapsed ? "justify-center px-2" : "px-3"} py-2 rounded-lg text-sm text-muted-foreground hover:bg-white/5 hover:text-foreground transition-colors`}
           >
             <LogOut className="h-4 w-4" />
-            Sair
+            {!collapsed && "Sair"}
           </button>
         </div>
       </aside>
