@@ -284,6 +284,21 @@ async function runEnrichment(supabase: any, userId: string | null, id: string) {
       enriched_at: new Date().toISOString(),
     };
 
+    // Recalcular score/priority/icp_signals com base nos dados enriquecidos
+    const { data: icp } = await supabase
+      .from("icp_config")
+      .select("rules, thresholds")
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
+    const rules = (icp?.rules ?? {}) as unknown as IcpRules;
+    const thresholds = (icp?.thresholds ?? { high: 70, medium: 40, low: 15 }) as unknown as IcpThresholds;
+    const merged = { ...lead, ...patch };
+    const { score, priority, signals } = calculateScore(merged, rules, thresholds);
+    (patch as Record<string, unknown>).score = score;
+    (patch as Record<string, unknown>).priority = priority;
+    (patch as Record<string, unknown>).icp_signals = signals as never;
+
     await supabase.from("leads").update(patch).eq("id", id);
     await supabase.from("lead_interactions").insert({
       lead_id: id,
