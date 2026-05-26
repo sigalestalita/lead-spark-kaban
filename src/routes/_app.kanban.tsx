@@ -51,7 +51,11 @@ function KanbanPage() {
   });
 
   const sync = useMutation({
-    mutationFn: () => syncFn(),
+    mutationFn: async () => {
+      const result = await syncFn();
+      if (!result.ok) throw new Error(result.error);
+      return result;
+    },
     onSuccess: (r) => {
       toast.success(`Sincronizado: ${r.created} novos, ${r.updated} atualizados`);
       qc.invalidateQueries({ queryKey: ["kanban"] });
