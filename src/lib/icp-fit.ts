@@ -1,6 +1,9 @@
 import type { Lead } from "./lead-types";
 
 const SENIOR_KEYWORDS = [
+  "tomador de decisão",
+  "tomador de decisao",
+  "decisor",
   "analista",
   "gerente",
   "coordenador",
@@ -17,10 +20,14 @@ const SENIOR_KEYWORDS = [
   "cto",
   "cfo",
   "coo",
+  "cmo",
+  "chro",
   "founder",
   "owner",
   "sócio",
   "socio",
+  "hrbp",
+  "business partner",
 ];
 
 const PERSONAL_DOMAINS = new Set([
@@ -61,8 +68,11 @@ function parseSize(size?: string | null): number | null {
 }
 
 export function evaluateIcpFit(lead: Lead): IcpFit {
-  const position = (lead.position ?? "").toLowerCase();
-  const seniorPosition = SENIOR_KEYWORDS.some((k) => position.includes(k));
+  const positionRaw = (lead.position ?? "").toLowerCase();
+  // Padroniza separadores para detectar "bp" como token isolado (HR BP, People BP, etc.)
+  const positionTokens = positionRaw.split(/[^a-záéíóúâêôãõç]+/i).filter(Boolean);
+  const seniorPosition =
+    SENIOR_KEYWORDS.some((k) => positionRaw.includes(k)) || positionTokens.includes("bp");
 
   const sizeNum = parseSize(lead.company_size);
   const bigCompany = sizeNum != null && sizeNum >= 100;
