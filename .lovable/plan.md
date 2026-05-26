@@ -1,62 +1,96 @@
 ## Objetivo
 
-Expandir o enriquecimento por IA para preencher também:
-- `linkedin_url` (perfil pessoal do lead)
-- `company_website` (site da empresa)
-- `company_linkedin` (página da empresa no LinkedIn)
+Integrar WhatsApp via **UazAPI** para enviar mensagens diretamente do detalhe do lead e ter um **Inbox unificado** dentro do app, com match por telefone (E.164).
 
-Hoje o `enrichLead` em `src/lib/ai.functions.ts` só gera `company_summary`, `company_segment`, `company_size` e `probable_pain`. Esses três campos novos ficam vazios.
+## Provedor
 
-## Estratégia
+UazAPI (REST + webhook). Por instância (número conectado via QR):
+- `POST /send/text` — envia texto
+- Webhook configurável recebendo `messages.upsert` (mensagem enviada/recebida)
+- Token de instância como header `token`
 
-A IA sozinha (Gemini/GPT) **não navega na web** — se eu só pedir esses links no tool schema, ela vai inventar URLs. Para resolver de verdade preciso combinar duas coisas:
+Secrets necessários (via `add_secret` antes de codar):
+- `UAZAPI_BASE_URL` (ex.: `https://free.uazapi.com`)
+- `UAZAPI_INSTANCE_TOKEN`
+- `UAZAPI_WEBHOOK_SECRET` (gerado por nós, valida o webhook)
 
-1. **Busca real com Firecrawl** (já temos como connector padrão neste stack): faço 1-3 buscas direcionadas usando nome + empresa + cargo, e passo os resultados para a IA escolher a URL correta.
-2. **IA como classificador**: recebe os resultados da busca e retorna apenas URLs que aparecem nos resultados, com `confidence` por campo. Se a confiança for baixa, não grava (evita lixo).
+## Banco — 2 tabelas novas
 
-## Mudanças
+```text
+whatsapp_conversations
+  id, lead_id (nullable), phone_e164 (unique), last_message_at,
+  last_message_preview, unread_count, status (open/archived)
 
-### 1. Ativar connector Firecrawl
-Pedir ao usuário para conectar o Firecrawl (single click). Sem ele, faço fallback: a IA tenta inferir só a partir do domínio do email da empresa (ex.: `joao@acme.com` → `https://acme.com`) — útil mas limitado.
+whatsapp_messages
+  id, conversation_id, lead_id, direction (in/out),
+  phone_e164, body, media_url, status (sent/delivered/read/failed),
+  external_id (id do UazAPI), error, created_at
+```
 
-### 2. `src/lib/ai.functions.ts` — refatorar `enrichLead`
-- Antes de chamar a IA, fazer até 3 buscas Firecrawl:
-  - `"{nome} {empresa} site:linkedin.com/in"` → candidatos a `linkedin_url`
-  - `"{empresa} site:linkedin.com/company"` → candidatos a `company_linkedin`
-  - `"{empresa} site oficial"` (filtrando linkedin/facebook) → candidatos a `company_website`
-- Passar top 5 resultados de cada busca como contexto para a IA.
-- Expandir o tool schema com:
-  - `linkedin_url: string | null`
-  - `company_website: string | null`
-  - `company_linkedin: string | null`
-  - `links_confidence: { linkedin_url, company_website, company_linkedin } com "alta"/"media"/"baixa"/"nenhum"`
-- Regras de gravação no `update`:
-  - Só preencher campo se `confidence !== "baixa"` E `!== "nenhum"` E o lead ainda não tiver valor manual.
-  - Validar formato (`new URL(...)`) antes de gravar — descartar se não for URL válida.
-- Logar em `lead_interactions` (tipo `enrichment`) quais links foram encontrados e descartados.
+- RLS: `authenticated` lê/escreve tudo (segue padrão do projeto).
+- Realtime habilitado em ambas para atualizar a UI ao vivo.
+- Função `normalize_phone(text)` → E.164 (`+55...`), usada em trigger e no match.
 
-### 3. UI no detalhe do lead (`src/routes/_app.lead.$id.tsx`)
-- Onde já mostro os campos da empresa, garantir que os três links apareçam como **link clicável** (ícone externo) quando preenchidos.
-- Se vazios após enriquecimento, mostrar "—" (já é o padrão hoje, só validar).
+## Server-side (TanStack)
 
-### 4. Fallback sem Firecrawl
-Se `FIRECRAWL_API_KEY` não estiver definido:
-- Pular a busca, chamar IA só com contexto local + domínio do email.
-- A IA pode sugerir `company_website` baseado no domínio do email (ex.: email `@empresa.com.br` → `https://empresa.com.br`), mas `linkedin_url` e `company_linkedin` ficam null.
+### `src/lib/whatsapp.functions.ts` (createServerFn)
+- `sendWhatsappMessage({ leadId?, phone, body })` — valida com Zod, normaliza telefone, chama UazAPI, grava `whatsapp_messages` (direction=out), atualiza/cria `whatsapp_conversations`, registra `lead_interactions` tipo `whatsapp_out`.
+- `listConversations({ search?, status? })` — lista paginada com join leve em `leads`.
+- `getConversation({ conversationId })` — conversa + últimas N mensagens + lead.
+- `markConversationRead({ conversationId })`.
 
-## Detalhes técnicos
+### `src/routes/api/public/hooks/whatsapp.ts` (server route)
+- POST recebe webhook UazAPI.
+- Valida header `x-webhook-secret` contra `UAZAPI_WEBHOOK_SECRET` (timingSafeEqual).
+- Para cada mensagem: normaliza telefone, faz match em `leads.phone` (E.164); se achar lead, vincula; senão deixa `lead_id=null` (caixa "sem lead").
+- Insere em `whatsapp_messages` (direction=in), atualiza `whatsapp_conversations` (last_message_at, unread_count++).
+- Também trata status updates (delivered/read) atualizando `external_id`.
 
-- Firecrawl chamado **dentro do `.handler()`** via `@mendable/firecrawl-js` (SDK v2), nunca no client. `FIRECRAWL_API_KEY` lido de `process.env`.
-- Usar modelo `google/gemini-3-flash-preview` (já em uso) — barato e suficiente para essa classificação.
-- Não criar tabela nova: os campos já existem em `leads`.
-- Sem mudança de schema, sem migration.
+## UI
 
-## Fora de escopo
+### 1. Detalhe do lead (`src/routes/_app.lead.$id.tsx`)
+- Nova aba/card "WhatsApp" com:
+  - Histórico de mensagens (in/out) do telefone do lead
+  - Composer (textarea + enviar)
+  - Aviso se `lead.phone` estiver vazio ou não normalizável
 
-- Não vou scrapear o conteúdo do LinkedIn (LinkedIn bloqueia bots e o Firecrawl não é confiável lá).
-- Não vou tentar achar telefone — campo `phone` continua manual.
-- Não vou mexer no fluxo do Claude/RD (continua como está).
+### 2. Inbox (`src/routes/_app.inbox.tsx` — nova rota)
+- Layout 2 colunas:
+  - **Esquerda**: lista de conversas (ordenadas por `last_message_at`, badge unread, busca por nome/telefone, filtro "sem lead")
+  - **Direita**: thread da conversa selecionada + composer
+- Subscribe realtime em `whatsapp_messages` e `whatsapp_conversations` para atualizar sem refresh.
+- Item no menu lateral em `src/routes/_app.tsx` (ícone MessageCircle).
+
+## Fluxo de configuração (Configurações)
+
+Bloco novo em `_app.configuracoes.tsx` "WhatsApp (UazAPI)":
+- Mostra URL do webhook que o usuário cola no painel UazAPI: `https://sdr-grou.lovable.app/api/public/hooks/whatsapp`
+- Botão "Testar envio" (envia mensagem de teste para um número informado)
+- Status da última mensagem recebida (timestamp)
+
+## Segurança
+
+- Webhook valida secret + Zod no payload.
+- Rate-limit simples no `sendWhatsappMessage` (1 msg / 2s por usuário, em memória aceitável no MVP — anotar limitação).
+- `phone` validado com Zod regex E.164 antes de qualquer chamada externa.
+- Service role só dentro do webhook (precisa bypassar RLS para inserir sem sessão).
+
+## Fora de escopo (MVP)
+
+- Templates HSM / disparo em massa
+- Mídia (áudio/imagem/documento) — só texto no v1; schema já suporta `media_url` para depois
+- Disparo automático por IA (fica como botão "sugerir mensagem" reusando `suggestApproach` já existente)
+- Múltiplas instâncias / múltiplos números
+
+## Ordem de execução
+
+1. `add_secret` para `UAZAPI_BASE_URL`, `UAZAPI_INSTANCE_TOKEN`, `UAZAPI_WEBHOOK_SECRET`
+2. Migration: tabelas + RLS + realtime + função normalize_phone
+3. `whatsapp.functions.ts` + webhook route
+4. Aba WhatsApp no detalhe do lead
+5. Rota `/inbox` + item de menu
+6. Card de configuração + URL do webhook
 
 ## Pergunta antes de seguir
 
-Posso pedir para você conectar o **Firecrawl** (connector padrão da Lovable, gratuito até certo volume) para que a busca funcione de verdade? Sem ele, só consigo o `company_website` aproximado pelo domínio do email.
+Tem um número UazAPI já conectado e o `token` da instância em mãos? Se sim, posso pedir os 3 secrets logo no início da implementação.
