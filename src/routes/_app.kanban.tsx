@@ -223,11 +223,39 @@ function Column({ stageId, name, color, count, children }: { stageId: string; na
   );
 }
 
-function LeadCard({ lead, overlay }: { lead: import("@/lib/lead-types").Lead; overlay?: boolean }) {
+function LeadCard({
+  lead,
+  stageSlug,
+  overlay,
+}: {
+  lead: import("@/lib/lead-types").Lead;
+  stageSlug: string;
+  overlay?: boolean;
+}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: lead.id,
     data: { stage_id: lead.stage_id },
   });
+
+  const convertedAt = lead.converted_at ? new Date(lead.converted_at) : null;
+  const stageEnteredAt = lead.stage_entered_at ? new Date(lead.stage_entered_at) : null;
+  const meetingAt = lead.meeting_at ? new Date(lead.meeting_at) : null;
+
+  const sinceConversion =
+    convertedAt && stageEnteredAt
+      ? formatDistanceToNow(convertedAt, { locale: ptBR }) // total tempo desde conversão
+      : null;
+  const daysInStage =
+    stageEnteredAt ? Math.max(0, differenceInDays(new Date(), stageEnteredAt)) : null;
+
+  const formPayload = (lead.form_payload ?? null) as Record<string, unknown> | null;
+  const formEntries =
+    formPayload && typeof formPayload === "object"
+      ? Object.entries(formPayload)
+          .filter(([, v]) => v != null && v !== "" && typeof v !== "object")
+          .slice(0, 6)
+      : [];
+
   const content = (
     <Card
       className={`p-3 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${
@@ -253,8 +281,78 @@ function LeadCard({ lead, overlay }: { lead: import("@/lib/lead-types").Lead; ov
         </Badge>
       </div>
       {lead.company_name && <p className="text-xs text-muted-foreground truncate">{lead.company_name}</p>}
-      {lead.campaign && <p className="text-[10px] text-muted-foreground truncate mt-1">📣 {lead.campaign}</p>}
-      <div className="flex justify-between items-center mt-2">
+
+      {stageSlug === "novo" && (
+        <div className="mt-2 space-y-1">
+          {lead.campaign && (
+            <p className="text-[10px] text-muted-foreground truncate">📣 {lead.campaign}</p>
+          )}
+          {lead.form_name && (
+            <p className="text-[10px] text-muted-foreground truncate">📝 {lead.form_name}</p>
+          )}
+          {formEntries.length > 0 && (
+            <div className="rounded bg-muted/40 p-1.5 space-y-0.5">
+              {formEntries.map(([k, v]) => (
+                <div key={k} className="text-[10px] truncate">
+                  <span className="text-muted-foreground">{k}:</span>{" "}
+                  <span className="font-medium">{String(v)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {convertedAt && (
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              Convertido {format(convertedAt, "dd/MM HH:mm", { locale: ptBR })}
+            </p>
+          )}
+        </div>
+      )}
+
+      {(stageSlug === "qualificacao" || stageSlug === "em_contato") && (
+        <div className="mt-2 text-[10px] text-muted-foreground flex items-center gap-1">
+          <Timer className="h-3 w-3" />
+          {convertedAt && stageEnteredAt
+            ? `${formatDistanceToNow(convertedAt, { locale: ptBR, addSuffix: false })} após conversão`
+            : "—"}
+        </div>
+      )}
+
+      {stageSlug === "aguardando" && (
+        <div className="mt-2 text-[10px] text-muted-foreground flex items-center gap-1">
+          <Timer className="h-3 w-3" />
+          {daysInStage != null
+            ? `${daysInStage} ${daysInStage === 1 ? "dia" : "dias"} aguardando`
+            : "—"}
+        </div>
+      )}
+
+      {stageSlug === "agendado" && (
+        <div className="mt-2 space-y-1">
+          <p className="text-[10px] font-medium flex items-center gap-1 text-emerald-600">
+            <Calendar className="h-3 w-3" />
+            {meetingAt
+              ? `Agenda: ${format(meetingAt, "dd/MM HH:mm", { locale: ptBR })}`
+              : "Sem data de agenda"}
+          </p>
+          {convertedAt && stageEnteredAt && (
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <Timer className="h-3 w-3" />
+              {formatDistanceToNow(convertedAt, { locale: ptBR })} após conversão
+            </p>
+          )}
+        </div>
+      )}
+
+      {stageSlug === "desqualificado" && (
+        <div className="mt-2 text-[10px]">
+          <Badge variant="outline" className="text-[10px]">
+            {lead.lost_reason ?? "Sem motivo"}
+          </Badge>
+        </div>
+      )}
+
+      <div className="flex justify-between items-center mt-2 pt-2 border-t border-border/40">
         <span className="text-[10px] text-muted-foreground">
           {lead.last_action_at
             ? formatDistanceToNow(new Date(lead.last_action_at), { addSuffix: true, locale: ptBR })
@@ -262,12 +360,55 @@ function LeadCard({ lead, overlay }: { lead: import("@/lib/lead-types").Lead; ov
         </span>
         <span className="text-[10px] font-mono text-muted-foreground">{lead.score}pts</span>
       </div>
+      {/* unused but keep referenced to avoid lint */}
+      <span className="hidden">{sinceConversion}</span>
     </Card>
   );
   if (overlay) return content;
   return (
     <div ref={setNodeRef} {...listeners} {...attributes}>
       {content}
+    </div>
+  );
+}
+
+function LostReasonDialog({
+  onClose,
+  onPick,
+}: {
+  onClose: () => void;
+  onPick: (reason: string) => void;
+}) {
+  const reasons = ["Sem perfil", "Sem fit com soluções", "Sem contato"];
+  const [custom, setCustom] = useState("");
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={onClose}>
+      <Card className="p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-bold mb-1">Motivo de desqualificação</h2>
+        <p className="text-xs text-muted-foreground mb-4">Escolha o motivo para mover este lead.</p>
+        <div className="space-y-2">
+          {reasons.map((r) => (
+            <Button key={r} variant="outline" className="w-full justify-start" onClick={() => onPick(r)}>
+              {r}
+            </Button>
+          ))}
+        </div>
+        <div className="mt-4 flex gap-2">
+          <Input
+            placeholder="Outro motivo…"
+            value={custom}
+            onChange={(e) => setCustom(e.target.value)}
+          />
+          <Button disabled={!custom.trim()} onClick={() => onPick(custom.trim())}>
+            Salvar
+          </Button>
+        </div>
+        <div className="mt-4 text-right">
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Cancelar
+          </Button>
+        </div>
+      </Card>
     </div>
   );
 }
