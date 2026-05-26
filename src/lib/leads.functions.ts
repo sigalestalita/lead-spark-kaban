@@ -72,8 +72,9 @@ export const moveLeadStage = createServerFn({ method: "POST" })
     const patch: Record<string, unknown> = {
       stage_id: data.stageId,
       last_action_at: new Date().toISOString(),
+      stage_entered_at: new Date().toISOString(),
     };
-    if (stage?.slug === "abordado") {
+    if (stage?.slug === "em_contato") {
       patch.first_approach_at = new Date().toISOString();
     }
 
@@ -122,6 +123,8 @@ export const updateLead = createServerFn({ method: "POST" })
       "approach_result",
       "assigned_to",
       "stage_id",
+      "meeting_at",
+      "lost_reason",
     ];
     for (const k of allowedKeys) {
       if (k in data.patch) allowed[k] = data.patch[k];

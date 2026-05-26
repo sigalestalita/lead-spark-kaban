@@ -23,8 +23,9 @@ function DashboardPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Kpi label="Total de leads" value={data.total} />
         <Kpi label="Novos" value={data.novos} />
-        <Kpi label="Abordados" value={data.abordados} />
         <Kpi label="Em qualificação" value={data.qualificacao} />
+        <Kpi label="Em contato" value={data.em_contato} />
+        <Kpi label="Aguardando" value={data.aguardando} />
         <Kpi label="Agendados" value={data.agendados} highlight />
         <Kpi label="Desqualificados" value={data.desqualificados} />
         <Kpi label="Conversão lead→agenda" value={`${data.conversionRate}%`} />
