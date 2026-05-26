@@ -97,9 +97,25 @@ async function runEnrichment(supabase: any, userId: string | null, id: string) {
     // 1) Buscas Firecrawl para descobrir URLs reais (linkedin pessoal, linkedin empresa, site)
     const company = (lead.company_name ?? "").trim();
     const person = (lead.name ?? "").trim();
-    const [linkedinHits, linkedinByNameHits, companyLinkedinHits, websiteHits] = await Promise.all([
-      company && person
-        ? firecrawlSearch(`${person} ${company} site:linkedin.com/in`)
+    // Normaliza o nome da empresa: remove sufixos jurídicos (Ltda, S/A, ME, EIRELI, EPP,
+    // Imp/Com/Ind, Inc, Corp etc.) que poluem a busca no Google e fazem `site:linkedin.com`
+    // retornar zero resultados. Mantém apenas as 3 primeiras palavras significativas.
+    const companyClean = (() => {
+      if (!company) return "";
+      const stop = /\b(ltda|s\/?a|s\.a\.?|me|eireli|epp|inc|llc|corp|cia|cia\.|oficial|grupo|holding|imp|com|ind|importadora|exportadora|exp|distribuidora|dist|servi[cç]os?|tecnologia|tech|do brasil|brasil|do br|br)\b\.?/gi;
+      const cleaned = company
+        .replace(stop, " ")
+        .replace(/[^\p{L}\p{N}\s&]+/gu, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      // pega no máximo as 3 primeiras palavras
+      return cleaned.split(" ").slice(0, 3).join(" ");
+    })();
+    const companyForSearch = companyClean || company;
+
+    const [linkedinHits, linkedinByNameHits, linkedinByNameAndCompanyHits, companyLinkedinHits, websiteHits] = await Promise.all([
+      companyForSearch && person
+        ? firecrawlSearch(`${person} ${companyForSearch} site:linkedin.com/in`)
         : Promise.resolve([] as SearchHit[]),
       // Busca "limpa" — só pelo nome — para descobrir a empresa ATUAL do contato
       // (a empresa no form costuma estar desatualizada; os snippets do Google
@@ -108,11 +124,16 @@ async function runEnrichment(supabase: any, userId: string | null, id: string) {
       person
         ? firecrawlSearch(`"${person}" linkedin`)
         : Promise.resolve([] as SearchHit[]),
-      company
-        ? firecrawlSearch(`"${company}" linkedin empresa`)
+      // Busca permissiva (sem `site:`) — pega snippets de contactout/rocketreach/zoominfo
+      // que normalmente exibem "Nome - Cargo na Empresa" e ajudam a IA a confirmar o match.
+      companyForSearch && person
+        ? firecrawlSearch(`"${person}" ${companyForSearch}`)
         : Promise.resolve([] as SearchHit[]),
-      company
-        ? firecrawlSearch(`"${company}" -site:linkedin.com -site:facebook.com -site:instagram.com`)
+      companyForSearch
+        ? firecrawlSearch(`"${companyForSearch}" linkedin empresa`)
+        : Promise.resolve([] as SearchHit[]),
+      companyForSearch
+        ? firecrawlSearch(`"${companyForSearch}" -site:linkedin.com -site:facebook.com -site:instagram.com`)
         : Promise.resolve([] as SearchHit[]),
     ]);
 
