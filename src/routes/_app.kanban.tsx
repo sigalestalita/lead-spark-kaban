@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PRIORITY_LABEL, PRIORITY_COLOR } from "@/lib/lead-types";
+import { evaluateIcpFit } from "@/lib/icp-fit";
 import { toast } from "sonner";
-import { RefreshCw, Plus, Search, Calendar, Clock, Timer } from "lucide-react";
+import { RefreshCw, Plus, Search, Calendar, Clock, Timer, Flame, Briefcase, Building2, Mail } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -174,9 +175,25 @@ function KanbanPage() {
       >
         <div className="flex gap-3 overflow-x-auto pb-4">
           {data.stages.map((s) => {
-            const stageLeads = filtered.filter((l) => l.stage_id === s.id);
+            let stageLeads = filtered.filter((l) => l.stage_id === s.id);
+            if (s.slug === "novo") {
+              stageLeads = [...stageLeads].sort((a, b) => {
+                const fa = evaluateIcpFit(a).score;
+                const fb = evaluateIcpFit(b).score;
+                if (fb !== fa) return fb - fa;
+                const ta = a.converted_at ? new Date(a.converted_at).getTime() : new Date(a.created_at).getTime();
+                const tb = b.converted_at ? new Date(b.converted_at).getTime() : new Date(b.created_at).getTime();
+                return tb - ta;
+              });
+            }
             return (
-              <Column key={s.id} stageId={s.id} name={s.name} color={s.color} count={stageLeads.length}>
+              <Column
+                key={s.id}
+                stageId={s.id}
+                name={s.slug === "novo" ? "Novo lead · Priorização" : s.name}
+                color={s.color}
+                count={stageLeads.length}
+              >
                 {stageLeads.map((l) => (
                   <LeadCard key={l.id} lead={l} stageSlug={s.slug} />
                 ))}
