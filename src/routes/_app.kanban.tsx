@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { listKanbanData, moveLeadStage, createManualLead } from "@/lib/leads.functions";
+import { listKanbanData, moveLeadStage, createManualLead, updateLead } from "@/lib/leads.functions";
 import { syncRdLeads } from "@/lib/rd-station.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PRIORITY_LABEL, PRIORITY_COLOR } from "@/lib/lead-types";
 import { toast } from "sonner";
-import { RefreshCw, Plus, Search } from "lucide-react";
+import { RefreshCw, Plus, Search, Calendar, Clock, Timer } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -21,7 +21,7 @@ import {
   useDroppable,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export const Route = createFileRoute("/_app/kanban")({
@@ -34,10 +34,12 @@ function KanbanPage() {
   const moveFn = useServerFn(moveLeadStage);
   const syncFn = useServerFn(syncRdLeads);
   const createFn = useServerFn(createManualLead);
+  const updateFn = useServerFn(updateLead);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [priority, setPriority] = useState<string>("all");
   const [showNew, setShowNew] = useState(false);
+  const [lostFor, setLostFor] = useState<{ leadId: string; stageId: string } | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["kanban"],
@@ -93,11 +95,18 @@ function KanbanPage() {
   const onDragEnd = (e: DragEndEvent) => {
     setActiveId(null);
     if (e.over && e.active.data.current && e.over.id !== e.active.data.current.stage_id) {
-      move.mutate({ leadId: e.active.id as string, stageId: e.over.id as string });
+      const targetStage = data.stages.find((s) => s.id === e.over!.id);
+      const payload = { leadId: e.active.id as string, stageId: e.over.id as string };
+      if (targetStage?.slug === "desqualificado") {
+        setLostFor(payload);
+      } else {
+        move.mutate(payload);
+      }
     }
   };
 
   const activeLead = activeId ? filtered.find((l) => l.id === activeId) : null;
+  const stageById = new Map(data.stages.map((s) => [s.id, s] as const));
 
   return (
     <div className="p-6 space-y-4">
@@ -151,14 +160,20 @@ function KanbanPage() {
             return (
               <Column key={s.id} stageId={s.id} name={s.name} color={s.color} count={stageLeads.length}>
                 {stageLeads.map((l) => (
-                  <LeadCard key={l.id} lead={l} />
+                  <LeadCard key={l.id} lead={l} stageSlug={s.slug} />
                 ))}
               </Column>
             );
           })}
         </div>
         <DragOverlay>
-          {activeLead ? <LeadCard lead={activeLead} overlay /> : null}
+          {activeLead ? (
+            <LeadCard
+              lead={activeLead}
+              stageSlug={stageById.get(activeLead.stage_id ?? "")?.slug ?? ""}
+              overlay
+            />
+          ) : null}
         </DragOverlay>
       </DndContext>
 
@@ -170,6 +185,21 @@ function KanbanPage() {
           setShowNew(false);
         } catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
       }} />}
+
+      {lostFor && (
+        <LostReasonDialog
+          onClose={() => setLostFor(null)}
+          onPick={async (reason) => {
+            try {
+              await updateFn({ data: { id: lostFor.leadId, patch: { lost_reason: reason } } });
+              await move.mutateAsync(lostFor);
+              setLostFor(null);
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : "Erro");
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
