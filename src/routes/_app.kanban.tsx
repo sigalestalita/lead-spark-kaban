@@ -48,8 +48,26 @@ function KanbanPage() {
 
   const move = useMutation({
     mutationFn: (vars: { leadId: string; stageId: string }) => moveFn({ data: vars }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["kanban"] }),
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao mover"),
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: ["kanban"] });
+      const prev = qc.getQueryData<Awaited<ReturnType<typeof fetchData>>>(["kanban"]);
+      if (prev) {
+        qc.setQueryData(["kanban"], {
+          ...prev,
+          leads: prev.leads.map((l) =>
+            l.id === vars.leadId
+              ? { ...l, stage_id: vars.stageId, stage_entered_at: new Date().toISOString(), last_action_at: new Date().toISOString() }
+              : l
+          ),
+        });
+      }
+      return { prev };
+    },
+    onError: (e, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["kanban"], ctx.prev);
+      toast.error(e instanceof Error ? e.message : "Falha ao mover");
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["kanban"] }),
   });
 
   const sync = useMutation({
