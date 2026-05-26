@@ -86,7 +86,13 @@ export const enrichLead = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { data: lead } = await supabase.from("leads").select("*").eq("id", data.id).maybeSingle();
+    return runEnrichment(supabase, userId, data.id);
+  });
+
+type SupaClient = Parameters<typeof requireSupabaseAuth.client>[0] extends infer _ ? any : any;
+
+async function runEnrichment(supabase: any, userId: string | null, id: string) {
+    const { data: lead } = await supabase.from("leads").select("*").eq("id", id).maybeSingle();
     if (!lead) throw new Error("Lead não encontrado");
 
     // 1) Buscas Firecrawl para descobrir URLs reais (linkedin pessoal, linkedin empresa, site)
