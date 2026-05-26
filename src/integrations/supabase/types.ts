@@ -186,6 +186,8 @@ export type Database = {
           id: string
           last_action_at: string | null
           linkedin_url: string | null
+          lost_reason: string | null
+          meeting_at: string | null
           name: string
           next_action: string | null
           original_company_name: string | null
@@ -198,6 +200,7 @@ export type Database = {
           rd_status: string | null
           score: number
           source: string | null
+          stage_entered_at: string | null
           stage_id: string | null
           updated_at: string
         }
@@ -227,6 +230,8 @@ export type Database = {
           id?: string
           last_action_at?: string | null
           linkedin_url?: string | null
+          lost_reason?: string | null
+          meeting_at?: string | null
           name: string
           next_action?: string | null
           original_company_name?: string | null
@@ -239,6 +244,7 @@ export type Database = {
           rd_status?: string | null
           score?: number
           source?: string | null
+          stage_entered_at?: string | null
           stage_id?: string | null
           updated_at?: string
         }
@@ -268,6 +274,8 @@ export type Database = {
           id?: string
           last_action_at?: string | null
           linkedin_url?: string | null
+          lost_reason?: string | null
+          meeting_at?: string | null
           name?: string
           next_action?: string | null
           original_company_name?: string | null
@@ -280,6 +288,7 @@ export type Database = {
           rd_status?: string | null
           score?: number
           source?: string | null
+          stage_entered_at?: string | null
           stage_id?: string | null
           updated_at?: string
         }
