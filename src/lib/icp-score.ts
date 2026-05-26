@@ -1,4 +1,5 @@
 import type { Lead } from "./lead-types";
+import { evaluateIcpFit } from "./icp-fit";
 
 export interface IcpRules {
   weights?: {
@@ -23,88 +24,41 @@ export interface IcpThresholds {
 
 export type Priority = "alta" | "media" | "baixa" | "fora_icp" | "pendente";
 
-const FREE_EMAIL_DOMAINS = [
-  "gmail.com",
-  "hotmail.com",
-  "outlook.com",
-  "yahoo.com",
-  "icloud.com",
-  "live.com",
-  "uol.com.br",
-  "bol.com.br",
-];
-
-function includesAny(haystack: string | null | undefined, needles: string[]): boolean {
-  if (!haystack) return false;
-  const h = haystack.toLowerCase();
-  return needles.some((n) => h.includes(n.toLowerCase()));
-}
-
 export interface ScoreResult {
   score: number;
   priority: Priority;
   signals: { key: string; label: string; matched: boolean }[];
 }
 
+/**
+ * Scoring simplificado — 3 sinais binários (compartilhados com `evaluateIcpFit`):
+ *  1. Cargo decisor (gerente/coordenador/supervisor/diretor/CEO/HRBP/BP/etc.)
+ *  2. Email corporativo (qualquer domínio não-pessoal)
+ *  3. Empresa com >100 funcionários
+ *
+ * Cada sinal vale ~33pts. Prioridade pela quantidade de sinais batidos:
+ *  3/3 → alta · 2/3 → média · 1/3 → baixa · 0/3 → fora_icp.
+ *
+ * Os parâmetros `rules`/`thresholds` são aceitos por compatibilidade mas ignorados.
+ */
 export function calculateScore(
   lead: Partial<Lead>,
-  rules: IcpRules,
-  thresholds: IcpThresholds
+  _rules?: IcpRules,
+  _thresholds?: IcpThresholds
 ): ScoreResult {
-  const w = {
-    b2b: 20,
-    size: 20,
-    segment: 15,
-    position: 15,
-    campaign: 10,
-    intent: 20,
-    ...(rules.weights ?? {}),
-  };
-
-  const signals: ScoreResult["signals"] = [];
-  let score = 0;
-
-  // B2B: email corporativo (não é domínio gratuito)
-  const domain = (lead.email ?? "").split("@")[1]?.toLowerCase();
-  const b2b = !!domain && !FREE_EMAIL_DOMAINS.includes(domain);
-  signals.push({ key: "b2b", label: "Email corporativo", matched: b2b });
-  if (b2b) score += w.b2b;
-
-  // Size
-  const sizeMatch = !!lead.company_size && (rules.target_sizes ?? []).includes(lead.company_size);
-  signals.push({ key: "size", label: "Tamanho da empresa aderente", matched: sizeMatch });
-  if (sizeMatch) score += w.size;
-
-  // Segment
-  const segMatch = includesAny(lead.company_segment, rules.target_segments ?? []);
-  signals.push({ key: "segment", label: "Segmento aderente", matched: segMatch });
-  if (segMatch) score += w.segment;
-
-  // Position
-  const posMatch = includesAny(lead.position, rules.target_positions ?? []);
-  signals.push({ key: "position", label: "Cargo decisor", matched: posMatch });
-  if (posMatch) score += w.position;
-
-  // Campaign
-  const campMatch =
-    (rules.target_campaigns?.length ?? 0) > 0 &&
-    includesAny(lead.campaign, rules.target_campaigns ?? []);
-  signals.push({ key: "campaign", label: "Campanha prioritária", matched: campMatch });
-  if (campMatch) score += w.campaign;
-
-  // Intent — heurística simples sobre payload
-  const payloadText = JSON.stringify(lead.form_payload ?? {}).toLowerCase();
-  const intentMatch = /demo|orçamento|reuniao|reunião|urgente|implementar|comprar|teste/.test(
-    payloadText
-  );
-  signals.push({ key: "intent", label: "Intenção declarada no formulário", matched: intentMatch });
-  if (intentMatch) score += w.intent;
-
+  const fit = evaluateIcpFit(lead as Lead);
+  const signals: ScoreResult["signals"] = [
+    { key: "position", label: "Cargo decisor", matched: fit.seniorPosition },
+    { key: "b2b", label: "Email corporativo", matched: fit.corporateEmail },
+    { key: "size", label: "Empresa com mais de 100 funcionários", matched: fit.bigCompany },
+  ];
+  const matched = signals.filter((s) => s.matched).length;
+  // 1 sinal = 33, 2 = 66, 3 = 100
+  const score = matched === 3 ? 100 : matched * 33;
   let priority: Priority;
-  if (score >= thresholds.high) priority = "alta";
-  else if (score >= thresholds.medium) priority = "media";
-  else if (score >= thresholds.low) priority = "baixa";
+  if (matched === 3) priority = "alta";
+  else if (matched === 2) priority = "media";
+  else if (matched === 1) priority = "baixa";
   else priority = "fora_icp";
-
   return { score, priority, signals };
 }
