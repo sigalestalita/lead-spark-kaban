@@ -215,20 +215,21 @@ async function runEnrichment(supabase: any, userId: string | null, id: string) {
       payload: lead.form_payload,
       dominio_email_corporativo: emailDomain,
       busca_linkedin_pessoal: linkedinHits,
+      busca_pessoa_e_empresa: linkedinByNameAndCompanyHits,
       busca_linkedin_empresa: companyLinkedinHits,
       busca_site_empresa: websiteHits,
     };
 
     // 2) Snippets do LinkedIn por nome — fonte primária para descobrir a empresa ATUAL.
-    // Combinamos a busca por nome+empresa e a busca só por nome; dedupe por URL.
+    // Combinamos as 3 buscas relacionadas à pessoa; dedupe por URL.
     const linkedinSnippetsForCurrentCompany = (() => {
-      const all = [...linkedinByNameHits, ...linkedinHits];
+      const all = [...linkedinByNameHits, ...linkedinByNameAndCompanyHits, ...linkedinHits];
       const seen = new Set<string>();
       return all.filter((h) => {
         if (seen.has(h.url)) return false;
         seen.add(h.url);
         return true;
-      }).slice(0, 8);
+      }).slice(0, 12);
     })();
     (ctx as Record<string, unknown>).linkedin_snippets_para_empresa_atual = linkedinSnippetsForCurrentCompany;
     (ctx as Record<string, unknown>).empresa_no_formulario = lead.company_name;
