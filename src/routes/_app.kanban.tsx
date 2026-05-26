@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { listKanbanData, moveLeadStage, createManualLead, updateLead } from "@/lib/leads.functions";
 import { syncRdLeads } from "@/lib/rd-station.functions";
+import { autoEnrichPendingLeads } from "@/lib/ai.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -36,6 +37,7 @@ function KanbanPage() {
   const syncFn = useServerFn(syncRdLeads);
   const createFn = useServerFn(createManualLead);
   const updateFn = useServerFn(updateLead);
+  const autoEnrichFn = useServerFn(autoEnrichPendingLeads);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [priority, setPriority] = useState<string>("all");
@@ -46,6 +48,35 @@ function KanbanPage() {
     queryKey: ["kanban"],
     queryFn: () => fetchData(),
   });
+
+  // Auto-enriquecimento: dispara em background quando há leads pendentes.
+  // Roda ao abrir o Kanban e a cada 90s enquanto houver pendentes.
+  const enrichingRef = useRef(false);
+  useEffect(() => {
+    const pendingCount = (data?.leads ?? []).filter((l) => l.enrichment_status === "pending").length;
+    if (pendingCount === 0 || enrichingRef.current) return;
+    let cancelled = false;
+    const run = async () => {
+      if (enrichingRef.current) return;
+      enrichingRef.current = true;
+      try {
+        const res = await autoEnrichFn({ data: { limit: 5 } });
+        if (!cancelled && res?.ok) {
+          qc.invalidateQueries({ queryKey: ["kanban"] });
+        }
+      } catch {
+        /* silencioso */
+      } finally {
+        enrichingRef.current = false;
+      }
+    };
+    run();
+    const t = setInterval(run, 90_000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [data?.leads, autoEnrichFn, qc]);
 
   const move = useMutation({
     mutationFn: (vars: { leadId: string; stageId: string }) => moveFn({ data: vars }),
