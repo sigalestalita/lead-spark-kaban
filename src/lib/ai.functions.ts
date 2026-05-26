@@ -359,9 +359,9 @@ export const autoEnrichPendingLeads = createServerFn({ method: "POST" })
     return { processed: ids.length, ok, failed };
   });
 
-/** Recalcula score/priority/icp_signals para leads já enriquecidos cujo score ficou desatualizado.
- *  Útil para retroagir mudanças do calculador / dados que foram enriquecidos antes do recálculo
- *  automático existir. Roda sobre todos os leads `found` que ainda estão com priority='pendente'. */
+/** Recalcula score/priority/icp_signals para leads já enriquecidos.
+ *  Roda sobre todos os leads `found` e atualiza apenas quando o resultado mudar
+ *  (idempotente — seguro de rodar repetidamente). */
 export const recalculatePendingScores = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ limit: z.number().int().min(1).max(500).optional() }).parse(d ?? {}))
@@ -381,12 +381,12 @@ export const recalculatePendingScores = createServerFn({ method: "POST" })
       .from("leads")
       .select("*")
       .eq("enrichment_status", "found")
-      .eq("priority", "pendente")
       .limit(limit);
 
     let updated = 0;
     for (const lead of leads ?? []) {
       const { score, priority, signals } = calculateScore(lead, rules, thresholds);
+      if (lead.score === score && lead.priority === priority) continue;
       const { error } = await supabase
         .from("leads")
         .update({ score, priority, icp_signals: signals as never })
