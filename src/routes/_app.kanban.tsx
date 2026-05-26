@@ -141,6 +141,27 @@ function KanbanPage() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const [activeId, setActiveId] = useState<string | null>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [focusedCol, setFocusedCol] = useState(0);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      const tgt = e.target as HTMLElement | null;
+      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.tagName === "SELECT" || tgt.isContentEditable)) return;
+      const stages = data?.stages ?? [];
+      if (stages.length === 0) return;
+      e.preventDefault();
+      setFocusedCol((i) => {
+        const next = e.key === "ArrowLeft" ? Math.max(0, i - 1) : Math.min(stages.length - 1, i + 1);
+        const el = scrollerRef.current?.querySelector<HTMLElement>(`[data-col-index="${next}"]`);
+        el?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+        return next;
+      });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [data?.stages]);
 
   if (isLoading) return <div className="p-8 text-sm text-muted-foreground">Carregando…</div>;
   if (!data) return null;
@@ -221,8 +242,8 @@ function KanbanPage() {
         onDragEnd={onDragEnd}
         onDragCancel={() => setActiveId(null)}
       >
-        <div className="flex gap-3 overflow-x-auto pb-4">
-          {data.stages.map((s) => {
+        <div ref={scrollerRef} className="flex gap-3 overflow-x-auto pb-4">
+          {data.stages.map((s, idx) => {
             let stageLeads = filtered.filter((l) => l.stage_id === s.id);
             if (s.slug === "novo") {
               stageLeads = [...stageLeads].sort((a, b) => {
@@ -241,6 +262,8 @@ function KanbanPage() {
                 name={s.slug === "novo" ? "Novo lead · Priorização" : s.name}
                 color={s.color}
                 count={stageLeads.length}
+                index={idx}
+                focused={idx === focusedCol}
               >
                 {stageLeads.map((l) => (
                   <LeadCard key={l.id} lead={l} stageSlug={s.slug} />
@@ -287,12 +310,13 @@ function KanbanPage() {
   );
 }
 
-function Column({ stageId, name, color, count, children }: { stageId: string; name: string; color: string; count: number; children: React.ReactNode }) {
+function Column({ stageId, name, color, count, index, focused, children }: { stageId: string; name: string; color: string; count: number; index: number; focused: boolean; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id: stageId });
   return (
     <div
       ref={setNodeRef}
-      className={`w-72 shrink-0 rounded-lg bg-muted/40 border ${isOver ? "ring-2 ring-primary" : ""}`}
+      data-col-index={index}
+      className={`w-72 shrink-0 rounded-lg bg-muted/40 border ${isOver ? "ring-2 ring-primary" : ""} ${focused ? "ring-2 ring-primary/50" : ""}`}
     >
       <div className="px-3 py-2 border-b flex items-center justify-between sticky top-0 bg-muted/60 backdrop-blur rounded-t-lg">
         <div className="flex items-center gap-2">
