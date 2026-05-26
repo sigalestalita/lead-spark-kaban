@@ -43,6 +43,24 @@ function pickPhone(d: RdDeal): string | null {
   return d.contacts?.[0]?.phones?.[0]?.phone ?? null;
 }
 
+function pickCompanyName(d: RdDeal): string | null {
+  // 1) organização vinculada (caminho padrão)
+  const orgName = d.organization?.name?.trim();
+  if (orgName) return orgName;
+  // 2) fallback: campos customizados do deal com rótulos comuns
+  const labels = ["empresa", "company", "organização", "organizacao", "nome da empresa"];
+  const cf = d.deal_custom_fields ?? [];
+  for (const f of cf) {
+    const label = (f.label ?? "").toString().trim().toLowerCase();
+    if (!label) continue;
+    if (labels.some((l) => label.includes(l))) {
+      const v = f.value;
+      if (typeof v === "string" && v.trim()) return v.trim();
+    }
+  }
+  return null;
+}
+
 async function fetchAllDeals(
   token: string,
   tokenSource: RdTokenSource,
@@ -186,7 +204,7 @@ export async function runRdSync(supabase: any, mode: SyncMode) {
       phone,
       position: contact?.title ?? null,
       linkedin_url: contact?.linkedin ?? null,
-      company_name: d.organization?.name ?? null,
+      company_name: pickCompanyName(d),
       company_website: d.organization?.site ?? null,
       company_segment: d.organization?.segment ?? null,
       source: sourceName,
