@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { PRIORITY_LABEL, PRIORITY_COLOR } from "@/lib/lead-types";
-import { ArrowLeft, MessageSquare, Linkedin, Globe, Sparkles, Wand2, Copy, Building2, ExternalLink } from "lucide-react";
+import { ArrowLeft, MessageSquare, Linkedin, Globe, Sparkles, Wand2, Copy, Building2, ExternalLink, ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/_app/lead/$id")({
   component: LeadDetailPage,
@@ -66,6 +66,22 @@ function LeadDetailPage() {
   if (isLoading) return <div className="p-8 text-sm text-muted-foreground">Carregando…</div>;
   if (!data) return null;
   const lead = data.lead;
+  const currentStage = data.stages.find((s) => s.id === lead.stage_id) ?? null;
+
+  const moveToStage = (stageId: string, slug: string) => {
+    if (stageId === lead.stage_id) return;
+    const patch: Record<string, unknown> = {
+      stage_id: stageId,
+      stage_entered_at: new Date().toISOString(),
+      last_action_at: new Date().toISOString(),
+    };
+    if (slug === "desqualificado") {
+      const reason = window.prompt("Motivo da desqualificação:", lead.lost_reason ?? "");
+      if (reason === null) return;
+      patch.lost_reason = reason.trim() || null;
+    }
+    update.mutate(patch);
+  };
 
   const whatsappUrl = lead.phone
     ? `https://wa.me/${lead.phone.replace(/\D/g, "")}${
@@ -74,7 +90,61 @@ function LeadDetailPage() {
     : null;
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-4">
+    <div className="p-6 max-w-5xl mx-auto space-y-4 xl:pr-56">
+      <aside className="hidden xl:flex flex-col gap-1 fixed right-4 top-24 w-48 z-10">
+        <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold px-2 mb-1">Mover para etapa</p>
+        {data.stages.map((s) => {
+          const active = s.id === lead.stage_id;
+          return (
+            <button
+              key={s.id}
+              type="button"
+              disabled={active || update.isPending}
+              onClick={() => moveToStage(s.id, s.slug)}
+              className={`group flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-xs text-left transition-colors ${
+                active
+                  ? "bg-primary/10 border-primary/40 text-foreground cursor-default"
+                  : "bg-background hover:bg-accent hover:border-primary/40"
+              }`}
+              title={active ? "Etapa atual" : `Mover para ${s.name}`}
+            >
+              <span className="flex items-center gap-2 truncate">
+                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: s.color }} />
+                <span className="truncate">{s.name}</span>
+              </span>
+              {active ? (
+                <span className="text-[9px] uppercase text-primary">atual</span>
+              ) : (
+                <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 text-primary" />
+              )}
+            </button>
+          );
+        })}
+      </aside>
+
+      <div className="xl:hidden">
+        <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold mb-1">Mover para etapa</p>
+        <select
+          value={lead.stage_id ?? ""}
+          onChange={(e) => {
+            const s = data.stages.find((x) => x.id === e.target.value);
+            if (s) moveToStage(s.id, s.slug);
+          }}
+          className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+        >
+          {data.stages.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}{s.id === lead.stage_id ? " (atual)" : ""}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {currentStage && (
+        <p className="text-xs text-muted-foreground">
+          Etapa atual: <span className="font-medium text-foreground">{currentStage.name}</span>
+        </p>
+      )}
       <Link to="/kanban" className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
         <ArrowLeft className="h-4 w-4" /> Voltar para o Kanban
       </Link>
