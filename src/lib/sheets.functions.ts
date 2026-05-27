@@ -3,7 +3,11 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const SPREADSHEET_ID = "1gGib1CJCUaS-1xNKBrexP7OzuY87u_ZDWehsJdz1U5A";
-const SHEET_RANGES = ["entrada_correta!A2:W", "entrada_organico_e_outbound!A2:W"];
+const SHEETS: Array<{ tab: string; source: string; channel: string }> = [
+  { tab: "entrada_correta", source: "meta_ads", channel: "meta_ads" },
+  { tab: "entrada_organico_e_outbound", source: "organico_outbound", channel: "organico_outbound" },
+];
+const SHEET_RANGES = SHEETS.map((s) => `${s.tab}!A2:W`);
 const GATEWAY = "https://connector-gateway.lovable.dev/google_sheets/v4";
 const SYNC_MIN_INTERVAL_MS = 90_000;
 
@@ -55,6 +59,8 @@ function parseDate(v: unknown): string | null {
 
 type LeadRow = {
   meta_lead_id: string;
+  source: string;
+  channel: string;
   payload: {
     name: string;
     email: string | null;
@@ -73,21 +79,49 @@ type LeadRow = {
 };
 
 type SheetFetchResult =
-  | { ok: true; rows: string[][] }
+  | { ok: true; rows: Array<{ row: string[]; sheetIndex: number; rowIndex: number }> }
   | { ok: false; status: number; message: string; rateLimited: boolean };
 
-function rowToLead(row: string[]): LeadRow | null {
-  const leadId = cleanStr(row[C.lead_id]);
-  if (!leadId) return null;
+function hashRow(parts: Array<string | null>): string {
+  let h = 0;
+  const s = parts.map((p) => p ?? "").join("|");
+  for (let i = 0; i < s.length; i++) {
+    h = (h * 31 + s.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h).toString(36);
+}
+
+function rowToLead(row: string[], sheetIndex: number, rowIndex: number): LeadRow | null {
+  const sheet = SHEETS[sheetIndex] ?? SHEETS[0];
   const nome = cleanStr(row[C.nome]) ?? "";
   const sobrenome = cleanStr(row[C.sobrenome]) ?? "";
   const name = `${nome} ${sobrenome}`.trim() || "(sem nome)";
+  const email = cleanStr(row[C.email]);
+  const phone = normalizePhone(cleanStr(row[C.telefone]));
+  let leadId = cleanStr(row[C.lead_id]);
+  if (!leadId) {
+    // Fallback estável para abas sem Lead_ID (organico/outbound):
+    // usa email/phone se houver, senão hash do conteúdo + posição.
+    const base = email ?? phone ?? hashRow([
+      cleanStr(row[C.data]),
+      nome,
+      sobrenome,
+      cleanStr(row[C.empresa]),
+      cleanStr(row[C.cargo]),
+      String(rowIndex),
+    ]);
+    leadId = `${sheet.tab}:${base}`;
+  }
+  // Se a linha estiver totalmente vazia (sem nome, email, phone, empresa), ignora.
+  if (!nome && !sobrenome && !email && !phone && !cleanStr(row[C.empresa])) return null;
   return {
     meta_lead_id: leadId,
+    source: sheet.source,
+    channel: sheet.channel,
     payload: {
       name,
-      email: cleanStr(row[C.email]),
-      phone: normalizePhone(cleanStr(row[C.telefone])),
+      email,
+      phone,
       company_name: cleanStr(row[C.empresa]),
       position: cleanStr(row[C.cargo]),
       company_segment: cleanStr(row[C.area]),
@@ -99,6 +133,7 @@ function rowToLead(row: string[]): LeadRow | null {
       submitted_at: parseDate(row[C.data]),
       form_payload: {
         lead_id: leadId,
+        sheet_tab: sheet.tab,
         form_id: cleanStr(row[C.form_id]),
         lead_type: cleanStr(row[C.tipo]),
         ad_set: cleanStr(row[C.conjunto]),
@@ -142,10 +177,12 @@ async function fetchSheetRows(): Promise<SheetFetchResult> {
     };
   }
   const json = (await res.json()) as { valueRanges?: Array<{ values?: string[][] }> };
-  const rows: string[][] = [];
-  for (const vr of json.valueRanges ?? []) {
-    for (const r of vr.values ?? []) rows.push(r);
-  }
+  const rows: Array<{ row: string[]; sheetIndex: number; rowIndex: number }> = [];
+  (json.valueRanges ?? []).forEach((vr, sheetIndex) => {
+    (vr.values ?? []).forEach((r, rowIndex) => {
+      rows.push({ row: r, sheetIndex, rowIndex });
+    });
+  });
   return { ok: true, rows };
 }
 
@@ -209,8 +246,8 @@ export const syncLeadsFromSheet = createServerFn({ method: "POST" })
 
     const parsed: LeadRow[] = [];
     const seen = new Set<string>();
-    for (const row of rows) {
-      const r = rowToLead(row);
+    for (const item of rows) {
+      const r = rowToLead(item.row, item.sheetIndex, item.rowIndex);
       if (!r) continue;
       if (seen.has(r.meta_lead_id)) continue;
       seen.add(r.meta_lead_id);
@@ -280,8 +317,8 @@ export const syncLeadsFromSheet = createServerFn({ method: "POST" })
           campaign: p.payload.campaign,
           ad_name: p.payload.ad_name,
           form_name: p.payload.form_name,
-          source: "meta_ads",
-          channel: "meta_ads",
+          source: p.source,
+          channel: p.channel,
           stage_id: novoId,
           enrichment_status: "pending" as const,
           form_payload: p.payload.form_payload as never,
