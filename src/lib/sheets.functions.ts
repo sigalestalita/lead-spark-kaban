@@ -5,6 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 const SPREADSHEET_ID = "1gGib1CJCUaS-1xNKBrexP7OzuY87u_ZDWehsJdz1U5A";
 const SHEET_RANGE = "entrada_correta!A2:W";
 const GATEWAY = "https://connector-gateway.lovable.dev/google_sheets/v4";
+const SYNC_MIN_INTERVAL_MS = 90_000;
 
 // Índices das colunas (A=0..W=22)
 const C = {
@@ -71,6 +72,10 @@ type LeadRow = {
   };
 };
 
+type SheetFetchResult =
+  | { ok: true; rows: string[][] }
+  | { ok: false; status: number; message: string; rateLimited: boolean };
+
 function rowToLead(row: string[]): LeadRow | null {
   const leadId = cleanStr(row[C.lead_id]);
   if (!leadId) return null;
@@ -108,24 +113,35 @@ function rowToLead(row: string[]): LeadRow | null {
   };
 }
 
-async function fetchSheetRows(): Promise<string[][]> {
+async function fetchSheetRows(): Promise<SheetFetchResult> {
   const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
   const GOOGLE_SHEETS_API_KEY = process.env.GOOGLE_SHEETS_API_KEY;
-  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY ausente");
-  if (!GOOGLE_SHEETS_API_KEY) throw new Error("GOOGLE_SHEETS_API_KEY ausente — conecte o Google Sheets em Connectors");
+  if (!LOVABLE_API_KEY) return { ok: false, status: 500, message: "LOVABLE_API_KEY ausente", rateLimited: false };
+  if (!GOOGLE_SHEETS_API_KEY) {
+    return { ok: false, status: 500, message: "GOOGLE_SHEETS_API_KEY ausente — conecte o Google Sheets em Connectors", rateLimited: false };
+  }
   const url = `${GATEWAY}/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_RANGE}`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${LOVABLE_API_KEY}`,
       "X-Connection-Api-Key": GOOGLE_SHEETS_API_KEY,
     },
-  });
+  }).catch((err) => null);
+  if (!res) {
+    return { ok: false, status: 503, message: "Falha temporária ao consultar o Google Sheets", rateLimited: false };
+  }
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Google Sheets API ${res.status}: ${body.slice(0, 200)}`);
+    const rateLimited = res.status === 429 || body.includes('"code": 429') || body.includes("Quota exceeded");
+    return {
+      ok: false,
+      status: res.status,
+      message: `Google Sheets API ${res.status}: ${body.slice(0, 300)}`,
+      rateLimited,
+    };
   }
   const json = (await res.json()) as { values?: string[][] };
-  return json.values ?? [];
+  return { ok: true, rows: json.values ?? [] };
 }
 
 export const syncLeadsFromSheet = createServerFn({ method: "POST" })
@@ -134,37 +150,56 @@ export const syncLeadsFromSheet = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase } = context;
 
-    // Throttle: não buscar a planilha se sincronizamos há menos de 60s.
+    // Throttle: não buscar a planilha se já tentamos sincronizar há pouco.
     const { data: prev } = await supabase
       .from("app_settings")
       .select("value")
       .eq("key", "sheets_sync_state")
       .maybeSingle();
-    const prevState = (prev?.value ?? null) as null | { last_sync_at?: string };
-    if (prevState?.last_sync_at) {
-      const ageMs = Date.now() - new Date(prevState.last_sync_at).getTime();
-      if (ageMs < 60_000) {
-        return { total: 0, parsed: 0, inserted: 0, skipped: 0, throttled: true };
+    const prevState = (prev?.value ?? null) as null | { last_sync_at?: string; last_attempt_at?: string };
+    const lastAttempt = prevState?.last_attempt_at ?? prevState?.last_sync_at;
+    if (lastAttempt) {
+      const ageMs = Date.now() - new Date(lastAttempt).getTime();
+      if (ageMs < SYNC_MIN_INTERVAL_MS) {
+        return { total: 0, parsed: 0, inserted: 0, skipped: 0, throttled: true, retry_after_ms: SYNC_MIN_INTERVAL_MS - ageMs };
       }
     }
 
-    let rows: string[][];
-    try {
-      rows = await fetchSheetRows();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      // 429 = quota da Google Sheets. Não derruba o app: registra e retorna.
-      if (msg.includes("429")) {
-        await supabase.from("integration_logs").insert({
-          provider: "google_sheets",
-          action: "sync_leads",
-          status: "rate_limited",
-          detail: { error: msg.slice(0, 300) } as never,
-        });
-        return { total: 0, parsed: 0, inserted: 0, skipped: 0, rate_limited: true };
-      }
-      throw err;
+    const startedAt = new Date().toISOString();
+    await supabase.from("app_settings").upsert(
+      { key: "sheets_sync_state", value: { ...(prevState ?? {}), last_attempt_at: startedAt, status: "running" } as never } as never,
+      { onConflict: "key" },
+    );
+
+    const sheetResult = await fetchSheetRows();
+    if (!sheetResult.ok) {
+      const stateValue = {
+        ...(prevState ?? {}),
+        last_attempt_at: startedAt,
+        last_error_at: new Date().toISOString(),
+        last_error: sheetResult.message,
+        status: sheetResult.rateLimited ? "rate_limited" : "error",
+      };
+      await supabase.from("app_settings").upsert(
+        { key: "sheets_sync_state", value: stateValue as never } as never,
+        { onConflict: "key" },
+      );
+      await supabase.from("integration_logs").insert({
+        provider: "google_sheets",
+        action: "sync_leads",
+        status: sheetResult.rateLimited ? "rate_limited" : "error",
+        detail: { error: sheetResult.message, status: sheetResult.status } as never,
+      });
+      return {
+        total: 0,
+        parsed: 0,
+        inserted: 0,
+        skipped: 0,
+        rate_limited: sheetResult.rateLimited,
+        error: sheetResult.message,
+      };
     }
+    const rows = sheetResult.rows;
     const total = rows.length;
 
     const parsed: LeadRow[] = [];
@@ -265,7 +300,9 @@ export const syncLeadsFromSheet = createServerFn({ method: "POST" })
 
     const skipped = parsed.length - inserted;
     const stateValue = {
+      last_attempt_at: startedAt,
       last_sync_at: new Date().toISOString(),
+      status: insertErrors.length ? "partial" : "ok",
       total_rows: total,
       parsed: parsed.length,
       inserted_total_run: inserted,
