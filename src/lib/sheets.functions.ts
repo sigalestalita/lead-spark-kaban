@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const SPREADSHEET_ID = "1gGib1CJCUaS-1xNKBrexP7OzuY87u_ZDWehsJdz1U5A";
-const SHEET_RANGE = "entrada_correta!A2:W";
+const SHEET_RANGES = ["entrada_correta!A2:W", "entrada_organico_e_outbound!A2:W"];
 const GATEWAY = "https://connector-gateway.lovable.dev/google_sheets/v4";
 const SYNC_MIN_INTERVAL_MS = 90_000;
 
@@ -120,13 +120,14 @@ async function fetchSheetRows(): Promise<SheetFetchResult> {
   if (!GOOGLE_SHEETS_API_KEY) {
     return { ok: false, status: 500, message: "GOOGLE_SHEETS_API_KEY ausente — conecte o Google Sheets em Connectors", rateLimited: false };
   }
-  const url = `${GATEWAY}/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_RANGE}`;
+  const params = SHEET_RANGES.map((r) => `ranges=${encodeURIComponent(r)}`).join("&");
+  const url = `${GATEWAY}/spreadsheets/${SPREADSHEET_ID}/values:batchGet?${params}`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${LOVABLE_API_KEY}`,
       "X-Connection-Api-Key": GOOGLE_SHEETS_API_KEY,
     },
-  }).catch((err) => null);
+  }).catch(() => null);
   if (!res) {
     return { ok: false, status: 503, message: "Falha temporária ao consultar o Google Sheets", rateLimited: false };
   }
@@ -140,8 +141,12 @@ async function fetchSheetRows(): Promise<SheetFetchResult> {
       rateLimited,
     };
   }
-  const json = (await res.json()) as { values?: string[][] };
-  return { ok: true, rows: json.values ?? [] };
+  const json = (await res.json()) as { valueRanges?: Array<{ values?: string[][] }> };
+  const rows: string[][] = [];
+  for (const vr of json.valueRanges ?? []) {
+    for (const r of vr.values ?? []) rows.push(r);
+  }
+  return { ok: true, rows };
 }
 
 export const syncLeadsFromSheet = createServerFn({ method: "POST" })
