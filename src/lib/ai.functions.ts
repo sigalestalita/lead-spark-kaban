@@ -60,7 +60,7 @@ function normalizeFirecrawlResults(raw: unknown): SearchHit[] {
       return { url: it.url ?? "", title: it.title, description: it.description };
     })
     .filter((h) => !!h.url)
-    .slice(0, 5);
+    .slice(0, 10);
 }
 
 async function firecrawlSearch(query: string): Promise<SearchHit[]> {
@@ -69,7 +69,7 @@ async function firecrawlSearch(query: string): Promise<SearchHit[]> {
   try {
     const { default: Firecrawl } = await import("@mendable/firecrawl-js");
     const fc = new Firecrawl({ apiKey: key });
-    const res = await fc.search(query, { limit: 5, location: "Brazil" });
+    const res = await fc.search(query, { limit: 10, location: "Brazil" });
     const hits = normalizeFirecrawlResults(res);
     console.log(`[firecrawl] "${query}" → ${hits.length} hits`, hits.map((h) => h.url));
     return hits;
