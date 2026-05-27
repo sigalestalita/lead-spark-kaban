@@ -664,7 +664,6 @@ function LeadCard({
             </button>
           </div>
         </div>
-        </div>
       </div>
       {/* unused but keep referenced to avoid lint */}
       <span className="hidden">{sinceConversion}</span>
