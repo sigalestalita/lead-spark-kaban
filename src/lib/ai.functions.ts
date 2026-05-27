@@ -114,7 +114,20 @@ async function runEnrichment(supabase: any, userId: string | null, id: string) {
     })();
     const companyForSearch = companyClean || company;
 
-    const [linkedinHits, linkedinByNameHits, linkedinByNameAndCompanyHits, companyLinkedinHits, websiteHits] = await Promise.all([
+    // Variante curta: primeiro + último nome (ignora iniciais/nomes do meio).
+    // Resolve casos como "Germana B Betto" no form vs "Germana Bonamigo Betto" no LinkedIn —
+    // a busca literal com a inicial retorna 0 resultados.
+    const personShort = (() => {
+      const parts = person.split(/\s+/).filter(Boolean);
+      if (parts.length < 2) return "";
+      const first = parts[0];
+      const last = parts[parts.length - 1];
+      // Só usa se diferente do nome completo (i.e., havia nomes do meio/iniciais)
+      const short = `${first} ${last}`;
+      return short.toLowerCase() !== person.toLowerCase() ? short : "";
+    })();
+
+    const [linkedinHits, linkedinByNameHits, linkedinByNameAndCompanyHits, companyLinkedinHits, websiteHits, linkedinByShortNameHits] = await Promise.all([
       companyForSearch && person
         ? firecrawlSearch(`${person} ${companyForSearch} site:linkedin.com/in`)
         : Promise.resolve([] as SearchHit[]),
@@ -135,6 +148,11 @@ async function runEnrichment(supabase: any, userId: string | null, id: string) {
         : Promise.resolve([] as SearchHit[]),
       companyForSearch
         ? firecrawlSearch(`"${companyForSearch}" -site:linkedin.com -site:facebook.com -site:instagram.com`)
+        : Promise.resolve([] as SearchHit[]),
+      // Fallback com nome curto (primeiro + último) + empresa — pega perfis cujo
+      // nome no LinkedIn tem nomes do meio que não estão no form.
+      personShort && companyForSearch
+        ? firecrawlSearch(`"${personShort}" ${companyForSearch} site:linkedin.com/in`)
         : Promise.resolve([] as SearchHit[]),
     ]);
 
@@ -222,9 +240,9 @@ async function runEnrichment(supabase: any, userId: string | null, id: string) {
     };
 
     // 2) Snippets do LinkedIn por nome — fonte primária para descobrir a empresa ATUAL.
-    // Combinamos as 3 buscas relacionadas à pessoa; dedupe por URL.
+    // Combinamos as buscas relacionadas à pessoa; dedupe por URL.
     const linkedinSnippetsForCurrentCompany = (() => {
-      const all = [...linkedinByNameHits, ...linkedinByNameAndCompanyHits, ...linkedinHits];
+      const all = [...linkedinByNameHits, ...linkedinByNameAndCompanyHits, ...linkedinHits, ...linkedinByShortNameHits];
       const seen = new Set<string>();
       return all.filter((h) => {
         if (seen.has(h.url)) return false;
