@@ -60,7 +60,7 @@ function normalizeFirecrawlResults(raw: unknown): SearchHit[] {
       return { url: it.url ?? "", title: it.title, description: it.description };
     })
     .filter((h) => !!h.url)
-    .slice(0, 5);
+    .slice(0, 10);
 }
 
 async function firecrawlSearch(query: string): Promise<SearchHit[]> {
@@ -69,7 +69,7 @@ async function firecrawlSearch(query: string): Promise<SearchHit[]> {
   try {
     const { default: Firecrawl } = await import("@mendable/firecrawl-js");
     const fc = new Firecrawl({ apiKey: key });
-    const res = await fc.search(query, { limit: 5, location: "Brazil" });
+    const res = await fc.search(query, { limit: 10, location: "Brazil" });
     const hits = normalizeFirecrawlResults(res);
     console.log(`[firecrawl] "${query}" → ${hits.length} hits`, hits.map((h) => h.url));
     return hits;
@@ -127,7 +127,25 @@ async function runEnrichment(supabase: any, userId: string | null, id: string) {
       return short.toLowerCase() !== person.toLowerCase() ? short : "";
     })();
 
-    const [linkedinHits, linkedinByNameHits, linkedinByNameAndCompanyHits, companyLinkedinHits, websiteHits, linkedinByShortNameHits] = await Promise.all([
+    // Slug provável do LinkedIn derivado do username do email (ex.: joao.silva@x.com → "joao.silva")
+    const emailLocal = (() => {
+      const m = (lead.email ?? "").match(/^([\w.+-]+)@/);
+      return m ? m[1].toLowerCase() : "";
+    })();
+
+    // Nome efetivo para busca "só nome" (usa short quando existe, senão o nome completo)
+    const personForNameOnly = personShort || person;
+
+    const [
+      linkedinHits,
+      linkedinByNameHits,
+      linkedinByNameAndCompanyHits,
+      companyLinkedinHits,
+      websiteHits,
+      linkedinByShortNameHits,
+      linkedinByNameOnlyHits,
+      linkedinByEmailSlugHits,
+    ] = await Promise.all([
       companyForSearch && person
         ? firecrawlSearch(`${person} ${companyForSearch} site:linkedin.com/in`)
         : Promise.resolve([] as SearchHit[]),
@@ -153,6 +171,16 @@ async function runEnrichment(supabase: any, userId: string | null, id: string) {
       // nome no LinkedIn tem nomes do meio que não estão no form.
       personShort && companyForSearch
         ? firecrawlSearch(`"${personShort}" ${companyForSearch} site:linkedin.com/in`)
+        : Promise.resolve([] as SearchHit[]),
+      // Busca SÓ pelo nome + site:linkedin.com/in — cobre quem trocou de emprego
+      // (a empresa do form pode estar desatualizada, eliminando o perfil das
+      // buscas que combinam nome+empresa).
+      personForNameOnly
+        ? firecrawlSearch(`"${personForNameOnly}" site:linkedin.com/in`)
+        : Promise.resolve([] as SearchHit[]),
+      // Slug do email costuma bater com o slug do LinkedIn (joao.silva → /in/joao-silva)
+      emailLocal && emailLocal.length >= 4
+        ? firecrawlSearch(`"${emailLocal.replace(/\./g, " ")}" site:linkedin.com/in`)
         : Promise.resolve([] as SearchHit[]),
     ]);
 
@@ -238,18 +266,27 @@ async function runEnrichment(supabase: any, userId: string | null, id: string) {
       busca_linkedin_empresa: companyLinkedinHits,
       busca_site_empresa: websiteHits,
       busca_linkedin_pessoal_nome_curto: linkedinByShortNameHits,
+      busca_linkedin_so_nome: linkedinByNameOnlyHits,
+      busca_linkedin_por_slug_email: linkedinByEmailSlugHits,
     };
 
     // 2) Snippets do LinkedIn por nome — fonte primária para descobrir a empresa ATUAL.
     // Combinamos as buscas relacionadas à pessoa; dedupe por URL.
     const linkedinSnippetsForCurrentCompany = (() => {
-      const all = [...linkedinByNameHits, ...linkedinByNameAndCompanyHits, ...linkedinHits, ...linkedinByShortNameHits];
+      const all = [
+        ...linkedinByNameHits,
+        ...linkedinByNameAndCompanyHits,
+        ...linkedinHits,
+        ...linkedinByShortNameHits,
+        ...linkedinByNameOnlyHits,
+        ...linkedinByEmailSlugHits,
+      ];
       const seen = new Set<string>();
       return all.filter((h) => {
         if (seen.has(h.url)) return false;
         seen.add(h.url);
         return true;
-      }).slice(0, 12);
+      }).slice(0, 20);
     })();
     (ctx as Record<string, unknown>).linkedin_snippets_para_empresa_atual = linkedinSnippetsForCurrentCompany;
     (ctx as Record<string, unknown>).empresa_no_formulario = lead.company_name;
@@ -259,7 +296,7 @@ async function runEnrichment(supabase: any, userId: string | null, id: string) {
         {
           role: "system",
           content:
-            "Você é um analista de pré-vendas B2B. A partir do contexto fornecido produza inferências realistas e selecione URLs a partir dos resultados de busca fornecidos. REGRAS DE URL: (1) NUNCA invente URLs — escolha APENAS uma URL que aparece nos resultados de busca fornecidos (busca_linkedin_pessoal, busca_pessoa_e_empresa, busca_linkedin_empresa, busca_site_empresa) OU, no caso de company_website, derive do dominio_email_corporativo (https://<dominio>). (2) Nomes de empresa em formulários frequentemente têm sufixos jurídicos (Ltda, S/A, Imp Com, ME) ou erros de grafia. Aceite matches fuzzy razoáveis. (3) Para linkedin_url pessoal: SEJA PRÁTICO — aceite qualquer URL `linkedin.com/in/<slug>` cujo título/description contenha o PRIMEIRO + ÚLTIMO nome do lead, MESMO QUE existam nomes do meio adicionais (ex.: lead 'Andreia Rolim' → 'Andreia Vieira Rolim' é match válido) e mesmo que a empresa atual seja diferente da do formulário (pessoas trocam de emprego). Descarte apenas páginas de listagem (`/pub/dir/...`, '10+ profiles', '50+ profiles') — essas não são perfis individuais. Se houver UM único perfil `/in/` plausível, retorne ele com confiança 'media'. Só retorne null se NENHUM perfil `/in/` aparecer ou se houver vários candidatos ambíguos. (4) Para company_linkedin e company_website seja PRÁTICO: 1º resultado orgânico claro = aceita. Descarte agregadores (reclameaqui, glassdoor, wikipedia, indeed, jusbrasil, contactout, rocketreach, zoominfo). (5) Calibre links_confidence: 'alta' = match óbvio; 'media' = pequena variação ou nome do meio diferente; 'baixa' = dúvida real; 'nenhum' = nada serve. (6) Não invente CNPJ/faturamento/funcionários. (7) EMPRESA ATUAL DO LEAD: use linkedin_snippets_para_empresa_atual. Snippets de contactout/rocketreach/zoominfo geralmente mostram 'Nome | Empresa - Cargo' e são CONFIÁVEIS para confirmar empresa atual (mesmo que você descarte a URL deles). DESCRIPTIONS de linkedin.com/in/... mostram 'Nome - Cargo na Empresa'. Procure menções recorrentes de uma mesma empresa. Use o nome EXATAMENTE como aparece. Confiança 'alta' = 2+ snippets concordam; 'media' = 1 snippet claro; 'baixa' = só inferido; 'nenhum' = snippets genéricos. Se a empresa identificada for igual à empresa_no_formulario (ignorando case/acentos/sufixos jurídicos), retorne null para current_company_from_linkedin.",
+            "Você é um analista de pré-vendas B2B. A partir do contexto fornecido produza inferências realistas e selecione URLs a partir dos resultados de busca fornecidos. REGRAS DE URL: (1) NUNCA invente URLs — escolha APENAS uma URL que aparece nos resultados de busca fornecidos (busca_linkedin_pessoal, busca_pessoa_e_empresa, busca_linkedin_empresa, busca_site_empresa, busca_linkedin_pessoal_nome_curto, busca_linkedin_so_nome, busca_linkedin_por_slug_email) OU, no caso de company_website, derive do dominio_email_corporativo (https://<dominio>). (2) Nomes de empresa em formulários frequentemente têm sufixos jurídicos (Ltda, S/A, Imp Com, ME) ou erros de grafia. Aceite matches fuzzy razoáveis. (3) Para linkedin_url pessoal: SEJA AGRESSIVO E PRÁTICO. Considere TODAS as listas de busca pessoais (busca_linkedin_pessoal, busca_pessoa_e_empresa, busca_linkedin_pessoal_nome_curto, busca_linkedin_so_nome, busca_linkedin_por_slug_email) — perfis frequentemente aparecem apenas na busca SÓ pelo nome (pessoa trocou de emprego) ou pelo slug do email. Aceite qualquer URL `linkedin.com/in/<slug>` quando: (a) o título/description contém o primeiro + último nome do lead (nomes do meio podem diferir, iniciais expandem, ex.: 'Germana B Betto' = 'Germana Bonamigo Betto'; acentos podem faltar), OU (b) o slug da URL é claramente derivado do nome ou do username do email (ex.: email 'joao.silva@x.com' → /in/joao-silva). NÃO exija que a empresa atual confira — pessoas mudam de emprego. Descarte apenas páginas de listagem (`/pub/dir/...`, '10+ profiles', '50+ profiles', '100+ profiles'). Se houver UM perfil `/in/` plausível em QUALQUER das listas, retorne ele com confiança 'media'. Se houver múltiplos perfis com mesmo primeiro+último nome, escolha aquele cujo cargo/empresa/localização mais bate com o contexto (cargo do form, empresa do form, ou Brasil/cidade). Só retorne null se REALMENTE nenhum perfil `/in/` aparecer em nenhuma das listas. (4) Para company_linkedin e company_website seja PRÁTICO: 1º resultado orgânico claro = aceita. Descarte agregadores (reclameaqui, glassdoor, wikipedia, indeed, jusbrasil, contactout, rocketreach, zoominfo). (5) Calibre links_confidence: 'alta' = match óbvio; 'media' = pequena variação, nome do meio diferente, ou match por slug de email; 'baixa' = dúvida real entre 2+ candidatos; 'nenhum' = nada serve. (6) Não invente CNPJ/faturamento/funcionários. (7) EMPRESA ATUAL DO LEAD: use linkedin_snippets_para_empresa_atual. Snippets de contactout/rocketreach/zoominfo geralmente mostram 'Nome | Empresa - Cargo' e são CONFIÁVEIS para confirmar empresa atual (mesmo que você descarte a URL deles). DESCRIPTIONS de linkedin.com/in/... mostram 'Nome - Cargo na Empresa'. Procure menções recorrentes de uma mesma empresa. Use o nome EXATAMENTE como aparece. Confiança 'alta' = 2+ snippets concordam; 'media' = 1 snippet claro; 'baixa' = só inferido; 'nenhum' = snippets genéricos. Se a empresa identificada for igual à empresa_no_formulario (ignorando case/acentos/sufixos jurídicos), retorne null para current_company_from_linkedin.",
         },
         {
           role: "user",
