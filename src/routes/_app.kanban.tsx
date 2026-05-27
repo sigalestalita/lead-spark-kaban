@@ -544,9 +544,14 @@ function LeadCard({
         </Badge>
       </div>
       {lead.company_name && <p className="text-xs text-muted-foreground truncate">{lead.company_name}</p>}
-      {lead.probable_pain && (
-        <p className="mt-1 text-[11px] text-foreground/80 line-clamp-2" title={lead.probable_pain}>
-          <span className="text-muted-foreground">Dor:</span> {lead.probable_pain}
+      {lead.position && (
+        <p className="mt-1 text-[11px] text-foreground/80 truncate" title={lead.position}>
+          <span className="text-muted-foreground">Cargo:</span> {lead.position}
+        </p>
+      )}
+      {lead.company_size && (
+        <p className="text-[11px] text-foreground/80 truncate" title={lead.company_size}>
+          <span className="text-muted-foreground">Porte:</span> {lead.company_size}
         </p>
       )}
 
