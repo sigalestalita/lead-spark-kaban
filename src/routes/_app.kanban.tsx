@@ -266,6 +266,17 @@ function KanbanPage() {
             <option value="fora_icp">Fora de ICP</option>
             <option value="pendente">Pendente</option>
           </select>
+          <select
+            value={companySize}
+            onChange={(e) => setCompanySize(e.target.value)}
+            className="h-9 rounded-md border bg-background px-2 text-sm max-w-[180px]"
+            title="Porte da empresa"
+          >
+            <option value="all">Todos os portes</option>
+            {sizeOptions.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
           <div className="flex items-center gap-1">
             <Input
               type="date"
