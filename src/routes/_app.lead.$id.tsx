@@ -34,6 +34,7 @@ function LeadDetailPage() {
 
   const [note, setNote] = useState("");
   const [suggestion, setSuggestion] = useState<string | null>(null);
+  const [lostFor, setLostFor] = useState<string | null>(null);
 
   const update = useMutation({
     mutationFn: (patch: Record<string, unknown>) => updateFn({ data: { id, patch } }),
@@ -70,17 +71,15 @@ function LeadDetailPage() {
 
   const moveToStage = (stageId: string, slug: string) => {
     if (stageId === lead.stage_id) return;
-    const patch: Record<string, unknown> = {
+    if (slug === "desqualificado") {
+      setLostFor(stageId);
+      return;
+    }
+    update.mutate({
       stage_id: stageId,
       stage_entered_at: new Date().toISOString(),
       last_action_at: new Date().toISOString(),
-    };
-    if (slug === "desqualificado") {
-      const reason = window.prompt("Motivo da desqualificação:", lead.lost_reason ?? "");
-      if (reason === null) return;
-      patch.lost_reason = reason.trim() || null;
-    }
-    update.mutate(patch);
+    });
   };
 
   const whatsappUrl = lead.phone
@@ -144,6 +143,22 @@ function LeadDetailPage() {
         <p className="text-xs text-muted-foreground">
           Etapa atual: <span className="font-medium text-foreground">{currentStage.name}</span>
         </p>
+      )}
+
+      {lostFor && (
+        <LostReasonDialog
+          initial={lead.lost_reason ?? ""}
+          onClose={() => setLostFor(null)}
+          onConfirm={(reason) => {
+            update.mutate({
+              stage_id: lostFor,
+              stage_entered_at: new Date().toISOString(),
+              last_action_at: new Date().toISOString(),
+              lost_reason: reason,
+            });
+            setLostFor(null);
+          }}
+        />
       )}
       <Link to="/kanban" className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
         <ArrowLeft className="h-4 w-4" /> Voltar para o Kanban
@@ -381,4 +396,53 @@ function labelForInteraction(type: string) {
     case "call": return "Ligação";
     default: return type;
   }
+}
+
+function LostReasonDialog({
+  initial,
+  onClose,
+  onConfirm,
+}: {
+  initial: string;
+  onClose: () => void;
+  onConfirm: (reason: string) => void;
+}) {
+  const reasons = ["Sem perfil", "Sem fit com soluções", "Sem contato", "Sem orçamento", "Timing inadequado", "Concorrência"];
+  const initialMatch = reasons.includes(initial) ? initial : initial ? "__other" : reasons[0];
+  const [selected, setSelected] = useState<string>(initialMatch);
+  const [custom, setCustom] = useState(reasons.includes(initial) ? "" : initial);
+  const isOther = selected === "__other";
+  const finalReason = isOther ? custom.trim() : selected;
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={onClose}>
+      <Card className="p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-bold mb-1">Motivo de desqualificação</h2>
+        <p className="text-xs text-muted-foreground mb-4">Escolha o motivo para mover este lead.</p>
+        <div className="space-y-3">
+          <select
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+            className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+          >
+            {reasons.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+            <option value="__other">Outros…</option>
+          </select>
+          {isOther && (
+            <Input
+              placeholder="Descreva o motivo"
+              value={custom}
+              onChange={(e) => setCustom(e.target.value)}
+              autoFocus
+            />
+          )}
+        </div>
+        <div className="mt-5 flex gap-2 justify-end">
+          <Button variant="ghost" size="sm" onClick={onClose}>Cancelar</Button>
+          <Button size="sm" disabled={!finalReason} onClick={() => onConfirm(finalReason)}>Salvar</Button>
+        </div>
+      </Card>
+    </div>
+  );
 }
