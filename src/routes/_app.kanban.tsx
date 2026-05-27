@@ -219,6 +219,9 @@ function KanbanPage() {
 
   const activeLead = activeId ? filtered.find((l) => l.id === activeId) : null;
   const stageById = new Map(data.stages.map((s) => [s.id, s] as const));
+  const sizeOptions = Array.from(
+    new Set(data.leads.map((l) => (l.company_size ?? "").trim()).filter(Boolean))
+  ).sort();
 
   const handleMoveTo = (leadId: string, stageId: string) => {
     const targetStage = data.stages.find((s) => s.id === stageId);
