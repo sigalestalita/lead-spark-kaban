@@ -218,6 +218,20 @@ function KanbanPage() {
   const activeLead = activeId ? filtered.find((l) => l.id === activeId) : null;
   const stageById = new Map(data.stages.map((s) => [s.id, s] as const));
 
+  const handleMoveTo = (leadId: string, stageId: string) => {
+    const targetStage = data.stages.find((s) => s.id === stageId);
+    if (targetStage?.slug === "desqualificado") {
+      setLostFor({ leadId, stageId });
+    } else {
+      move.mutate({ leadId, stageId });
+    }
+  };
+  const handleUpdateLead = (id: string, patch: Record<string, unknown>) => {
+    updateFn({ data: { id, patch } })
+      .then(() => qc.invalidateQueries({ queryKey: ["kanban"] }))
+      .catch((e) => toast.error(e instanceof Error ? e.message : "Erro"));
+  };
+
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -310,7 +324,14 @@ function KanbanPage() {
                 focused={idx === focusedCol}
               >
                 {stageLeads.map((l) => (
-                  <LeadCard key={l.id} lead={l} stageSlug={s.slug} />
+                  <LeadCard
+                    key={l.id}
+                    lead={l}
+                    stageSlug={s.slug}
+                    stages={data.stages}
+                    onMoveTo={handleMoveTo}
+                    onUpdate={handleUpdateLead}
+                  />
                 ))}
               </Column>
             );
