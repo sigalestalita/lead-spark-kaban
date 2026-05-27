@@ -397,3 +397,52 @@ function labelForInteraction(type: string) {
     default: return type;
   }
 }
+
+function LostReasonDialog({
+  initial,
+  onClose,
+  onConfirm,
+}: {
+  initial: string;
+  onClose: () => void;
+  onConfirm: (reason: string) => void;
+}) {
+  const reasons = ["Sem perfil", "Sem fit com soluções", "Sem contato", "Sem orçamento", "Timing inadequado", "Concorrência"];
+  const initialMatch = reasons.includes(initial) ? initial : initial ? "__other" : reasons[0];
+  const [selected, setSelected] = useState<string>(initialMatch);
+  const [custom, setCustom] = useState(reasons.includes(initial) ? "" : initial);
+  const isOther = selected === "__other";
+  const finalReason = isOther ? custom.trim() : selected;
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={onClose}>
+      <Card className="p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-bold mb-1">Motivo de desqualificação</h2>
+        <p className="text-xs text-muted-foreground mb-4">Escolha o motivo para mover este lead.</p>
+        <div className="space-y-3">
+          <select
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+            className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+          >
+            {reasons.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+            <option value="__other">Outros…</option>
+          </select>
+          {isOther && (
+            <Input
+              placeholder="Descreva o motivo"
+              value={custom}
+              onChange={(e) => setCustom(e.target.value)}
+              autoFocus
+            />
+          )}
+        </div>
+        <div className="mt-5 flex gap-2 justify-end">
+          <Button variant="ghost" size="sm" onClick={onClose}>Cancelar</Button>
+          <Button size="sm" disabled={!finalReason} onClick={() => onConfirm(finalReason)}>Salvar</Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
