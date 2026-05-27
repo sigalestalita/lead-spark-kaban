@@ -14,7 +14,7 @@ export const listKanbanData = createServerFn({ method: "GET" })
         .from("leads")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(500),
+        .limit(5000),
       supabase.from("profiles").select("id, full_name, email"),
     ]);
     if (stagesRes.error) throw new Error(stagesRes.error.message);
