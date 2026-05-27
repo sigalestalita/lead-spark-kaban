@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { PRIORITY_LABEL, PRIORITY_COLOR } from "@/lib/lead-types";
 import { evaluateIcpFit } from "@/lib/icp-fit";
 import { toast } from "sonner";
-import { RefreshCw, Plus, Search, Calendar, Clock, Timer, Flame, Briefcase, Building2, Mail } from "lucide-react";
+import { RefreshCw, Plus, Search, Calendar, Clock, Timer, Flame, Briefcase, Building2, Mail, ChevronLeft, ChevronRight, Pencil, Check, X } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
