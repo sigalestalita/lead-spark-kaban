@@ -750,33 +750,40 @@ function LostReasonDialog({
   onClose: () => void;
   onPick: (reason: string) => void;
 }) {
-  const reasons = ["Sem perfil", "Sem fit com soluções", "Sem contato"];
+  const reasons = ["Sem perfil", "Sem fit com soluções", "Sem contato", "Sem orçamento", "Timing inadequado", "Concorrência"];
+  const [selected, setSelected] = useState<string>(reasons[0]);
   const [custom, setCustom] = useState("");
+  const isOther = selected === "__other";
+  const finalReason = isOther ? custom.trim() : selected;
   return (
     <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={onClose}>
       <Card className="p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-lg font-bold mb-1">Motivo de desqualificação</h2>
         <p className="text-xs text-muted-foreground mb-4">Escolha o motivo para mover este lead.</p>
-        <div className="space-y-2">
-          {reasons.map((r) => (
-            <Button key={r} variant="outline" className="w-full justify-start" onClick={() => onPick(r)}>
-              {r}
-            </Button>
-          ))}
+        <div className="space-y-3">
+          <select
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+            className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+          >
+            {reasons.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+            <option value="__other">Outros…</option>
+          </select>
+          {isOther && (
+            <Input
+              placeholder="Descreva o motivo"
+              value={custom}
+              onChange={(e) => setCustom(e.target.value)}
+              autoFocus
+            />
+          )}
         </div>
-        <div className="mt-4 flex gap-2">
-          <Input
-            placeholder="Outro motivo…"
-            value={custom}
-            onChange={(e) => setCustom(e.target.value)}
-          />
-          <Button disabled={!custom.trim()} onClick={() => onPick(custom.trim())}>
+        <div className="mt-5 flex gap-2 justify-end">
+          <Button variant="ghost" size="sm" onClick={onClose}>Cancelar</Button>
+          <Button size="sm" disabled={!finalReason} onClick={() => onPick(finalReason)}>
             Salvar
-          </Button>
-        </div>
-        <div className="mt-4 text-right">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            Cancelar
           </Button>
         </div>
       </Card>
