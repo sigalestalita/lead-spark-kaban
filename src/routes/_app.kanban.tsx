@@ -655,9 +655,7 @@ function LeadCard({
       <div className="flex justify-between items-center mt-2 pt-2 border-t border-border/40">
         <span className="text-[10px] text-muted-foreground flex items-center gap-1">
           <Clock className="h-3 w-3" />
-          {convertedAt
-            ? format(convertedAt, "dd/MM/yy HH:mm", { locale: ptBR })
-            : format(new Date(lead.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}
+          {format(submittedAt, "dd/MM/yy HH:mm", { locale: ptBR })}
         </span>
         <div className="flex items-center gap-1">
           <span className="text-[10px] font-mono text-muted-foreground">{lead.score}pts</span>
