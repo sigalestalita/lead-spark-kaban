@@ -1,96 +1,59 @@
 ## Objetivo
+Tratar a planilha `leads_meta_pipeline-inbound` (aba `entrada_correta`) como fonte de verdade dos leads inbound da Meta. Toda linha vira um card na coluna "Novos leads", com enriquecimento automático já existente.
 
-Integrar WhatsApp via **UazAPI** para enviar mensagens diretamente do detalhe do lead e ter um **Inbox unificado** dentro do app, com match por telefone (E.164).
+## Mapeamento (colunas do Sheet → campos do lead)
 
-## Provedor
+| Sheet | Lead |
+|---|---|
+| Data | `form_payload.submitted_at` (e `created_at` ao inserir) |
+| Tipo de lead | `form_payload.lead_type` |
+| Nome + Sobrenome | `name` |
+| Telefone | `phone` (normalizado para E.164 `+55...`) |
+| Email | `email` |
+| Empresa | `company_name` + `original_company_name` |
+| Área | `company_segment` |
+| Porte | `company_size` |
+| Cargo | `position` |
+| Dor | `probable_pain` |
+| Campanha | `campaign` |
+| Conjunto | `form_payload.ad_set` |
+| Ad | `ad_name` |
+| Campanha id / Ad set ID / Ad ID | `form_payload.meta_ids` |
+| Form_ID | `form_name` |
+| Lead_ID | `form_payload.lead_id` (chave única de dedupe) |
 
-UazAPI (REST + webhook). Por instância (número conectado via QR):
-- `POST /send/text` — envia texto
-- Webhook configurável recebendo `messages.upsert` (mensagem enviada/recebida)
-- Token de instância como header `token`
+Fixos: `source = "meta_ads"`, `channel = "meta_ads"`, `stage_id = stage 'novo'`, `enrichment_status = 'pending'` (o loop atual de auto-enriquecimento já pega esses leads e roda IA + Firecrawl).
 
-Secrets necessários (via `add_secret` antes de codar):
-- `UAZAPI_BASE_URL` (ex.: `https://free.uazapi.com`)
-- `UAZAPI_INSTANCE_TOKEN`
-- `UAZAPI_WEBHOOK_SECRET` (gerado por nós, valida o webhook)
+## O que vou implementar
 
-## Banco — 2 tabelas novas
+1. **`src/lib/sheets.functions.ts`** — server fn `syncLeadsFromSheet`:
+   - Lê `entrada_correta!A2:W` via gateway Google Sheets (já conectado).
+   - Para cada linha com `Lead_ID`, monta o objeto de lead.
+   - Busca em batch os `form_payload->>lead_id` já existentes em `leads` e ignora duplicados.
+   - Insere os novos em `leads` (stage = `novo`, `enrichment_status = 'pending'`).
+   - Grava log em `integration_logs` (`provider='google_sheets'`, action='sync', detail com counts).
+   - Atualiza `app_settings` chave `sheets_sync_state` com `{ last_sync_at, last_lead_id, inserted, skipped }`.
+   - Retorna `{ inserted, skipped, total }`.
 
-```text
-whatsapp_conversations
-  id, lead_id (nullable), phone_e164 (unique), last_message_at,
-  last_message_preview, unread_count, status (open/archived)
+2. **Backfill inicial** — primeira execução importa todas as ~2.4k linhas (em batches de 200 inserts). Como o enriquecimento já roda em ciclos, os cards ficam visíveis imediatamente e vão sendo enriquecidos em background.
 
-whatsapp_messages
-  id, conversation_id, lead_id, direction (in/out),
-  phone_e164, body, media_url, status (sent/delivered/read/failed),
-  external_id (id do UazAPI), error, created_at
-```
+3. **Sincronização contínua** — duas formas, complementares:
+   - **No Kanban**: mesmo loop que já chama `autoEnrichPending` chama também `syncLeadsFromSheet` a cada ~60s enquanto a aba está aberta (barato — só lê o sheet quando alguém está usando).
+   - **Endpoint público** `src/routes/api/public/cron/sheets-sync.ts` protegido por header `x-cron-secret` (novo secret `CRON_SECRET`) para um cron externo opcional disparar a sincronização independente do uso da UI.
 
-- RLS: `authenticated` lê/escreve tudo (segue padrão do projeto).
-- Realtime habilitado em ambas para atualizar a UI ao vivo.
-- Função `normalize_phone(text)` → E.164 (`+55...`), usada em trigger e no match.
+4. **UI em Configurações** — bloco "Integração Google Sheets":
+   - Mostra `last_sync_at`, total importado, link para o sheet.
+   - Botão "Sincronizar agora" disparando `syncLeadsFromSheet` manualmente.
 
-## Server-side (TanStack)
+## Detalhes técnicos
 
-### `src/lib/whatsapp.functions.ts` (createServerFn)
-- `sendWhatsappMessage({ leadId?, phone, body })` — valida com Zod, normaliza telefone, chama UazAPI, grava `whatsapp_messages` (direction=out), atualiza/cria `whatsapp_conversations`, registra `lead_interactions` tipo `whatsapp_out`.
-- `listConversations({ search?, status? })` — lista paginada com join leve em `leads`.
-- `getConversation({ conversationId })` — conversa + últimas N mensagens + lead.
-- `markConversationRead({ conversationId })`.
+- **Telefone**: helper que tira não-dígitos; se começar com `55` e tiver 12-13 dígitos vira `+55...`; senão tenta `+<digitos>`.
+- **Dedupe**: `Lead_ID` da Meta é o identificador único. Query: `select form_payload->>'lead_id' from leads where form_payload->>'lead_id' in (...)`.
+- **Empresa "."** ou vazia: cai como `null` em `company_name` (o enriquecimento ainda roda pelo email/LinkedIn).
+- **Connector**: usa `GOOGLE_SHEETS_API_KEY` + `LOVABLE_API_KEY` via gateway (`https://connector-gateway.lovable.dev/google_sheets/v4/...`). Já vinculado ao projeto.
+- **ID da planilha** fica fixo no código por enquanto: `1gGib1CJCUaS-1xNKBrexP7OzuY87u_ZDWehsJdz1U5A`, aba `entrada_correta`.
+- **Secret novo**: `CRON_SECRET` (só pedido se você quiser configurar um cron externo; sem ele, a sincronização via UI já funciona).
 
-### `src/routes/api/public/hooks/whatsapp.ts` (server route)
-- POST recebe webhook UazAPI.
-- Valida header `x-webhook-secret` contra `UAZAPI_WEBHOOK_SECRET` (timingSafeEqual).
-- Para cada mensagem: normaliza telefone, faz match em `leads.phone` (E.164); se achar lead, vincula; senão deixa `lead_id=null` (caixa "sem lead").
-- Insere em `whatsapp_messages` (direction=in), atualiza `whatsapp_conversations` (last_message_at, unread_count++).
-- Também trata status updates (delivered/read) atualizando `external_id`.
-
-## UI
-
-### 1. Detalhe do lead (`src/routes/_app.lead.$id.tsx`)
-- Nova aba/card "WhatsApp" com:
-  - Histórico de mensagens (in/out) do telefone do lead
-  - Composer (textarea + enviar)
-  - Aviso se `lead.phone` estiver vazio ou não normalizável
-
-### 2. Inbox (`src/routes/_app.inbox.tsx` — nova rota)
-- Layout 2 colunas:
-  - **Esquerda**: lista de conversas (ordenadas por `last_message_at`, badge unread, busca por nome/telefone, filtro "sem lead")
-  - **Direita**: thread da conversa selecionada + composer
-- Subscribe realtime em `whatsapp_messages` e `whatsapp_conversations` para atualizar sem refresh.
-- Item no menu lateral em `src/routes/_app.tsx` (ícone MessageCircle).
-
-## Fluxo de configuração (Configurações)
-
-Bloco novo em `_app.configuracoes.tsx` "WhatsApp (UazAPI)":
-- Mostra URL do webhook que o usuário cola no painel UazAPI: `https://sdr-grou.lovable.app/api/public/hooks/whatsapp`
-- Botão "Testar envio" (envia mensagem de teste para um número informado)
-- Status da última mensagem recebida (timestamp)
-
-## Segurança
-
-- Webhook valida secret + Zod no payload.
-- Rate-limit simples no `sendWhatsappMessage` (1 msg / 2s por usuário, em memória aceitável no MVP — anotar limitação).
-- `phone` validado com Zod regex E.164 antes de qualquer chamada externa.
-- Service role só dentro do webhook (precisa bypassar RLS para inserir sem sessão).
-
-## Fora de escopo (MVP)
-
-- Templates HSM / disparo em massa
-- Mídia (áudio/imagem/documento) — só texto no v1; schema já suporta `media_url` para depois
-- Disparo automático por IA (fica como botão "sugerir mensagem" reusando `suggestApproach` já existente)
-- Múltiplas instâncias / múltiplos números
-
-## Ordem de execução
-
-1. `add_secret` para `UAZAPI_BASE_URL`, `UAZAPI_INSTANCE_TOKEN`, `UAZAPI_WEBHOOK_SECRET`
-2. Migration: tabelas + RLS + realtime + função normalize_phone
-3. `whatsapp.functions.ts` + webhook route
-4. Aba WhatsApp no detalhe do lead
-5. Rota `/inbox` + item de menu
-6. Card de configuração + URL do webhook
-
-## Pergunta antes de seguir
-
-Tem um número UazAPI já conectado e o `token` da instância em mãos? Se sim, posso pedir os 3 secrets logo no início da implementação.
+## Fora de escopo
+- Webhook em tempo real do Sheets (Apps Script) — pode vir depois; o polling de 60s é suficiente para o fluxo atual.
+- Sincronização inversa (escrever no sheet a partir do CRM).
