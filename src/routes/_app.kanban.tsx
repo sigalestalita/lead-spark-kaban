@@ -283,6 +283,44 @@ function KanbanPage() {
             ))}
           </select>
           <div className="flex items-center gap-1">
+            <select
+              value=""
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) return;
+                const fmt = (d: Date) => {
+                  const y = d.getFullYear();
+                  const m = String(d.getMonth() + 1).padStart(2, "0");
+                  const day = String(d.getDate()).padStart(2, "0");
+                  return `${y}-${m}-${day}`;
+                };
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                let from = new Date(today);
+                let to = new Date(today);
+                if (v === "hoje") { /* same */ }
+                else if (v === "ontem") { from.setDate(from.getDate() - 1); to.setDate(to.getDate() - 1); }
+                else if (v === "7d") { from.setDate(from.getDate() - 6); }
+                else if (v === "15d") { from.setDate(from.getDate() - 14); }
+                else if (v === "mes") { from = new Date(today.getFullYear(), today.getMonth(), 1); }
+                else if (v === "mes_ant") {
+                  from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                  to = new Date(today.getFullYear(), today.getMonth(), 0);
+                }
+                setDateFrom(fmt(from));
+                setDateTo(fmt(to));
+              }}
+              className="h-9 rounded-md border bg-background px-2 text-sm"
+              title="Período rápido"
+            >
+              <option value="">Período…</option>
+              <option value="hoje">Hoje</option>
+              <option value="ontem">Ontem</option>
+              <option value="7d">Últimos 7 dias</option>
+              <option value="15d">Últimos 15 dias</option>
+              <option value="mes">Este mês</option>
+              <option value="mes_ant">Mês anterior</option>
+            </select>
             <Input
               type="date"
               value={dateFrom}
