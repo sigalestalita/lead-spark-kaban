@@ -450,6 +450,8 @@ function LeadCard({
   const convertedAt = lead.converted_at ? new Date(lead.converted_at) : null;
   const stageEnteredAt = lead.stage_entered_at ? new Date(lead.stage_entered_at) : null;
   const meetingAt = lead.meeting_at ? new Date(lead.meeting_at) : null;
+  const submittedRaw = (lead.form_payload as { submitted_at?: string } | null)?.submitted_at ?? null;
+  const submittedAt = submittedRaw ? new Date(submittedRaw) : new Date(lead.created_at);
 
   const sinceConversion =
     convertedAt && stageEnteredAt
