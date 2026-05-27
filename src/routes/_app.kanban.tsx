@@ -329,8 +329,10 @@ function KanbanPage() {
                 const fa = evaluateIcpFit(a).score;
                 const fb = evaluateIcpFit(b).score;
                 if (fb !== fa) return fb - fa;
-                const ta = a.converted_at ? new Date(a.converted_at).getTime() : new Date(a.created_at).getTime();
-                const tb = b.converted_at ? new Date(b.converted_at).getTime() : new Date(b.created_at).getTime();
+                const ra = (a.form_payload as { submitted_at?: string } | null)?.submitted_at;
+                const rb = (b.form_payload as { submitted_at?: string } | null)?.submitted_at;
+                const ta = ra ? new Date(ra).getTime() : new Date(a.created_at).getTime();
+                const tb = rb ? new Date(rb).getTime() : new Date(b.created_at).getTime();
                 return tb - ta;
               });
             }
