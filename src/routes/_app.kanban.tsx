@@ -46,6 +46,8 @@ function KanbanPage() {
   const [priority, setPriority] = useState<string>("all");
   const [showNew, setShowNew] = useState(false);
   const [lostFor, setLostFor] = useState<{ leadId: string; stageId: string } | null>(null);
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["kanban"],
@@ -179,6 +181,15 @@ function KanbanPage() {
 
   const filtered = data.leads.filter((l) => {
     if (priority !== "all" && l.priority !== priority) return false;
+    const convTs = l.converted_at ? new Date(l.converted_at).getTime() : new Date(l.created_at).getTime();
+    if (dateFrom) {
+      const fromTs = new Date(dateFrom + "T00:00:00").getTime();
+      if (convTs < fromTs) return false;
+    }
+    if (dateTo) {
+      const toTs = new Date(dateTo + "T23:59:59").getTime();
+      if (convTs > toTs) return false;
+    }
     if (search) {
       const q = search.toLowerCase();
       return (
@@ -236,6 +247,28 @@ function KanbanPage() {
             <option value="fora_icp">Fora de ICP</option>
             <option value="pendente">Pendente</option>
           </select>
+          <div className="flex items-center gap-1">
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="h-9 w-[140px]"
+              title="Conversão a partir de"
+            />
+            <span className="text-xs text-muted-foreground">até</span>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="h-9 w-[140px]"
+              title="Conversão até"
+            />
+            {(dateFrom || dateTo) && (
+              <Button variant="ghost" size="sm" onClick={() => { setDateFrom(""); setDateTo(""); }}>
+                Limpar
+              </Button>
+            )}
+          </div>
           <Button variant="outline" size="sm" onClick={() => sync.mutate()} disabled={sync.isPending}>
             <RefreshCw className={`h-4 w-4 mr-1 ${sync.isPending ? "animate-spin" : ""}`} />
             Sincronizar RD
