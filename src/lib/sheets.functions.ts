@@ -146,27 +146,21 @@ export const syncLeadsFromSheet = createServerFn({ method: "POST" })
       parsed.push(r);
     }
 
-    // Buscar quais lead_ids já existem (em batches de 500 IDs por filtro IN).
+    // Buscar todos os lead_ids já importados via Meta (paginando para evitar o limite de 1000).
     const existingIds = new Set<string>();
-    const ids = parsed.map((p) => p.meta_lead_id);
-    for (let i = 0; i < ids.length; i += 500) {
-      const slice = ids.slice(i, i + 500);
-      const filter = slice.map((id) => `"lead_id":"${id}"`).join(",");
-      // Postgres jsonb ->> filter via .or
-      const orExpr = slice.map((id) => `form_payload->>lead_id.eq.${id}`).join(",");
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
       const { data: rows2, error } = await supabase
         .from("leads")
         .select("form_payload")
-        .or(orExpr);
-      if (error) {
-        // fallback: ignorar e seguir (vai detectar via unique constraint? não temos. seguir e arriscar dup)
-        void filter;
-        continue;
-      }
-      for (const r of rows2 ?? []) {
+        .eq("source", "meta_ads")
+        .range(from, from + PAGE - 1);
+      if (error || !rows2 || rows2.length === 0) break;
+      for (const r of rows2) {
         const lid = (r as { form_payload: { lead_id?: string } | null }).form_payload?.lead_id;
         if (lid) existingIds.add(lid);
       }
+      if (rows2.length < PAGE) break;
     }
 
     const toInsert = parsed.filter((p) => !existingIds.has(p.meta_lead_id));
