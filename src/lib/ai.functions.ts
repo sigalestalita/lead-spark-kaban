@@ -127,7 +127,25 @@ async function runEnrichment(supabase: any, userId: string | null, id: string) {
       return short.toLowerCase() !== person.toLowerCase() ? short : "";
     })();
 
-    const [linkedinHits, linkedinByNameHits, linkedinByNameAndCompanyHits, companyLinkedinHits, websiteHits, linkedinByShortNameHits] = await Promise.all([
+    // Slug provável do LinkedIn derivado do username do email (ex.: joao.silva@x.com → "joao.silva")
+    const emailLocal = (() => {
+      const m = (lead.email ?? "").match(/^([\w.+-]+)@/);
+      return m ? m[1].toLowerCase() : "";
+    })();
+
+    // Nome efetivo para busca "só nome" (usa short quando existe, senão o nome completo)
+    const personForNameOnly = personShort || person;
+
+    const [
+      linkedinHits,
+      linkedinByNameHits,
+      linkedinByNameAndCompanyHits,
+      companyLinkedinHits,
+      websiteHits,
+      linkedinByShortNameHits,
+      linkedinByNameOnlyHits,
+      linkedinByEmailSlugHits,
+    ] = await Promise.all([
       companyForSearch && person
         ? firecrawlSearch(`${person} ${companyForSearch} site:linkedin.com/in`)
         : Promise.resolve([] as SearchHit[]),
@@ -153,6 +171,16 @@ async function runEnrichment(supabase: any, userId: string | null, id: string) {
       // nome no LinkedIn tem nomes do meio que não estão no form.
       personShort && companyForSearch
         ? firecrawlSearch(`"${personShort}" ${companyForSearch} site:linkedin.com/in`)
+        : Promise.resolve([] as SearchHit[]),
+      // Busca SÓ pelo nome + site:linkedin.com/in — cobre quem trocou de emprego
+      // (a empresa do form pode estar desatualizada, eliminando o perfil das
+      // buscas que combinam nome+empresa).
+      personForNameOnly
+        ? firecrawlSearch(`"${personForNameOnly}" site:linkedin.com/in`)
+        : Promise.resolve([] as SearchHit[]),
+      // Slug do email costuma bater com o slug do LinkedIn (joao.silva → /in/joao-silva)
+      emailLocal && emailLocal.length >= 4
+        ? firecrawlSearch(`"${emailLocal.replace(/\./g, " ")}" site:linkedin.com/in`)
         : Promise.resolve([] as SearchHit[]),
     ]);
 
