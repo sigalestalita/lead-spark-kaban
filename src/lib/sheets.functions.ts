@@ -126,14 +126,18 @@ async function fetchSheetRows(): Promise<SheetFetchResult> {
       Authorization: `Bearer ${LOVABLE_API_KEY}`,
       "X-Connection-Api-Key": GOOGLE_SHEETS_API_KEY,
     },
-  });
+  }).catch((err) => null);
+  if (!res) {
+    return { ok: false, status: 503, message: "Falha temporária ao consultar o Google Sheets", rateLimited: false };
+  }
   if (!res.ok) {
     const body = await res.text();
+    const rateLimited = res.status === 429 || body.includes('"code": 429') || body.includes("Quota exceeded");
     return {
       ok: false,
       status: res.status,
       message: `Google Sheets API ${res.status}: ${body.slice(0, 300)}`,
-      rateLimited: res.status === 429,
+      rateLimited,
     };
   }
   const json = (await res.json()) as { values?: string[][] };
