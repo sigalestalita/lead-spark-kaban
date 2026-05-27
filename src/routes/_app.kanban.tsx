@@ -544,6 +544,11 @@ function LeadCard({
         </Badge>
       </div>
       {lead.company_name && <p className="text-xs text-muted-foreground truncate">{lead.company_name}</p>}
+      {lead.probable_pain && (
+        <p className="mt-1 text-[11px] text-foreground/80 line-clamp-2" title={lead.probable_pain}>
+          <span className="text-muted-foreground">Dor:</span> {lead.probable_pain}
+        </p>
+      )}
 
       {stageSlug === "novo" && (
         <div className="mt-2 space-y-1">
