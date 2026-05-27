@@ -237,6 +237,7 @@ async function runEnrichment(supabase: any, userId: string | null, id: string) {
       busca_pessoa_e_empresa: linkedinByNameAndCompanyHits,
       busca_linkedin_empresa: companyLinkedinHits,
       busca_site_empresa: websiteHits,
+      busca_linkedin_pessoal_nome_curto: linkedinByShortNameHits,
     };
 
     // 2) Snippets do LinkedIn por nome — fonte primária para descobrir a empresa ATUAL.
