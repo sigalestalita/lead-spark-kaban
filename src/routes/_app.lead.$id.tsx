@@ -144,6 +144,22 @@ function LeadDetailPage() {
           Etapa atual: <span className="font-medium text-foreground">{currentStage.name}</span>
         </p>
       )}
+
+      {lostFor && (
+        <LostReasonDialog
+          initial={lead.lost_reason ?? ""}
+          onClose={() => setLostFor(null)}
+          onConfirm={(reason) => {
+            update.mutate({
+              stage_id: lostFor,
+              stage_entered_at: new Date().toISOString(),
+              last_action_at: new Date().toISOString(),
+              lost_reason: reason,
+            });
+            setLostFor(null);
+          }}
+        />
+      )}
       <Link to="/kanban" className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
         <ArrowLeft className="h-4 w-4" /> Voltar para o Kanban
       </Link>
