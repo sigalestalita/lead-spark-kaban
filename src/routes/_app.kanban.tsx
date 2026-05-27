@@ -183,7 +183,12 @@ function KanbanPage() {
   const filtered = data.leads.filter((l) => {
     if (priority !== "all" && l.priority !== priority) return false;
     if (companySize !== "all" && (l.company_size ?? "") !== companySize) return false;
-    const convTs = l.converted_at ? new Date(l.converted_at).getTime() : new Date(l.created_at).getTime();
+    const submittedRaw = (l.form_payload as { submitted_at?: string } | null)?.submitted_at ?? null;
+    const convTs = submittedRaw
+      ? new Date(submittedRaw).getTime()
+      : l.converted_at
+        ? new Date(l.converted_at).getTime()
+        : new Date(l.created_at).getTime();
     if (dateFrom) {
       const fromTs = new Date(dateFrom + "T00:00:00").getTime();
       if (convTs < fromTs) return false;
@@ -324,8 +329,10 @@ function KanbanPage() {
                 const fa = evaluateIcpFit(a).score;
                 const fb = evaluateIcpFit(b).score;
                 if (fb !== fa) return fb - fa;
-                const ta = a.converted_at ? new Date(a.converted_at).getTime() : new Date(a.created_at).getTime();
-                const tb = b.converted_at ? new Date(b.converted_at).getTime() : new Date(b.created_at).getTime();
+                const ra = (a.form_payload as { submitted_at?: string } | null)?.submitted_at;
+                const rb = (b.form_payload as { submitted_at?: string } | null)?.submitted_at;
+                const ta = ra ? new Date(ra).getTime() : new Date(a.created_at).getTime();
+                const tb = rb ? new Date(rb).getTime() : new Date(b.created_at).getTime();
                 return tb - ta;
               });
             }
@@ -450,6 +457,8 @@ function LeadCard({
   const convertedAt = lead.converted_at ? new Date(lead.converted_at) : null;
   const stageEnteredAt = lead.stage_entered_at ? new Date(lead.stage_entered_at) : null;
   const meetingAt = lead.meeting_at ? new Date(lead.meeting_at) : null;
+  const submittedRaw = (lead.form_payload as { submitted_at?: string } | null)?.submitted_at ?? null;
+  const submittedAt = submittedRaw ? new Date(submittedRaw) : new Date(lead.created_at);
 
   const sinceConversion =
     convertedAt && stageEnteredAt
@@ -653,9 +662,7 @@ function LeadCard({
       <div className="flex justify-between items-center mt-2 pt-2 border-t border-border/40">
         <span className="text-[10px] text-muted-foreground flex items-center gap-1">
           <Clock className="h-3 w-3" />
-          {convertedAt
-            ? format(convertedAt, "dd/MM/yy HH:mm", { locale: ptBR })
-            : format(new Date(lead.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}
+          {format(submittedAt, "dd/MM/yy HH:mm", { locale: ptBR })}
         </span>
         <div className="flex items-center gap-1">
           <span className="text-[10px] font-mono text-muted-foreground">{lead.score}pts</span>
