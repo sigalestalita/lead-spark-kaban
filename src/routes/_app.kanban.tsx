@@ -48,6 +48,7 @@ function KanbanPage() {
   const [lostFor, setLostFor] = useState<{ leadId: string; stageId: string } | null>(null);
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+  const [companySize, setCompanySize] = useState<string>("all");
 
   const { data, isLoading } = useQuery({
     queryKey: ["kanban"],
@@ -181,6 +182,7 @@ function KanbanPage() {
 
   const filtered = data.leads.filter((l) => {
     if (priority !== "all" && l.priority !== priority) return false;
+    if (companySize !== "all" && (l.company_size ?? "") !== companySize) return false;
     const convTs = l.converted_at ? new Date(l.converted_at).getTime() : new Date(l.created_at).getTime();
     if (dateFrom) {
       const fromTs = new Date(dateFrom + "T00:00:00").getTime();
@@ -217,6 +219,9 @@ function KanbanPage() {
 
   const activeLead = activeId ? filtered.find((l) => l.id === activeId) : null;
   const stageById = new Map(data.stages.map((s) => [s.id, s] as const));
+  const sizeOptions = Array.from(
+    new Set(data.leads.map((l) => (l.company_size ?? "").trim()).filter(Boolean))
+  ).sort();
 
   const handleMoveTo = (leadId: string, stageId: string) => {
     const targetStage = data.stages.find((s) => s.id === stageId);
@@ -260,6 +265,17 @@ function KanbanPage() {
             <option value="baixa">Baixa</option>
             <option value="fora_icp">Fora de ICP</option>
             <option value="pendente">Pendente</option>
+          </select>
+          <select
+            value={companySize}
+            onChange={(e) => setCompanySize(e.target.value)}
+            className="h-9 rounded-md border bg-background px-2 text-sm max-w-[180px]"
+            title="Porte da empresa"
+          >
+            <option value="all">Todos os portes</option>
+            {sizeOptions.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
           </select>
           <div className="flex items-center gap-1">
             <Input
