@@ -6,6 +6,7 @@ import { getSettings, updateSetting, updateIcp } from "@/lib/settings.functions"
 import { testRdConnection, getRecentSyncLogs } from "@/lib/rd-station.functions";
 import { getRdAuthUrl, getRdConnectionStatus, disconnectRd } from "@/lib/rd-oauth.functions";
 import { revealServiceRoleKey } from "@/lib/admin-secrets.functions";
+import { syncLeadsFromSheet, getSheetSyncState } from "@/lib/sheets.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,8 @@ function SettingsPage() {
   const statusFn = useServerFn(getRdConnectionStatus);
   const disconnectFn = useServerFn(disconnectRd);
   const revealFn = useServerFn(revealServiceRoleKey);
+  const sheetSyncFn = useServerFn(syncLeadsFromSheet);
+  const sheetStateFn = useServerFn(getSheetSyncState);
   const [revealed, setRevealed] = useState<{ url: string; serviceRoleKey: string } | null>(null);
   const reveal = useMutation({
     mutationFn: () => revealFn(),
@@ -39,6 +42,15 @@ function SettingsPage() {
   const { data, isLoading } = useQuery({ queryKey: ["settings"], queryFn: () => fetchFn() });
   const { data: logs } = useQuery({ queryKey: ["sync-logs"], queryFn: () => logsFn(), refetchInterval: 30000 });
   const { data: rdStatus } = useQuery({ queryKey: ["rd-status"], queryFn: () => statusFn(), refetchInterval: 10000 });
+  const { data: sheetState } = useQuery({ queryKey: ["sheet-state"], queryFn: () => sheetStateFn(), refetchInterval: 15000 });
+  const sheetSync = useMutation({
+    mutationFn: () => sheetSyncFn({ data: {} }),
+    onSuccess: (r) => {
+      toast.success(`Sheet: +${r.inserted} novos · ${r.skipped} já existiam · ${r.total} linhas`);
+      qc.invalidateQueries({ queryKey: ["sheet-state"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro"),
+  });
 
   const connect = useMutation({
     mutationFn: async () => authUrlFn({ data: { origin: window.location.origin } }),
@@ -187,6 +199,29 @@ function SettingsPage() {
         <div className="text-xs text-muted-foreground pt-2 border-t">
           Última sincronização: {lastSync ? new Date(lastSync).toLocaleString("pt-BR") : "nunca"} · Cron automático rodando a cada 15 min
         </div>
+      </Card>
+
+      <Card className="p-5 space-y-3">
+        <div className="flex justify-between items-center">
+          <h2 className="font-semibold">Integração Google Sheets (Meta Ads)</h2>
+          <Badge variant="default">Conectado</Badge>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Toda nova linha na aba <code>entrada_correta</code> vira um card na coluna "Novos leads" e é
+          enriquecida automaticamente. A sincronização roda a cada 60s enquanto o Kanban está aberto.
+        </p>
+        <a href={sheetState?.spreadsheet_url ?? "#"} target="_blank" rel="noreferrer" className="text-xs text-primary underline">
+          Abrir planilha
+        </a>
+        <div className="text-xs text-muted-foreground">
+          Última sincronização: {sheetState?.state?.last_sync_at ? new Date(sheetState.state.last_sync_at).toLocaleString("pt-BR") : "nunca"}
+          {sheetState?.state?.total_rows != null && (
+            <> · {sheetState.state.total_rows} linhas na planilha · {sheetState.state.skipped_existing ?? 0} leads já no CRM</>
+          )}
+        </div>
+        <Button size="sm" onClick={() => sheetSync.mutate()} disabled={sheetSync.isPending}>
+          {sheetSync.isPending ? "Sincronizando…" : "Sincronizar agora"}
+        </Button>
       </Card>
 
       <Card className="p-5 space-y-2">
