@@ -183,7 +183,12 @@ function KanbanPage() {
   const filtered = data.leads.filter((l) => {
     if (priority !== "all" && l.priority !== priority) return false;
     if (companySize !== "all" && (l.company_size ?? "") !== companySize) return false;
-    const convTs = l.converted_at ? new Date(l.converted_at).getTime() : new Date(l.created_at).getTime();
+    const submittedRaw = (l.form_payload as { submitted_at?: string } | null)?.submitted_at ?? null;
+    const convTs = submittedRaw
+      ? new Date(submittedRaw).getTime()
+      : l.converted_at
+        ? new Date(l.converted_at).getTime()
+        : new Date(l.created_at).getTime();
     if (dateFrom) {
       const fromTs = new Date(dateFrom + "T00:00:00").getTime();
       if (convTs < fromTs) return false;
