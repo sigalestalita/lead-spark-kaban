@@ -203,10 +203,8 @@ export const syncLeadsFromSheet = createServerFn({ method: "POST" })
           stage_entered_at: createdAt,
         };
       });
-      const { error, count } = await supabase
-        .from("leads")
-        .insert(chunk as never, { count: "exact" });
-      if (!error) inserted += count ?? chunk.length;
+      const { error } = await supabase.from("leads").insert(chunk as never);
+      if (!error) inserted += chunk.length;
     }
 
     const skipped = parsed.length - inserted;
