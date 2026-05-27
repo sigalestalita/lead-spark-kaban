@@ -148,22 +148,36 @@ export const syncLeadsFromSheet = createServerFn({ method: "POST" })
 
     // Buscar todos os lead_ids já importados via Meta (paginando para evitar o limite de 1000).
     const existingIds = new Set<string>();
+    const existingEmails = new Set<string>();
     const PAGE = 1000;
     for (let from = 0; ; from += PAGE) {
       const { data: rows2, error } = await supabase
         .from("leads")
-        .select("form_payload")
-        .eq("source", "meta_ads")
+        .select("email, form_payload")
         .range(from, from + PAGE - 1);
       if (error || !rows2 || rows2.length === 0) break;
       for (const r of rows2) {
-        const lid = (r as { form_payload: { lead_id?: string } | null }).form_payload?.lead_id;
+        const rr = r as { email: string | null; form_payload: { lead_id?: string } | null };
+        const lid = rr.form_payload?.lead_id;
         if (lid) existingIds.add(lid);
+        if (rr.email) existingEmails.add(rr.email.toLowerCase());
       }
       if (rows2.length < PAGE) break;
     }
 
-    const toInsert = parsed.filter((p) => !existingIds.has(p.meta_lead_id));
+    // Dedup também por email (índice único em lower(email)) para evitar
+    // que um único conflito derrube o chunk inteiro.
+    const seenEmail = new Set<string>();
+    const toInsert = parsed.filter((p) => {
+      if (existingIds.has(p.meta_lead_id)) return false;
+      const em = p.payload.email?.toLowerCase() ?? null;
+      if (em) {
+        if (existingEmails.has(em)) return false;
+        if (seenEmail.has(em)) return false;
+        seenEmail.add(em);
+      }
+      return true;
+    });
     const limit = data.limit ?? toInsert.length;
     const batch = toInsert.slice(0, limit);
 
@@ -176,9 +190,11 @@ export const syncLeadsFromSheet = createServerFn({ method: "POST" })
     const novoId = novo?.id ?? null;
 
     let inserted = 0;
+    const insertErrors: string[] = [];
     const CHUNK = 100;
     for (let i = 0; i < batch.length; i += CHUNK) {
-      const chunk = batch.slice(i, i + CHUNK).map((p) => {
+      const slice = batch.slice(i, i + CHUNK);
+      const chunk = slice.map((p) => {
         const createdAt = p.payload.submitted_at ?? new Date().toISOString();
         return {
           name: p.payload.name,
@@ -204,7 +220,16 @@ export const syncLeadsFromSheet = createServerFn({ method: "POST" })
         };
       });
       const { error } = await supabase.from("leads").insert(chunk as never);
-      if (!error) inserted += chunk.length;
+      if (!error) {
+        inserted += chunk.length;
+        continue;
+      }
+      // Fallback row-by-row para isolar conflitos (email duplicado, etc.).
+      for (const row of chunk) {
+        const { error: rowErr } = await supabase.from("leads").insert(row as never);
+        if (!rowErr) inserted += 1;
+        else if (insertErrors.length < 10) insertErrors.push(rowErr.message);
+      }
     }
 
     const skipped = parsed.length - inserted;
@@ -214,6 +239,7 @@ export const syncLeadsFromSheet = createServerFn({ method: "POST" })
       parsed: parsed.length,
       inserted_total_run: inserted,
       skipped_existing: existingIds.size,
+      insert_errors: insertErrors,
     };
     await supabase.from("app_settings").upsert(
       { key: "sheets_sync_state", value: stateValue as never } as never,
@@ -222,8 +248,8 @@ export const syncLeadsFromSheet = createServerFn({ method: "POST" })
     await supabase.from("integration_logs").insert({
       provider: "google_sheets",
       action: "sync_leads",
-      status: "ok",
-      detail: { total, parsed: parsed.length, inserted, skipped } as never,
+      status: insertErrors.length ? "partial" : "ok",
+      detail: { total, parsed: parsed.length, inserted, skipped, insert_errors: insertErrors } as never,
     });
 
     return { total, parsed: parsed.length, inserted, skipped };
