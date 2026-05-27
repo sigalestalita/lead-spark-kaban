@@ -34,6 +34,7 @@ function LeadDetailPage() {
 
   const [note, setNote] = useState("");
   const [suggestion, setSuggestion] = useState<string | null>(null);
+  const [lostFor, setLostFor] = useState<string | null>(null);
 
   const update = useMutation({
     mutationFn: (patch: Record<string, unknown>) => updateFn({ data: { id, patch } }),
@@ -70,17 +71,15 @@ function LeadDetailPage() {
 
   const moveToStage = (stageId: string, slug: string) => {
     if (stageId === lead.stage_id) return;
-    const patch: Record<string, unknown> = {
+    if (slug === "desqualificado") {
+      setLostFor(stageId);
+      return;
+    }
+    update.mutate({
       stage_id: stageId,
       stage_entered_at: new Date().toISOString(),
       last_action_at: new Date().toISOString(),
-    };
-    if (slug === "desqualificado") {
-      const reason = window.prompt("Motivo da desqualificação:", lead.lost_reason ?? "");
-      if (reason === null) return;
-      patch.lost_reason = reason.trim() || null;
-    }
-    update.mutate(patch);
+    });
   };
 
   const whatsappUrl = lead.phone
