@@ -48,6 +48,7 @@ function KanbanPage() {
   const [lostFor, setLostFor] = useState<{ leadId: string; stageId: string } | null>(null);
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+  const [companySize, setCompanySize] = useState<string>("all");
 
   const { data, isLoading } = useQuery({
     queryKey: ["kanban"],
@@ -181,6 +182,7 @@ function KanbanPage() {
 
   const filtered = data.leads.filter((l) => {
     if (priority !== "all" && l.priority !== priority) return false;
+    if (companySize !== "all" && (l.company_size ?? "") !== companySize) return false;
     const convTs = l.converted_at ? new Date(l.converted_at).getTime() : new Date(l.created_at).getTime();
     if (dateFrom) {
       const fromTs = new Date(dateFrom + "T00:00:00").getTime();
