@@ -133,7 +133,38 @@ export const syncLeadsFromSheet = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ limit: z.number().int().min(1).max(5000).optional() }).parse(d ?? {}))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
-    const rows = await fetchSheetRows();
+
+    // Throttle: não buscar a planilha se sincronizamos há menos de 60s.
+    const { data: prev } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "sheets_sync_state")
+      .maybeSingle();
+    const prevState = (prev?.value ?? null) as null | { last_sync_at?: string };
+    if (prevState?.last_sync_at) {
+      const ageMs = Date.now() - new Date(prevState.last_sync_at).getTime();
+      if (ageMs < 60_000) {
+        return { total: 0, parsed: 0, inserted: 0, skipped: 0, throttled: true };
+      }
+    }
+
+    let rows: string[][];
+    try {
+      rows = await fetchSheetRows();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // 429 = quota da Google Sheets. Não derruba o app: registra e retorna.
+      if (msg.includes("429")) {
+        await supabase.from("integration_logs").insert({
+          provider: "google_sheets",
+          action: "sync_leads",
+          status: "rate_limited",
+          detail: { error: msg.slice(0, 300) } as never,
+        });
+        return { total: 0, parsed: 0, inserted: 0, skipped: 0, rate_limited: true };
+      }
+      throw err;
+    }
     const total = rows.length;
 
     const parsed: LeadRow[] = [];
