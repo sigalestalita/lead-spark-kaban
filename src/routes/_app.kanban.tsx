@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { listKanbanData, moveLeadStage, createManualLead, updateLead } from "@/lib/leads.functions";
 import { syncRdLeads } from "@/lib/rd-station.functions";
 import { autoEnrichPendingLeads, recalculatePendingScores } from "@/lib/ai.functions";
+import { syncLeadsFromSheet } from "@/lib/sheets.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -39,6 +40,7 @@ function KanbanPage() {
   const updateFn = useServerFn(updateLead);
   const autoEnrichFn = useServerFn(autoEnrichPendingLeads);
   const recalcFn = useServerFn(recalculatePendingScores);
+  const sheetSyncFn = useServerFn(syncLeadsFromSheet);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [priority, setPriority] = useState<string>("all");
@@ -56,12 +58,12 @@ function KanbanPage() {
   //   quando muda). Garante que mudanças nas regras de ICP refletem nos cards.
   const enrichingRef = useRef(false);
   const recalcRunRef = useRef(false);
+  const sheetSyncRef = useRef(0);
   useEffect(() => {
     const leads = data?.leads ?? [];
     const pendingEnrich = leads.filter((l) => l.enrichment_status === "pending").length;
     const enrichedCount = leads.filter((l) => l.enrichment_status === "found").length;
     const shouldRecalc = enrichedCount > 0 && !recalcRunRef.current;
-    if (pendingEnrich === 0 && !shouldRecalc) return;
     if (enrichingRef.current) return;
     let cancelled = false;
     const run = async () => {
@@ -69,6 +71,15 @@ function KanbanPage() {
       enrichingRef.current = true;
       try {
         let changed = 0;
+        // Sync da planilha do Meta a cada 60s
+        const now = Date.now();
+        if (now - sheetSyncRef.current > 60_000) {
+          sheetSyncRef.current = now;
+          try {
+            const s = await sheetSyncFn({ data: {} });
+            if (s?.inserted) changed += s.inserted;
+          } catch { /* silencioso */ }
+        }
         if (shouldRecalc) {
           recalcRunRef.current = true;
           const r = await recalcFn({ data: { limit: 200 } });
@@ -93,7 +104,7 @@ function KanbanPage() {
       cancelled = true;
       clearInterval(t);
     };
-  }, [data?.leads, autoEnrichFn, recalcFn, qc]);
+  }, [data?.leads, autoEnrichFn, recalcFn, sheetSyncFn, qc]);
 
   const move = useMutation({
     mutationFn: (vars: { leadId: string; stageId: string }) => moveFn({ data: vars }),
