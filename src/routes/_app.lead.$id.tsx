@@ -152,7 +152,7 @@ function LeadDetailPage() {
           )}
           <Field label="Site" value={lead.company_website} onSave={(v) => update.mutate({ company_website: v })} />
           <Field label="LinkedIn empresa" value={lead.company_linkedin} onSave={(v) => update.mutate({ company_linkedin: v })} />
-          <Field label="Segmento" value={lead.company_segment} onSave={(v) => update.mutate({ company_segment: v })} />
+          <Field label="Área" value={lead.company_segment} onSave={(v) => update.mutate({ company_segment: v })} />
           <Field label="Tamanho" value={lead.company_size} onSave={(v) => update.mutate({ company_size: v })} />
           <Field label="Localização" value={lead.company_location} onSave={(v) => update.mutate({ company_location: v })} />
           <div>
