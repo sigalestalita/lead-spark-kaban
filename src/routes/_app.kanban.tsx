@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { PRIORITY_LABEL, PRIORITY_COLOR } from "@/lib/lead-types";
 import { evaluateIcpFit } from "@/lib/icp-fit";
 import { toast } from "sonner";
-import { RefreshCw, Plus, Search, Calendar, Clock, Timer, Flame, Briefcase, Building2, Mail, ChevronLeft, ChevronRight, Pencil, Check, X } from "lucide-react";
+import { RefreshCw, Plus, Search, Calendar, Clock, Timer, Flame, Briefcase, Building2, Mail, ChevronLeft, ChevronRight, Pencil, Check, X, LinkedinIcon } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -576,6 +576,11 @@ function LeadCard({
             {icpFit.score === 0 && (
               <Badge variant="outline" className="text-[10px] text-muted-foreground">
                 Sem sinais de ICP
+              </Badge>
+            )}
+            {lead.enrichment_status === "found" && !lead.linkedin_url && (
+              <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-600 gap-1">
+                <LinkedinIcon className="h-3 w-3" /> Sem LinkedIn
               </Badge>
             )}
           </div>
