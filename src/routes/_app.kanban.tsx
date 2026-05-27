@@ -342,6 +342,9 @@ function KanbanPage() {
             <LeadCard
               lead={activeLead}
               stageSlug={stageById.get(activeLead.stage_id ?? "")?.slug ?? ""}
+              stages={data.stages}
+              onMoveTo={handleMoveTo}
+              onUpdate={handleUpdateLead}
               overlay
             />
           ) : null}
@@ -398,16 +401,35 @@ function Column({ stageId, name, color, count, index, focused, children }: { sta
 function LeadCard({
   lead,
   stageSlug,
+  stages,
+  onMoveTo,
+  onUpdate,
   overlay,
 }: {
   lead: import("@/lib/lead-types").Lead;
   stageSlug: string;
+  stages: { id: string; slug: string; name: string; position: number }[];
+  onMoveTo: (leadId: string, stageId: string) => void;
+  onUpdate: (id: string, patch: Record<string, unknown>) => void;
   overlay?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: lead.id,
     data: { stage_id: lead.stage_id },
   });
+
+  const sortedStages = [...stages].sort((a, b) => a.position - b.position);
+  const currentIdx = sortedStages.findIndex((s) => s.id === lead.stage_id);
+  const prevStage = currentIdx > 0 ? sortedStages[currentIdx - 1] : null;
+  const nextStage = currentIdx >= 0 && currentIdx < sortedStages.length - 1 ? sortedStages[currentIdx + 1] : null;
+
+  const [editingReason, setEditingReason] = useState(false);
+  const [reasonDraft, setReasonDraft] = useState(lead.lost_reason ?? "");
+  const reasonOptions = ["Sem perfil", "Sem fit com soluções", "Sem contato"];
+
+  const stopDrag = (e: React.SyntheticEvent) => {
+    e.stopPropagation();
+  };
 
   const convertedAt = lead.converted_at ? new Date(lead.converted_at) : null;
   const stageEnteredAt = lead.stage_entered_at ? new Date(lead.stage_entered_at) : null;
@@ -546,9 +568,69 @@ function LeadCard({
 
       {stageSlug === "desqualificado" && (
         <div className="mt-2 text-[10px]">
-          <Badge variant="outline" className="text-[10px]">
-            {lead.lost_reason ?? "Sem motivo"}
-          </Badge>
+          {editingReason ? (
+            <div
+              className="space-y-1"
+              onPointerDown={stopDrag}
+              onClick={stopDrag}
+            >
+              <select
+                value={reasonOptions.includes(reasonDraft) ? reasonDraft : "__custom"}
+                onChange={(e) => {
+                  if (e.target.value !== "__custom") setReasonDraft(e.target.value);
+                  else setReasonDraft("");
+                }}
+                className="w-full h-7 rounded border bg-background px-1 text-[10px]"
+              >
+                {reasonOptions.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+                <option value="__custom">Outro…</option>
+              </select>
+              {!reasonOptions.includes(reasonDraft) && (
+                <Input
+                  value={reasonDraft}
+                  onChange={(e) => setReasonDraft(e.target.value)}
+                  placeholder="Motivo customizado"
+                  className="h-7 text-[10px]"
+                />
+              )}
+              <div className="flex gap-1 justify-end">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2"
+                  onClick={() => { setEditingReason(false); setReasonDraft(lead.lost_reason ?? ""); }}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-6 px-2"
+                  disabled={!reasonDraft.trim()}
+                  onClick={() => {
+                    onUpdate(lead.id, { lost_reason: reasonDraft.trim() });
+                    setEditingReason(false);
+                  }}
+                >
+                  <Check className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onPointerDown={stopDrag}
+              onClick={(e) => { stopDrag(e); setReasonDraft(lead.lost_reason ?? ""); setEditingReason(true); }}
+              className="inline-flex items-center gap-1 hover:opacity-80"
+              title="Editar motivo"
+            >
+              <Badge variant="outline" className="text-[10px]">
+                {lead.lost_reason ?? "Sem motivo"}
+              </Badge>
+              <Pencil className="h-3 w-3 text-muted-foreground" />
+            </button>
+          )}
         </div>
       )}
 
@@ -559,7 +641,30 @@ function LeadCard({
             ? format(convertedAt, "dd/MM/yy HH:mm", { locale: ptBR })
             : format(new Date(lead.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}
         </span>
-        <span className="text-[10px] font-mono text-muted-foreground">{lead.score}pts</span>
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] font-mono text-muted-foreground">{lead.score}pts</span>
+          <div className="flex items-center" onPointerDown={stopDrag} onClick={stopDrag}>
+            <button
+              type="button"
+              disabled={!prevStage}
+              onClick={(e) => { stopDrag(e); if (prevStage) onMoveTo(lead.id, prevStage.id); }}
+              title={prevStage ? `Mover para ${prevStage.name}` : "Sem etapa anterior"}
+              className="h-5 w-5 grid place-items-center rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="h-3 w-3" />
+            </button>
+            <button
+              type="button"
+              disabled={!nextStage}
+              onClick={(e) => { stopDrag(e); if (nextStage) onMoveTo(lead.id, nextStage.id); }}
+              title={nextStage ? `Mover para ${nextStage.name}` : "Sem próxima etapa"}
+              className="h-5 w-5 grid place-items-center rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronRight className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
+        </div>
       </div>
       {/* unused but keep referenced to avoid lint */}
       <span className="hidden">{sinceConversion}</span>
