@@ -582,8 +582,8 @@ function LeadCard({
           {lead.campaign && (
             <p className="text-[10px] text-muted-foreground truncate">📣 {lead.campaign}</p>
           )}
-          {lead.form_name && (
-            <p className="text-[10px] text-muted-foreground truncate">📝 {lead.form_name}</p>
+          {lead.ad_name && (
+            <p className="text-[10px] text-muted-foreground truncate">🪧 {lead.ad_name}</p>
           )}
           {formEntries.length > 0 && (
             <div className="rounded bg-muted/40 p-1.5 space-y-0.5">
