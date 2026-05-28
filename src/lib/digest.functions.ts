@@ -272,7 +272,7 @@ export const generateWeeklyDigest = createServerFn({ method: "POST" })
   .handler(async ({ data }) => generateWeeklyDigestInternal(data));
 
 const PUBLIC_SITE_URL = "https://sdr-grou.lovable.app";
-const LOGO_URL = `${PUBLIC_SITE_URL}/lidi-logo-white.png`;
+const LOGO_URL = "https://vlfohgirjbgpqhqbnuks.supabase.co/storage/v1/object/public/email-assets/lidi-logo-white.png";
 
 export function wrapHtml(inner: string): string {
   return `<!doctype html>
