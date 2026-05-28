@@ -18,6 +18,7 @@ import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoe
 import { Route as AppLeadIdRouteImport } from './routes/_app.lead.$id'
 import { Route as ApiPublicRdCallbackRouteImport } from './routes/api/public/rd/callback'
 import { Route as ApiPublicHooksSyncRdRouteImport } from './routes/api/public/hooks/sync-rd'
+import { Route as ApiPublicHooksSendWeeklyDigestRouteImport } from './routes/api/public/hooks/send-weekly-digest'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -63,6 +64,12 @@ const ApiPublicHooksSyncRdRoute = ApiPublicHooksSyncRdRouteImport.update({
   path: '/api/public/hooks/sync-rd',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksSendWeeklyDigestRoute =
+  ApiPublicHooksSendWeeklyDigestRouteImport.update({
+    id: '/api/public/hooks/send-weekly-digest',
+    path: '/api/public/hooks/send-weekly-digest',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -71,6 +78,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AppDashboardRoute
   '/kanban': typeof AppKanbanRoute
   '/lead/$id': typeof AppLeadIdRoute
+  '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
   '/api/public/rd/callback': typeof ApiPublicRdCallbackRoute
 }
@@ -81,6 +89,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AppDashboardRoute
   '/kanban': typeof AppKanbanRoute
   '/lead/$id': typeof AppLeadIdRoute
+  '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
   '/api/public/rd/callback': typeof ApiPublicRdCallbackRoute
 }
@@ -93,6 +102,7 @@ export interface FileRoutesById {
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/kanban': typeof AppKanbanRoute
   '/_app/lead/$id': typeof AppLeadIdRoute
+  '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
   '/api/public/rd/callback': typeof ApiPublicRdCallbackRoute
 }
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/kanban'
     | '/lead/$id'
+    | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
     | '/api/public/rd/callback'
   fileRoutesByTo: FileRoutesByTo
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/kanban'
     | '/lead/$id'
+    | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
     | '/api/public/rd/callback'
   id:
@@ -126,6 +138,7 @@ export interface FileRouteTypes {
     | '/_app/dashboard'
     | '/_app/kanban'
     | '/_app/lead/$id'
+    | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
     | '/api/public/rd/callback'
   fileRoutesById: FileRoutesById
@@ -134,6 +147,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiPublicHooksSendWeeklyDigestRoute: typeof ApiPublicHooksSendWeeklyDigestRoute
   ApiPublicHooksSyncRdRoute: typeof ApiPublicHooksSyncRdRoute
   ApiPublicRdCallbackRoute: typeof ApiPublicRdCallbackRoute
 }
@@ -203,6 +217,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksSyncRdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/send-weekly-digest': {
+      id: '/api/public/hooks/send-weekly-digest'
+      path: '/api/public/hooks/send-weekly-digest'
+      fullPath: '/api/public/hooks/send-weekly-digest'
+      preLoaderRoute: typeof ApiPublicHooksSendWeeklyDigestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -226,9 +247,20 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiPublicHooksSendWeeklyDigestRoute: ApiPublicHooksSendWeeklyDigestRoute,
   ApiPublicHooksSyncRdRoute: ApiPublicHooksSyncRdRoute,
   ApiPublicRdCallbackRoute: ApiPublicRdCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
