@@ -177,10 +177,11 @@ Instruções:
   return parsed as { subject: string; summary_markdown: string; html_body: string };
 }
 
-export const generateWeeklyDigest = createServerFn({ method: "POST" })
-  .inputValidator((input: { weekStart?: string; force?: boolean }) => input ?? {})
-  .handler(async ({ data }) => {
-    const weekStart = data.weekStart ?? mondayOf(new Date());
+export async function generateWeeklyDigestInternal(opts: {
+  weekStart?: string;
+  force?: boolean;
+}) {
+    const weekStart = opts.weekStart ?? mondayOf(new Date());
 
     const { data: existing } = await supabaseAdmin
       .from("weekly_digests")
@@ -188,12 +189,12 @@ export const generateWeeklyDigest = createServerFn({ method: "POST" })
       .eq("week_start", weekStart)
       .maybeSingle();
 
-    if (existing && existing.status === "sent" && !data.force) {
+    if (existing && existing.status === "sent" && !opts.force) {
       return { ok: true, alreadySent: true, digestId: existing.id };
     }
 
     const stats = await collectWeekStats(weekStart);
-    const recentChanges: string[] = []; // placeholder; pode ser populado por changelog futuro
+    const recentChanges: string[] = [];
     const ai = await generateContentWithAI(stats, recentChanges);
 
     if (existing) {
@@ -226,7 +227,11 @@ export const generateWeeklyDigest = createServerFn({ method: "POST" })
       if (error) throw error;
       return { ok: true, digestId: inserted.id };
     }
-  });
+}
+
+export const generateWeeklyDigest = createServerFn({ method: "POST" })
+  .inputValidator((input: { weekStart?: string; force?: boolean }) => input ?? {})
+  .handler(async ({ data }) => generateWeeklyDigestInternal(data));
 
 function wrapHtml(inner: string): string {
   return `<!doctype html>
