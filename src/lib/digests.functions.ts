@@ -18,11 +18,19 @@ export const triggerWeeklyDigestNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { force?: boolean }) => input ?? {})
   .handler(async ({ data }) => {
-    const { generateWeeklyDigestInternal, sendDigestEmail } = await import("./digest.functions");
+    const { generateWeeklyDigestInternal } = await import("./digest.functions");
     const gen = await generateWeeklyDigestInternal({ force: !!data.force });
     if (!("digestId" in gen) || !gen.digestId) {
-      throw new Error("Falha ao gerar digest");
+      throw new Error("Falha ao gerar prévia");
     }
-    const send = await sendDigestEmail(gen.digestId);
-    return { ok: true, digestId: gen.digestId, send };
+    return { ok: true, digestId: gen.digestId };
+  });
+
+export const approveAndSendDigest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { digestId: string }) => input)
+  .handler(async ({ data }) => {
+    const { sendDigestEmail } = await import("./digest.functions");
+    const send = await sendDigestEmail(data.digestId);
+    return { ok: true, send };
   });

@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
+// Só considerar leads criados a partir desta data (início da operação na planilha)
+const MIN_LEAD_DATE = "2025-05-15";
+
 function mondayOf(date: Date): string {
   const d = new Date(date);
   const day = d.getUTCDay();
@@ -14,7 +17,9 @@ async function collectWeekStats(weekStartISO: string) {
   const weekEnd = new Date(weekStart);
   weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
 
-  const startStr = weekStart.toISOString();
+  const minDate = new Date(MIN_LEAD_DATE + "T00:00:00Z");
+  const effectiveStart = weekStart > minDate ? weekStart : minDate;
+  const startStr = effectiveStart.toISOString();
   const endStr = weekEnd.toISOString();
 
   const [
@@ -75,6 +80,7 @@ async function collectWeekStats(weekStartISO: string) {
   return {
     week_start: weekStartISO,
     week_end: weekEnd.toISOString().slice(0, 10),
+    data_cutoff: MIN_LEAD_DATE,
     new_leads_count: newLeadsRes.count ?? 0,
     enriched_count: enrichedRes.count ?? 0,
     converted_count: convertedRes.count ?? 0,
@@ -99,36 +105,30 @@ async function collectWeekStats(weekStartISO: string) {
   };
 }
 
-const PLATFORM_CONTEXT = `
-SDR GROU é a plataforma interna de qualificação de leads da Grou. Funcionalidades principais:
-- CRM kanban de leads (stages customizáveis, drag-and-drop)
-- Captura via Meta Ads, RD Station Marketing, Google Sheets e webhooks
-- Enriquecimento automático (LinkedIn, site, segmento, tamanho de empresa)
-- Scoring ICP configurável com sinais ponderados (prioridade alta/média/baixa/pendente)
-- Integração bidirecional com RD Station CRM (sync de deals)
-- Histórico de interações por lead (ligações, emails, reuniões, WhatsApp)
-- Dashboard com métricas de funil e conversão
-- Multi-usuário com autenticação
-`;
-
-async function generateContentWithAI(stats: any, recentChanges: string[]) {
+async function generateContentWithAI(stats: any) {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY não configurada");
 
-  const systemPrompt = `Você é o redator interno da plataforma SDR GROU. Gere uma newsletter semanal em português brasileiro, tom profissional mas próximo, para o time interno da Grou. ${PLATFORM_CONTEXT}`;
+  const systemPrompt = `Você escreve a newsletter semanal do time comercial da Grou. Tom: leve, próximo, motivador, em português brasileiro. NÃO use jargão técnico, NÃO fale de plataforma, sistema, integrações, scoring, ICP, webhooks, dashboard ou qualquer termo de tecnologia. Fale como se fosse um colega comentando os números e os destaques da semana com o time.`;
 
-  const userPrompt = `Gere a edição desta semana da newsletter do SDR GROU.
+  const userPrompt = `Escreva a newsletter desta semana para o time comercial.
 
-# Estatísticas da semana (${stats.week_start} a ${stats.week_end})
+# Período: ${stats.week_start} a ${stats.week_end}
+(Considerando apenas leads cadastrados a partir de ${stats.data_cutoff}.)
+
+# Números da semana
 ${JSON.stringify(stats, null, 2)}
 
-# Mudanças/novidades recentes da plataforma (autodetectadas)
-${recentChanges.length ? recentChanges.map((c) => `- ${c}`).join("\n") : "- (sem mudanças técnicas detectadas — fale do conceito da plataforma e dos números)"}
-
-Instruções:
-- subject: assunto curto, max 70 chars, com emoji opcional.
-- summary_markdown: resumo em markdown (3-6 parágrafos curtos) para arquivamento interno.
-- html_body: corpo COMPLETO de email em HTML inline-styled (sem <html>/<body>, apenas o conteúdo que vai dentro de um container). Use cores escuras (#0f172a fundo de seções, #f1f5f9 texto, accent #3b82f6). Estrutura: header com nome da plataforma, seção "Conceito da semana" (1 parágrafo lembrando o que a plataforma faz), "Números da semana" (cards visuais com os principais KPIs), "Destaques" (top leads/conversões), "Novidades técnicas" (mudanças), e um fechamento. Use tabelas e divs com style inline (compatível com clientes de email).`;
+Instruções de escrita:
+- subject: assunto curto e humano, máx 70 caracteres, pode ter um emoji.
+- summary_markdown: resumo em markdown (3 a 5 parágrafos curtos), em linguagem simples e amigável.
+- html_body: corpo COMPLETO do e-mail em HTML com estilos inline (sem <html>/<body>, só o conteúdo do container). Use fundo claro #ffffff, texto #0f172a, títulos em #1e293b, destaque #2563eb. Estrutura:
+  1. Saudação calorosa ao time.
+  2. Bloco "Resumo da semana" — 1 parágrafo curto contando como foi.
+  3. Bloco "Nossos números" — cards/tabela visual com os principais indicadores (leads novos, enriquecidos, convertidos, interações), sempre em linguagem do dia a dia (ex: "novos contatos chegaram", "oportunidades avançaram"), nunca termos técnicos.
+  4. Bloco "Destaques da semana" — empresas e pessoas que se destacaram.
+  5. Fechamento curto, motivador.
+Importante: ZERO jargão técnico. Nada de "pipeline", "ICP", "score", "API". Fale de pessoas, empresas, oportunidades, contatos, conversas.`;
 
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -194,8 +194,7 @@ export async function generateWeeklyDigestInternal(opts: {
     }
 
     const stats = await collectWeekStats(weekStart);
-    const recentChanges: string[] = [];
-    const ai = await generateContentWithAI(stats, recentChanges);
+    const ai = await generateContentWithAI(stats);
 
     if (existing) {
       const { error } = await supabaseAdmin
@@ -235,15 +234,15 @@ export const generateWeeklyDigest = createServerFn({ method: "POST" })
 
 function wrapHtml(inner: string): string {
   return `<!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SDR GROU</title></head>
-<body style="margin:0;padding:0;background:#0b1120;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#f1f5f9;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0b1120;padding:24px 0;"><tr><td align="center">
-<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#0f172a;border-radius:12px;overflow:hidden;border:1px solid #1e293b;">
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Novidades da semana — Grou</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 0;"><tr><td align="center">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
 <tr><td style="padding:24px 28px;">
 ${inner}
 </td></tr>
-<tr><td style="padding:16px 28px;border-top:1px solid #1e293b;font-size:11px;color:#64748b;text-align:center;">
-Esta é a newsletter interna do SDR GROU · Enviado automaticamente toda quinta-feira
+<tr><td style="padding:16px 28px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b;text-align:center;">
+Novidades da semana · Time Grou
 </td></tr>
 </table>
 </td></tr></table>

@@ -1,14 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { listWeeklyDigests, triggerWeeklyDigestNow } from "@/lib/digests.functions";
+import { listWeeklyDigests, triggerWeeklyDigestNow, approveAndSendDigest } from "@/lib/digests.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Sparkles, Mail, Send } from "lucide-react";
+import { Sparkles, Mail, Send, FileText } from "lucide-react";
 
 export const Route = createFileRoute("/_app/novidades")({
   head: () => ({ meta: [{ title: "Novidades — SDR GROU" }] }),
@@ -18,6 +18,7 @@ export const Route = createFileRoute("/_app/novidades")({
 function NovidadesPage() {
   const fetchFn = useServerFn(listWeeklyDigests);
   const triggerFn = useServerFn(triggerWeeklyDigestNow);
+  const sendFn = useServerFn(approveAndSendDigest);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["weekly-digests"],
@@ -28,10 +29,19 @@ function NovidadesPage() {
   const trigger = useMutation({
     mutationFn: () => triggerFn({ data: { force: true } }),
     onSuccess: () => {
-      toast.success("Newsletter gerada e enviada para time@grougp.com.br");
+      toast.success("Prévia gerada. Revise antes de enviar.");
       qc.invalidateQueries({ queryKey: ["weekly-digests"] });
     },
     onError: (e: any) => toast.error(`Falha: ${e?.message ?? "erro desconhecido"}`),
+  });
+
+  const send = useMutation({
+    mutationFn: (digestId: string) => sendFn({ data: { digestId } }),
+    onSuccess: () => {
+      toast.success("Enviado para time@grougp.com.br");
+      qc.invalidateQueries({ queryKey: ["weekly-digests"] });
+    },
+    onError: (e: any) => toast.error(`Falha ao enviar: ${e?.message ?? "erro"}`),
   });
 
   return (
@@ -43,7 +53,7 @@ function NovidadesPage() {
             Novidades
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Histórico das edições semanais da newsletter enviadas ao time. Disparo automático toda quinta-feira às 9h para <span className="font-mono text-foreground">time@grougp.com.br</span>.
+            Toda quinta-feira às 9h uma prévia da newsletter é gerada automaticamente. Você revisa e aprova antes do envio para <span className="font-mono text-foreground">time@grougp.com.br</span>.
           </p>
         </div>
         <Button
@@ -51,8 +61,8 @@ function NovidadesPage() {
           disabled={trigger.isPending}
           className="gap-2"
         >
-          <Send className="h-4 w-4" />
-          {trigger.isPending ? "Gerando…" : "Gerar e enviar agora"}
+          <FileText className="h-4 w-4" />
+          {trigger.isPending ? "Gerando prévia…" : "Gerar prévia agora"}
         </Button>
       </div>
 
@@ -62,8 +72,7 @@ function NovidadesPage() {
 
       {!isLoading && data?.digests?.length === 0 && (
         <Card className="p-8 text-center text-sm text-muted-foreground">
-          Nenhuma edição enviada ainda. Clique em "Gerar e enviar agora" para
-          produzir a primeira edição.
+          Nenhuma edição ainda. Clique em "Gerar prévia agora" para criar a primeira.
         </Card>
       )}
 
@@ -99,15 +108,28 @@ function NovidadesPage() {
                   </div>
                 )}
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 shrink-0"
-                onClick={() => setPreviewHtml(d.content_html)}
-              >
-                <Mail className="h-4 w-4" />
-                Ver email
-              </Button>
+              <div className="flex flex-col gap-2 shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => setPreviewHtml(d.content_html)}
+                >
+                  <Mail className="h-4 w-4" />
+                  Ver prévia
+                </Button>
+                {d.status !== "sent" && (
+                  <Button
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => send.mutate(d.id)}
+                    disabled={send.isPending}
+                  >
+                    <Send className="h-4 w-4" />
+                    {send.isPending ? "Enviando…" : "Aprovar e enviar"}
+                  </Button>
+                )}
+              </div>
             </div>
           </Card>
         ))}
