@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { generateWeeklyDigest, sendDigestEmail } from "@/lib/digest.functions";
+import { generateWeeklyDigestInternal, sendDigestEmail } from "@/lib/digest.functions";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 function mondayOf(date: Date): string {
@@ -42,9 +42,7 @@ export const Route = createFileRoute("/api/public/hooks/send-weekly-digest")({
             });
           }
 
-          const gen = await generateWeeklyDigest({
-            data: { weekStart, force },
-          });
+          const gen = await generateWeeklyDigestInternal({ weekStart, force });
 
           if (!("digestId" in gen) || !gen.digestId) {
             return Response.json(
