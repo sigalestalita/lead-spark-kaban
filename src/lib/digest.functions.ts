@@ -12,15 +12,18 @@ function mondayOf(date: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-async function collectWeekStats(weekStartISO: string) {
+async function collectWeekStats(weekStartISO: string, opts?: { rangeStartISO?: string; rangeEndISO?: string }) {
   const weekStart = new Date(weekStartISO + "T00:00:00Z");
-  const weekEnd = new Date(weekStart);
-  weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
+  const defaultEnd = new Date(weekStart);
+  defaultEnd.setUTCDate(defaultEnd.getUTCDate() + 7);
 
   const minDate = new Date(MIN_LEAD_DATE + "T00:00:00Z");
-  const effectiveStart = weekStart > minDate ? weekStart : minDate;
-  const startStr = effectiveStart.toISOString();
-  const endStr = weekEnd.toISOString();
+  const rangeStart = opts?.rangeStartISO
+    ? new Date(opts.rangeStartISO)
+    : (weekStart > minDate ? weekStart : minDate);
+  const rangeEnd = opts?.rangeEndISO ? new Date(opts.rangeEndISO) : defaultEnd;
+  const startStr = rangeStart.toISOString();
+  const endStr = rangeEnd.toISOString();
 
   const [
     newLeadsRes,
@@ -79,7 +82,9 @@ async function collectWeekStats(weekStartISO: string) {
 
   return {
     week_start: weekStartISO,
-    week_end: weekEnd.toISOString().slice(0, 10),
+    week_end: rangeEnd.toISOString().slice(0, 10),
+    range_start: startStr,
+    range_end: endStr,
     data_cutoff: MIN_LEAD_DATE,
     new_leads_count: newLeadsRes.count ?? 0,
     enriched_count: enrichedRes.count ?? 0,
@@ -105,13 +110,28 @@ async function collectWeekStats(weekStartISO: string) {
   };
 }
 
-async function generateContentWithAI(stats: any) {
+async function generateContentWithAI(stats: any, briefOverride?: string) {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY não configurada");
 
-  const systemPrompt = `Você escreve a newsletter semanal do time comercial da Grou. Tom: leve, próximo, motivador, em português brasileiro. NÃO use jargão técnico, NÃO fale de plataforma, sistema, integrações, scoring, ICP, webhooks, dashboard ou qualquer termo de tecnologia. Fale como se fosse um colega comentando os números e os destaques da semana com o time.`;
+  const systemPrompt = briefOverride
+    ? `Você escreve a newsletter interna da Grou. Tom: leve, próximo, animado, em português brasileiro. Linguagem simples e humana, sem jargão técnico pesado. Quando falar de funcionalidades, fale com entusiasmo e clareza, traduzindo para o que muda no dia a dia do time.`
+    : `Você escreve a newsletter semanal do time comercial da Grou. Tom: leve, próximo, motivador, em português brasileiro. NÃO use jargão técnico, NÃO fale de plataforma, sistema, integrações, scoring, ICP, webhooks, dashboard ou qualquer termo de tecnologia. Fale como se fosse um colega comentando os números e os destaques da semana com o time.`;
 
-  const userPrompt = `Escreva a newsletter desta semana para o time comercial.
+  const userPrompt = briefOverride
+    ? `${briefOverride}
+
+# Período considerado: ${stats.range_start} até ${stats.range_end}
+(Considerando apenas leads cadastrados a partir de ${stats.data_cutoff}.)
+
+# Números reais do período (use estes dados, não invente)
+${JSON.stringify(stats, null, 2)}
+
+Instruções de saída:
+- subject: assunto curto e marcante, máx 70 caracteres, pode ter emoji.
+- summary_markdown: resumo em markdown (3 a 6 parágrafos curtos).
+- html_body: corpo COMPLETO do e-mail em HTML com estilos inline (sem <html>/<body>, só o conteúdo do container). Use fundo claro #ffffff, texto #0f172a, títulos em #1e293b, destaque #2563eb. Use tabelas e divs com style inline para os cards de números. Siga a estrutura definida no briefing acima.`
+    : `Escreva a newsletter desta semana para o time comercial.
 
 # Período: ${stats.week_start} a ${stats.week_end}
 (Considerando apenas leads cadastrados a partir de ${stats.data_cutoff}.)
@@ -180,6 +200,9 @@ Importante: ZERO jargão técnico. Nada de "pipeline", "ICP", "score", "API". Fa
 export async function generateWeeklyDigestInternal(opts: {
   weekStart?: string;
   force?: boolean;
+  rangeStartISO?: string;
+  rangeEndISO?: string;
+  briefOverride?: string;
 }) {
     const weekStart = opts.weekStart ?? mondayOf(new Date());
 
@@ -193,8 +216,11 @@ export async function generateWeeklyDigestInternal(opts: {
       return { ok: true, alreadySent: true, digestId: existing.id };
     }
 
-    const stats = await collectWeekStats(weekStart);
-    const ai = await generateContentWithAI(stats);
+    const stats = await collectWeekStats(weekStart, {
+      rangeStartISO: opts.rangeStartISO,
+      rangeEndISO: opts.rangeEndISO,
+    });
+    const ai = await generateContentWithAI(stats, opts.briefOverride);
 
     if (existing) {
       const { error } = await supabaseAdmin
