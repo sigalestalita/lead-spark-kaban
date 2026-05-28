@@ -239,6 +239,12 @@ function LeadDetailPage() {
           <Field label="LinkedIn empresa" value={lead.company_linkedin} onSave={(v) => update.mutate({ company_linkedin: v })} />
           <Field label="Área" value={lead.company_segment} onSave={(v) => update.mutate({ company_segment: v })} />
           <Field label="Tamanho" value={lead.company_size} onSave={(v) => update.mutate({ company_size: v })} />
+          {lead.linkedin_company_size && lead.linkedin_company_size !== lead.company_size && (
+            <div className="text-xs bg-blue-500/10 border border-blue-500/30 rounded-md px-2 py-1.5 text-blue-700 dark:text-blue-400">
+              <span className="font-medium">Tamanho no LinkedIn:</span> {lead.linkedin_company_size}
+              <p className="text-[10px] opacity-80 mt-0.5">Porte informado no formulário difere do tamanho atual da empresa no LinkedIn.</p>
+            </div>
+          )}
           <Field label="Localização" value={lead.company_location} onSave={(v) => update.mutate({ company_location: v })} />
           <div>
             <p className="text-xs text-muted-foreground mb-1">Análise da empresa (IA)</p>
