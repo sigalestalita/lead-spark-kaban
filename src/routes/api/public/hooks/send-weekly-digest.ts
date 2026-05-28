@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { generateWeeklyDigestInternal, sendDigestEmail } from "@/lib/digest.functions";
+import { generateWeeklyDigestInternal } from "@/lib/digest.functions";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 function mondayOf(date: Date): string {
@@ -27,32 +27,32 @@ export const Route = createFileRoute("/api/public/hooks/send-weekly-digest")({
         try {
           const weekStart = mondayOf(new Date());
 
-          // Idempotência: se já enviado nesta semana e não foi forçado, sai.
+          // Idempotência: se já existe prévia/enviado nesta semana e não foi forçado, sai.
           const { data: existing } = await supabaseAdmin
             .from("weekly_digests")
             .select("id, status")
             .eq("week_start", weekStart)
             .maybeSingle();
 
-          if (existing?.status === "sent" && !force) {
+          if (existing && !force) {
             return Response.json({
               ok: true,
-              alreadySent: true,
+              alreadyGenerated: true,
               digestId: existing.id,
             });
           }
 
+          // Apenas gera a prévia. O envio é manual após validação humana.
           const gen = await generateWeeklyDigestInternal({ weekStart, force });
 
           if (!("digestId" in gen) || !gen.digestId) {
             return Response.json(
-              { ok: false, error: "Falha ao gerar digest" },
+              { ok: false, error: "Falha ao gerar prévia" },
               { status: 500 },
             );
           }
 
-          const send = await sendDigestEmail(gen.digestId);
-          return Response.json({ ok: true, digestId: gen.digestId, send });
+          return Response.json({ ok: true, digestId: gen.digestId, draft: true });
         } catch (e) {
           console.error("send-weekly-digest error:", e);
           return Response.json(
