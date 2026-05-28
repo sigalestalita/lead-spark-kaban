@@ -58,7 +58,11 @@ export const updateDigestDraft = createServerFn({ method: "POST" })
       throw new Error("Esta edição já foi enviada e não pode ser editada");
     }
 
-    const patch: Record<string, unknown> = {};
+    const patch: {
+      subject?: string;
+      content_html?: string;
+      content_summary?: string;
+    } = {};
     if (data.subject !== undefined) patch.subject = data.subject;
     if (data.contentHtml !== undefined) {
       // Se o usuário colar apenas conteúdo interno, embrulhamos.
