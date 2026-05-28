@@ -1,60 +1,50 @@
-## Newsletter semanal automática para `time@grougp.com.br`
+## O que vou entregar
 
-Replicar o padrão do projeto "Plataforma de Sucesso do Cliente: Grou": **Resend + domínio `grougp.com.br` já verificado lá**.
+### 1. Edição da prévia antes do disparo
+- Na página `/novidades`, ao clicar em "Ver prévia" o modal passa a abrir em **modo editor**:
+  - Campo de **Assunto** editável.
+  - Editor do **HTML do email** (textarea com fonte mono + pré-visualização ao vivo em iframe lado a lado).
+  - Campo opcional de **Resumo** (o texto que aparece no card).
+  - Botões: "Salvar alterações", "Salvar e enviar", "Cancelar".
+- Nova server function `updateDigestDraft({ digestId, subject?, contentHtml?, contentSummary? })` que só altera digests com `status != 'sent'`.
+- Migration: adicionar policies de `UPDATE` em `weekly_digests` para `authenticated` (hoje só tem SELECT), restritas a linhas onde `status <> 'sent'`. INSERT continua só via service_role.
+- O botão "Aprovar e enviar" do card continua funcionando para envio direto sem abrir o editor.
 
-### 1. Secret
-- Solicitar `RESEND_API_KEY` (mesma chave usada no outro projeto da Grou — pode copiar de lá).
+### 2. Novo layout do email (visual da plataforma Lidi)
+Substituir o `wrapHtml` em `src/lib/digest.functions.ts` por um template novo:
+- **Fundo escuro azul** (mesmo tom da plataforma — `oklch(0.11 0.03 265)` convertido para HEX equivalente para compatibilidade com clientes de email).
+- **Header**: faixa com gradiente azul → roxo (estilo aurora do login), logo Lidi branca centralizada, tagline "Newsletter semanal do time Grou".
+- **Card de conteúdo** central (max-width 640px) com fundo `#0f172a`/translúcido, bordas arredondadas, texto claro, accent em azul Gerdau.
+- **Bloco de números** (stats) em grid de 4 cards com números grandes em fonte display.
+- **Footer** escuro com logo pequena + "Gerado automaticamente pela Lidi · Grou".
+- Tipografia: Plus Jakarta Sans (já carregada na plataforma) via fallback web-safe.
+- Tudo inline CSS (compatível com Gmail/Outlook), sem dependência externa exceto a logo hospedada em `/public`.
 
-### 2. Schema (migration)
-Nova tabela `weekly_digests`:
-- `id uuid pk`
-- `week_start date` (segunda-feira da semana)
-- `subject text`
-- `content_html text` (HTML do email)
-- `content_summary text` (resumo em markdown, exibido no /novidades)
-- `stats jsonb` (números crus: leads novos, conversões, etc.)
-- `status text` (`draft`/`sent`/`failed`)
-- `sent_at timestamptz`
-- `error_message text`
-- `created_at timestamptz default now()`
-- RLS: leitura para `authenticated`, escrita só via service role.
-- GRANTs apropriados.
-
-### 3. Server function: `generateWeeklyDigest` (`src/lib/digest.functions.ts`)
-- Coleta dados da última semana via `supabaseAdmin`:
-  - Total de leads novos (`leads.created_at`)
-  - Leads enriquecidos
-  - Mudanças de stage / conversões
-  - Interações registradas
-  - Top empresas pelo score
-- Chama Lovable AI (`google/gemini-3-flash-preview`) com tool calling estruturado para gerar:
-  - `subject` (assunto do email)
-  - `summary_markdown` (resumo amigável para /novidades)
-  - `html_body` (corpo HTML do email, com seções: novidades da plataforma, números da semana, destaques)
-- Insere em `weekly_digests` com `status='draft'`.
-
-### 4. Server route pública: `/api/public/hooks/send-weekly-digest`
-- Protegida por `apikey` header (anon key — padrão Lovable).
-- Chama `generateWeeklyDigest` se não houver digest da semana atual.
-- Envia via Resend API direta:
-  - From: `Grou Plataforma <noreply@grougp.com.br>`
-  - To: `time@grougp.com.br`
-  - Subject/HTML do digest gerado
-- Atualiza `weekly_digests` para `status='sent'` + `sent_at`. Em erro, `failed` + `error_message`.
-
-### 5. Cron pg_cron
-- Job `send-weekly-digest-thursday` rodando toda quinta às 09:00 BRT (12:00 UTC): `0 12 * * 4`.
-- Body vazio `{}`.
-
-### 6. Página `/novidades` (`src/routes/_app.novidades.tsx`)
-- Lista todas as edições de `weekly_digests` ordenadas por `week_start desc`.
-- Cada card mostra: semana, assunto, status (badge), preview do `summary_markdown`, botão "ver HTML enviado" (modal).
-- Botão "Gerar e enviar agora" (admin) — chama a server route manualmente para testar.
-
-### 7. Item de menu
-- Adicionar link "Novidades" na navegação do `_app.tsx`.
+### 3. Logo nova (anexo `Logo_Branco.png`)
+- Copiar o anexo para `public/lidi-logo-white.png` (usado no email, pois precisa de URL pública absoluta) e para `src/assets/lidi-logo-white.png` (usado nos componentes React).
+- **Tela de login** (`src/routes/login.tsx`): substituir o ícone `<Users />` + texto "SDR GROU" pela logo Lidi branca (altura ~40px). Atualizar subtítulo para "Plataforma de qualificação de leads · Grou".
+- **App shell** (`src/routes/_app.tsx`): substituir o branding atual no topbar/sidebar pela logo Lidi branca.
+- **Email**: header usa a logo via URL absoluta (`https://<published>/lidi-logo-white.png`) — uso `VITE_PUBLIC_SITE_URL` se existir, senão hardcode do domínio publicado `https://sdr-grou.lovable.app`.
+- Títulos `<title>` de páginas que ainda dizem "SDR GROU" passam para "Lidi".
 
 ### Detalhes técnicos
-- Resend: chamada direta via `fetch('https://api.resend.com/emails', ...)` no server route (Node-compatível, sem SDK).
-- Conteúdo gerado: a IA recebe um system prompt explicando o conceito da plataforma SDR GROU (CRM de leads, Kanban, enriquecimento, scoring ICP, integração RD/Sheets/WhatsApp) + os números da semana, e gera HTML estilizado simples (inline CSS, sem dependências).
-- Idempotência: a server route checa se já existe digest com `week_start = segunda-feira atual` e `status='sent'` antes de enviar de novo.
+- Migration adiciona:
+  ```sql
+  CREATE POLICY digests_auth_update ON public.weekly_digests
+    FOR UPDATE TO authenticated
+    USING (status <> 'sent') WITH CHECK (status <> 'sent');
+  GRANT UPDATE ON public.weekly_digests TO authenticated;
+  ```
+- `updateDigestDraft` valida com Zod (subject 1-200, html 1-200000, summary 0-5000) e usa `supabaseAdmin` para garantir update independente de RLS, mas rejeita se `status === 'sent'` no servidor antes do update.
+- Editor usa textarea simples (sem dep nova) + iframe `srcDoc` que re-renderiza com debounce de 300ms. Sem rich-text editor para não inflar bundle.
+- Cores do email (HEX para compatibilidade): bg `#0b1226`, surface `#121a33`, border `#1f2a4a`, primary `#4A90E2`, primary-dark `#003DA5`, text `#e6ecff`, muted `#94a3c8`.
+
+### Arquivos afetados
+- novo: `supabase/migrations/<timestamp>_weekly_digests_update_policy.sql`
+- novo: `public/lidi-logo-white.png`, `src/assets/lidi-logo-white.png`
+- novo: `src/components/digest-editor.tsx` (modal editor)
+- edit: `src/lib/digests.functions.ts` (add `updateDigestDraft`)
+- edit: `src/lib/digest.functions.ts` (novo `wrapHtml` com layout Lidi)
+- edit: `src/routes/_app.novidades.tsx` (usar editor no lugar do preview read-only)
+- edit: `src/routes/login.tsx` (logo Lidi)
+- edit: `src/routes/_app.tsx` (logo Lidi no shell)

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { z } from "zod";
 
 export const listWeeklyDigests = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -33,6 +34,52 @@ export const approveAndSendDigest = createServerFn({ method: "POST" })
     const { sendDigestEmail } = await import("./digest.functions");
     const send = await sendDigestEmail(data.digestId);
     return { ok: true, send };
+  });
+
+const UpdateDraftSchema = z.object({
+  digestId: z.string().uuid(),
+  subject: z.string().min(1).max(200).optional(),
+  contentHtml: z.string().min(1).max(200000).optional(),
+  contentSummary: z.string().max(5000).optional(),
+});
+
+export const updateDigestDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => UpdateDraftSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { wrapHtml } = await import("./digest.functions");
+    const { data: existing, error: fetchErr } = await supabaseAdmin
+      .from("weekly_digests")
+      .select("id, status")
+      .eq("id", data.digestId)
+      .single();
+    if (fetchErr || !existing) throw new Error("Edição não encontrada");
+    if (existing.status === "sent") {
+      throw new Error("Esta edição já foi enviada e não pode ser editada");
+    }
+
+    const patch: {
+      subject?: string;
+      content_html?: string;
+      content_summary?: string;
+    } = {};
+    if (data.subject !== undefined) patch.subject = data.subject;
+    if (data.contentHtml !== undefined) {
+      // Se o usuário colar apenas conteúdo interno, embrulhamos.
+      // Se já vier o <!doctype html>, mantemos como veio.
+      const trimmed = data.contentHtml.trim();
+      patch.content_html = /^<!doctype/i.test(trimmed) ? trimmed : wrapHtml(trimmed);
+    }
+    if (data.contentSummary !== undefined) patch.content_summary = data.contentSummary;
+
+    if (Object.keys(patch).length === 0) return { ok: true, noop: true };
+
+    const { error } = await supabaseAdmin
+      .from("weekly_digests")
+      .update(patch)
+      .eq("id", data.digestId);
+    if (error) throw error;
+    return { ok: true };
   });
 
 const LIDI_FIRST_EDITION_BRIEF = `Esta é a PRIMEIRA edição da newsletter interna da Grou e ela tem um propósito especial: apresentar a **Lidi** — a nova plataforma de qualificação e gestão de leads da Grou — para todo o time.
