@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
+// Só considerar leads criados a partir desta data (início da operação na planilha)
+const MIN_LEAD_DATE = "2025-05-15";
+
 function mondayOf(date: Date): string {
   const d = new Date(date);
   const day = d.getUTCDay();
@@ -14,7 +17,9 @@ async function collectWeekStats(weekStartISO: string) {
   const weekEnd = new Date(weekStart);
   weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
 
-  const startStr = weekStart.toISOString();
+  const minDate = new Date(MIN_LEAD_DATE + "T00:00:00Z");
+  const effectiveStart = weekStart > minDate ? weekStart : minDate;
+  const startStr = effectiveStart.toISOString();
   const endStr = weekEnd.toISOString();
 
   const [
@@ -75,6 +80,7 @@ async function collectWeekStats(weekStartISO: string) {
   return {
     week_start: weekStartISO,
     week_end: weekEnd.toISOString().slice(0, 10),
+    data_cutoff: MIN_LEAD_DATE,
     new_leads_count: newLeadsRes.count ?? 0,
     enriched_count: enrichedRes.count ?? 0,
     converted_count: convertedRes.count ?? 0,
