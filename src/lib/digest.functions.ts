@@ -105,36 +105,30 @@ async function collectWeekStats(weekStartISO: string) {
   };
 }
 
-const PLATFORM_CONTEXT = `
-SDR GROU é a plataforma interna de qualificação de leads da Grou. Funcionalidades principais:
-- CRM kanban de leads (stages customizáveis, drag-and-drop)
-- Captura via Meta Ads, RD Station Marketing, Google Sheets e webhooks
-- Enriquecimento automático (LinkedIn, site, segmento, tamanho de empresa)
-- Scoring ICP configurável com sinais ponderados (prioridade alta/média/baixa/pendente)
-- Integração bidirecional com RD Station CRM (sync de deals)
-- Histórico de interações por lead (ligações, emails, reuniões, WhatsApp)
-- Dashboard com métricas de funil e conversão
-- Multi-usuário com autenticação
-`;
-
-async function generateContentWithAI(stats: any, recentChanges: string[]) {
+async function generateContentWithAI(stats: any) {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY não configurada");
 
-  const systemPrompt = `Você é o redator interno da plataforma SDR GROU. Gere uma newsletter semanal em português brasileiro, tom profissional mas próximo, para o time interno da Grou. ${PLATFORM_CONTEXT}`;
+  const systemPrompt = `Você escreve a newsletter semanal do time comercial da Grou. Tom: leve, próximo, motivador, em português brasileiro. NÃO use jargão técnico, NÃO fale de plataforma, sistema, integrações, scoring, ICP, webhooks, dashboard ou qualquer termo de tecnologia. Fale como se fosse um colega comentando os números e os destaques da semana com o time.`;
 
-  const userPrompt = `Gere a edição desta semana da newsletter do SDR GROU.
+  const userPrompt = `Escreva a newsletter desta semana para o time comercial.
 
-# Estatísticas da semana (${stats.week_start} a ${stats.week_end})
+# Período: ${stats.week_start} a ${stats.week_end}
+(Considerando apenas leads cadastrados a partir de ${stats.data_cutoff}.)
+
+# Números da semana
 ${JSON.stringify(stats, null, 2)}
 
-# Mudanças/novidades recentes da plataforma (autodetectadas)
-${recentChanges.length ? recentChanges.map((c) => `- ${c}`).join("\n") : "- (sem mudanças técnicas detectadas — fale do conceito da plataforma e dos números)"}
-
-Instruções:
-- subject: assunto curto, max 70 chars, com emoji opcional.
-- summary_markdown: resumo em markdown (3-6 parágrafos curtos) para arquivamento interno.
-- html_body: corpo COMPLETO de email em HTML inline-styled (sem <html>/<body>, apenas o conteúdo que vai dentro de um container). Use cores escuras (#0f172a fundo de seções, #f1f5f9 texto, accent #3b82f6). Estrutura: header com nome da plataforma, seção "Conceito da semana" (1 parágrafo lembrando o que a plataforma faz), "Números da semana" (cards visuais com os principais KPIs), "Destaques" (top leads/conversões), "Novidades técnicas" (mudanças), e um fechamento. Use tabelas e divs com style inline (compatível com clientes de email).`;
+Instruções de escrita:
+- subject: assunto curto e humano, máx 70 caracteres, pode ter um emoji.
+- summary_markdown: resumo em markdown (3 a 5 parágrafos curtos), em linguagem simples e amigável.
+- html_body: corpo COMPLETO do e-mail em HTML com estilos inline (sem <html>/<body>, só o conteúdo do container). Use fundo claro #ffffff, texto #0f172a, títulos em #1e293b, destaque #2563eb. Estrutura:
+  1. Saudação calorosa ao time.
+  2. Bloco "Resumo da semana" — 1 parágrafo curto contando como foi.
+  3. Bloco "Nossos números" — cards/tabela visual com os principais indicadores (leads novos, enriquecidos, convertidos, interações), sempre em linguagem do dia a dia (ex: "novos contatos chegaram", "oportunidades avançaram"), nunca termos técnicos.
+  4. Bloco "Destaques da semana" — empresas e pessoas que se destacaram.
+  5. Fechamento curto, motivador.
+Importante: ZERO jargão técnico. Nada de "pipeline", "ICP", "score", "API". Fale de pessoas, empresas, oportunidades, contatos, conversas.`;
 
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -200,8 +194,7 @@ export async function generateWeeklyDigestInternal(opts: {
     }
 
     const stats = await collectWeekStats(weekStart);
-    const recentChanges: string[] = [];
-    const ai = await generateContentWithAI(stats, recentChanges);
+    const ai = await generateContentWithAI(stats);
 
     if (existing) {
       const { error } = await supabaseAdmin
