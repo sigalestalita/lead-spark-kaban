@@ -16,7 +16,7 @@ import {
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
 
-export const Route = createFileRoute("/_app/configuracoes/usuarios")({
+export const Route = createFileRoute("/_app/usuarios")({
   head: () => ({ meta: [{ title: "Usuários — Lidi" }] }),
   component: UsersPage,
 });

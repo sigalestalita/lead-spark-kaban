@@ -12,12 +12,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppUsuariosRouteImport } from './routes/_app.usuarios'
 import { Route as AppNovidadesRouteImport } from './routes/_app.novidades'
 import { Route as AppKanbanRouteImport } from './routes/_app.kanban'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppLeadIdRouteImport } from './routes/_app.lead.$id'
-import { Route as AppConfiguracoesUsuariosRouteImport } from './routes/_app.configuracoes.usuarios'
 import { Route as ApiPublicRdCallbackRouteImport } from './routes/api/public/rd/callback'
 import { Route as ApiPublicHooksSyncRdRouteImport } from './routes/api/public/hooks/sync-rd'
 import { Route as ApiPublicHooksSendWeeklyDigestRouteImport } from './routes/api/public/hooks/send-weekly-digest'
@@ -35,6 +35,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppUsuariosRoute = AppUsuariosRouteImport.update({
+  id: '/usuarios',
+  path: '/usuarios',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppNovidadesRoute = AppNovidadesRouteImport.update({
   id: '/novidades',
@@ -61,12 +66,6 @@ const AppLeadIdRoute = AppLeadIdRouteImport.update({
   path: '/lead/$id',
   getParentRoute: () => AppRoute,
 } as any)
-const AppConfiguracoesUsuariosRoute =
-  AppConfiguracoesUsuariosRouteImport.update({
-    id: '/usuarios',
-    path: '/usuarios',
-    getParentRoute: () => AppConfiguracoesRoute,
-  } as any)
 const ApiPublicRdCallbackRoute = ApiPublicRdCallbackRouteImport.update({
   id: '/api/public/rd/callback',
   path: '/api/public/rd/callback',
@@ -87,11 +86,11 @@ const ApiPublicHooksSendWeeklyDigestRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/configuracoes': typeof AppConfiguracoesRouteWithChildren
+  '/configuracoes': typeof AppConfiguracoesRoute
   '/dashboard': typeof AppDashboardRoute
   '/kanban': typeof AppKanbanRoute
   '/novidades': typeof AppNovidadesRoute
-  '/configuracoes/usuarios': typeof AppConfiguracoesUsuariosRoute
+  '/usuarios': typeof AppUsuariosRoute
   '/lead/$id': typeof AppLeadIdRoute
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
@@ -100,11 +99,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/configuracoes': typeof AppConfiguracoesRouteWithChildren
+  '/configuracoes': typeof AppConfiguracoesRoute
   '/dashboard': typeof AppDashboardRoute
   '/kanban': typeof AppKanbanRoute
   '/novidades': typeof AppNovidadesRoute
-  '/configuracoes/usuarios': typeof AppConfiguracoesUsuariosRoute
+  '/usuarios': typeof AppUsuariosRoute
   '/lead/$id': typeof AppLeadIdRoute
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
@@ -115,11 +114,11 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
-  '/_app/configuracoes': typeof AppConfiguracoesRouteWithChildren
+  '/_app/configuracoes': typeof AppConfiguracoesRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/kanban': typeof AppKanbanRoute
   '/_app/novidades': typeof AppNovidadesRoute
-  '/_app/configuracoes/usuarios': typeof AppConfiguracoesUsuariosRoute
+  '/_app/usuarios': typeof AppUsuariosRoute
   '/_app/lead/$id': typeof AppLeadIdRoute
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
@@ -134,7 +133,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/kanban'
     | '/novidades'
-    | '/configuracoes/usuarios'
+    | '/usuarios'
     | '/lead/$id'
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
@@ -147,7 +146,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/kanban'
     | '/novidades'
-    | '/configuracoes/usuarios'
+    | '/usuarios'
     | '/lead/$id'
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
@@ -161,7 +160,7 @@ export interface FileRouteTypes {
     | '/_app/dashboard'
     | '/_app/kanban'
     | '/_app/novidades'
-    | '/_app/configuracoes/usuarios'
+    | '/_app/usuarios'
     | '/_app/lead/$id'
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
@@ -200,6 +199,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/usuarios': {
+      id: '/_app/usuarios'
+      path: '/usuarios'
+      fullPath: '/usuarios'
+      preLoaderRoute: typeof AppUsuariosRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/novidades': {
       id: '/_app/novidades'
       path: '/novidades'
@@ -235,13 +241,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppLeadIdRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/configuracoes/usuarios': {
-      id: '/_app/configuracoes/usuarios'
-      path: '/usuarios'
-      fullPath: '/configuracoes/usuarios'
-      preLoaderRoute: typeof AppConfiguracoesUsuariosRouteImport
-      parentRoute: typeof AppConfiguracoesRoute
-    }
     '/api/public/rd/callback': {
       id: '/api/public/rd/callback'
       path: '/api/public/rd/callback'
@@ -266,30 +265,21 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface AppConfiguracoesRouteChildren {
-  AppConfiguracoesUsuariosRoute: typeof AppConfiguracoesUsuariosRoute
-}
-
-const AppConfiguracoesRouteChildren: AppConfiguracoesRouteChildren = {
-  AppConfiguracoesUsuariosRoute: AppConfiguracoesUsuariosRoute,
-}
-
-const AppConfiguracoesRouteWithChildren =
-  AppConfiguracoesRoute._addFileChildren(AppConfiguracoesRouteChildren)
-
 interface AppRouteChildren {
-  AppConfiguracoesRoute: typeof AppConfiguracoesRouteWithChildren
+  AppConfiguracoesRoute: typeof AppConfiguracoesRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppKanbanRoute: typeof AppKanbanRoute
   AppNovidadesRoute: typeof AppNovidadesRoute
+  AppUsuariosRoute: typeof AppUsuariosRoute
   AppLeadIdRoute: typeof AppLeadIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppConfiguracoesRoute: AppConfiguracoesRouteWithChildren,
+  AppConfiguracoesRoute: AppConfiguracoesRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppKanbanRoute: AppKanbanRoute,
   AppNovidadesRoute: AppNovidadesRoute,
+  AppUsuariosRoute: AppUsuariosRoute,
   AppLeadIdRoute: AppLeadIdRoute,
 }
 
@@ -306,3 +296,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
