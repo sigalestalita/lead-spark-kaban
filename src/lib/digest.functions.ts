@@ -234,15 +234,15 @@ export const generateWeeklyDigest = createServerFn({ method: "POST" })
 
 function wrapHtml(inner: string): string {
   return `<!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SDR GROU</title></head>
-<body style="margin:0;padding:0;background:#0b1120;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#f1f5f9;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0b1120;padding:24px 0;"><tr><td align="center">
-<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#0f172a;border-radius:12px;overflow:hidden;border:1px solid #1e293b;">
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Novidades da semana — Grou</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 0;"><tr><td align="center">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
 <tr><td style="padding:24px 28px;">
 ${inner}
 </td></tr>
-<tr><td style="padding:16px 28px;border-top:1px solid #1e293b;font-size:11px;color:#64748b;text-align:center;">
-Esta é a newsletter interna do SDR GROU · Enviado automaticamente toda quinta-feira
+<tr><td style="padding:16px 28px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b;text-align:center;">
+Novidades da semana · Time Grou
 </td></tr>
 </table>
 </td></tr></table>
