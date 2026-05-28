@@ -389,6 +389,48 @@ export type Database = {
         }
         Relationships: []
       }
+      weekly_digests: {
+        Row: {
+          content_html: string
+          content_summary: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          sent_at: string | null
+          stats: Json
+          status: string
+          subject: string
+          updated_at: string
+          week_start: string
+        }
+        Insert: {
+          content_html: string
+          content_summary?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          sent_at?: string | null
+          stats?: Json
+          status?: string
+          subject: string
+          updated_at?: string
+          week_start: string
+        }
+        Update: {
+          content_html?: string
+          content_summary?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          sent_at?: string | null
+          stats?: Json
+          status?: string
+          subject?: string
+          updated_at?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
