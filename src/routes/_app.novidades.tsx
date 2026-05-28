@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { listWeeklyDigests, triggerWeeklyDigestNow, approveAndSendDigest } from "@/lib/digests.functions";
+import { listWeeklyDigests, triggerWeeklyDigestNow, approveAndSendDigest, triggerFirstLidiEdition } from "@/lib/digests.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ function NovidadesPage() {
   const fetchFn = useServerFn(listWeeklyDigests);
   const triggerFn = useServerFn(triggerWeeklyDigestNow);
   const sendFn = useServerFn(approveAndSendDigest);
+  const firstEditionFn = useServerFn(triggerFirstLidiEdition);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["weekly-digests"],
@@ -30,6 +31,15 @@ function NovidadesPage() {
     mutationFn: () => triggerFn({ data: { force: true } }),
     onSuccess: () => {
       toast.success("Prévia gerada. Revise antes de enviar.");
+      qc.invalidateQueries({ queryKey: ["weekly-digests"] });
+    },
+    onError: (e: any) => toast.error(`Falha: ${e?.message ?? "erro desconhecido"}`),
+  });
+
+  const firstEdition = useMutation({
+    mutationFn: () => firstEditionFn(),
+    onSuccess: () => {
+      toast.success("Edição de estreia da Lidi gerada. Revise antes de enviar.");
       qc.invalidateQueries({ queryKey: ["weekly-digests"] });
     },
     onError: (e: any) => toast.error(`Falha: ${e?.message ?? "erro desconhecido"}`),
@@ -56,14 +66,25 @@ function NovidadesPage() {
             Toda quinta-feira às 9h uma prévia da newsletter é gerada automaticamente. Você revisa e aprova antes do envio para <span className="font-mono text-foreground">time@grougp.com.br</span>.
           </p>
         </div>
-        <Button
-          onClick={() => trigger.mutate()}
-          disabled={trigger.isPending}
-          className="gap-2"
-        >
-          <FileText className="h-4 w-4" />
-          {trigger.isPending ? "Gerando prévia…" : "Gerar prévia agora"}
-        </Button>
+        <div className="flex flex-col gap-2 items-end">
+          <Button
+            onClick={() => firstEdition.mutate()}
+            disabled={firstEdition.isPending}
+            className="gap-2"
+          >
+            <Sparkles className="h-4 w-4" />
+            {firstEdition.isPending ? "Gerando estreia da Lidi…" : "Gerar edição de estreia da Lidi"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => trigger.mutate()}
+            disabled={trigger.isPending}
+            className="gap-2"
+          >
+            <FileText className="h-4 w-4" />
+            {trigger.isPending ? "Gerando prévia…" : "Gerar prévia padrão"}
+          </Button>
+        </div>
       </div>
 
       {isLoading && (
