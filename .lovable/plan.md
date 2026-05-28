@@ -1,50 +1,59 @@
 ## O que vou entregar
 
-### 1. Edição da prévia antes do disparo
-- Na página `/novidades`, ao clicar em "Ver prévia" o modal passa a abrir em **modo editor**:
-  - Campo de **Assunto** editável.
-  - Editor do **HTML do email** (textarea com fonte mono + pré-visualização ao vivo em iframe lado a lado).
-  - Campo opcional de **Resumo** (o texto que aparece no card).
-  - Botões: "Salvar alterações", "Salvar e enviar", "Cancelar".
-- Nova server function `updateDigestDraft({ digestId, subject?, contentHtml?, contentSummary? })` que só altera digests com `status != 'sent'`.
-- Migration: adicionar policies de `UPDATE` em `weekly_digests` para `authenticated` (hoje só tem SELECT), restritas a linhas onde `status <> 'sent'`. INSERT continua só via service_role.
-- O botão "Aprovar e enviar" do card continua funcionando para envio direto sem abrir o editor.
+### 1. Sistema de roles
+Nova migration cria:
+- `enum app_role` com valores `super_admin`, `gestao`, `executivo`, `sdr`.
+- Tabela `public.user_roles (id, user_id, role, created_at)` com unique `(user_id, role)`, RLS + grants:
+  - `SELECT` permitido a `authenticated` (necessário pro front saber o role do próprio user e o super_admin listar todos).
+  - `INSERT/UPDATE/DELETE` só via `service_role` (gerenciados por server functions).
+- Função `public.has_role(_user_id uuid, _role app_role)` `SECURITY DEFINER` (padrão Lovable, evita recursão de RLS).
+- Função `public.is_super_admin(_user_id uuid)` shortcut.
+- Trigger `handle_new_user` é estendido: além de criar profile, se o email for `talita.sigales@grougp.com.br` insere automaticamente role `super_admin`; senão lê o role escolhido em `raw_user_meta_data->>'role'` (validado contra o enum, fallback `sdr`).
 
-### 2. Novo layout do email (visual da plataforma Lidi)
-Substituir o `wrapHtml` em `src/lib/digest.functions.ts` por um template novo:
-- **Fundo escuro azul** (mesmo tom da plataforma — `oklch(0.11 0.03 265)` convertido para HEX equivalente para compatibilidade com clientes de email).
-- **Header**: faixa com gradiente azul → roxo (estilo aurora do login), logo Lidi branca centralizada, tagline "Newsletter semanal do time Grou".
-- **Card de conteúdo** central (max-width 640px) com fundo `#0f172a`/translúcido, bordas arredondadas, texto claro, accent em azul Gerdau.
-- **Bloco de números** (stats) em grid de 4 cards com números grandes em fonte display.
-- **Footer** escuro com logo pequena + "Gerado automaticamente pela Lidi · Grou".
-- Tipografia: Plus Jakarta Sans (já carregada na plataforma) via fallback web-safe.
-- Tudo inline CSS (compatível com Gmail/Outlook), sem dependência externa exceto a logo hospedada em `/public`.
+### 2. Restrição de domínio + role no cadastro (`src/routes/login.tsx`)
+- No modo signup, validar client-side que o email termina em `@grougp.com.br` antes de chamar `supabase.auth.signUp`. Erro amigável caso contrário.
+- Adicionar `<RadioGroup>` com opções: SDR, Executivo, Gestão (somente no modo signup).
+- Passar `data: { full_name, role }` no `signUp` options — o trigger usa esse role.
+- Validação server-side via trigger: se email não termina em `@grougp.com.br`, `RAISE EXCEPTION` (defesa em profundidade).
+- Mensagem no card de signup: "Cadastro restrito ao time Grou (@grougp.com.br)".
 
-### 3. Logo nova (anexo `Logo_Branco.png`)
-- Copiar o anexo para `public/lidi-logo-white.png` (usado no email, pois precisa de URL pública absoluta) e para `src/assets/lidi-logo-white.png` (usado nos componentes React).
-- **Tela de login** (`src/routes/login.tsx`): substituir o ícone `<Users />` + texto "SDR GROU" pela logo Lidi branca (altura ~40px). Atualizar subtítulo para "Plataforma de qualificação de leads · Grou".
-- **App shell** (`src/routes/_app.tsx`): substituir o branding atual no topbar/sidebar pela logo Lidi branca.
-- **Email**: header usa a logo via URL absoluta (`https://<published>/lidi-logo-white.png`) — uso `VITE_PUBLIC_SITE_URL` se existir, senão hardcode do domínio publicado `https://sdr-grou.lovable.app`.
-- Títulos `<title>` de páginas que ainda dizem "SDR GROU" passam para "Lidi".
+### 3. Hook `useCurrentRole`
+Novo `src/lib/use-role.ts`: query simples no `user_roles` filtrando por `auth.uid()`, retorna `{ role, isSuperAdmin, isGestao, loading }`. Cacheada via React Query.
+
+### 4. Tela de gestão de usuários (`/configuracoes/usuarios` — acessível só a super_admin/gestão)
+Nova rota `src/routes/_app.configuracoes.usuarios.tsx`:
+- Tabela com todos os usuários (join `profiles` + `user_roles`), mostrando email, nome, role atual, data de cadastro.
+- Para cada linha: `<Select>` para alterar o role + botão "Remover acesso" (super_admin only).
+- Server functions em `src/lib/users.functions.ts`:
+  - `listUsers()` — usa `requireSupabaseAuth` + checa `has_role(super_admin|gestao)`, retorna lista via `supabaseAdmin`.
+  - `updateUserRole({ userId, role })` — super_admin only, deleta roles antigas e insere a nova.
+  - `removeUser({ userId })` — super_admin only, usa `supabaseAdmin.auth.admin.deleteUser`.
+- Bloquear remoção/alteração do próprio super_admin (Talita).
+- Link "Gerenciar usuários" aparece no `_app.configuracoes.tsx` apenas se `isSuperAdmin || isGestao`.
+
+### 5. Backfill da Talita
+Caso ela já exista em `auth.users`, a migration roda um `INSERT ... ON CONFLICT DO NOTHING` para garantir o role `super_admin`. Se ainda não existir, o trigger cuida quando ela se cadastrar.
+
+### 6. Visibilidade no app shell
+- Sidebar (`_app.tsx`) continua mostrando todas as abas pra todos — o controle real é por server function. Apenas a aba "Usuários" dentro de Configurações é gated por role.
+- (Nada além disso muda hoje na UI por role — você só pediu visão total pra Talita, o que já acontece naturalmente. Se quiser esconder abas específicas para SDR/executivo no futuro, dá pra evoluir com base no mesmo hook.)
 
 ### Detalhes técnicos
-- Migration adiciona:
+- Migration ordem: enum → table → grants → RLS → policies → função has_role → função is_super_admin → atualizar `handle_new_user` (drop+recreate) → backfill Talita.
+- Trigger valida domínio:
   ```sql
-  CREATE POLICY digests_auth_update ON public.weekly_digests
-    FOR UPDATE TO authenticated
-    USING (status <> 'sent') WITH CHECK (status <> 'sent');
-  GRANT UPDATE ON public.weekly_digests TO authenticated;
+  IF NEW.email NOT LIKE '%@grougp.com.br' THEN
+    RAISE EXCEPTION 'Apenas emails @grougp.com.br podem se cadastrar';
+  END IF;
   ```
-- `updateDigestDraft` valida com Zod (subject 1-200, html 1-200000, summary 0-5000) e usa `supabaseAdmin` para garantir update independente de RLS, mas rejeita se `status === 'sent'` no servidor antes do update.
-- Editor usa textarea simples (sem dep nova) + iframe `srcDoc` que re-renderiza com debounce de 300ms. Sem rich-text editor para não inflar bundle.
-- Cores do email (HEX para compatibilidade): bg `#0b1226`, surface `#121a33`, border `#1f2a4a`, primary `#4A90E2`, primary-dark `#003DA5`, text `#e6ecff`, muted `#94a3c8`.
+- `updateUserRole` e `removeUser` checam `is_super_admin(context.userId)` no início; retornam 403 se falso.
+- `listUsers` permite gestão também (read-only), mas server retorna `canEdit: false` pra esse caso e o front desabilita os controles.
+- Validação Zod em todas as server fns (`role` é `z.enum([...])`, `userId` é `z.string().uuid()`).
 
 ### Arquivos afetados
-- novo: `supabase/migrations/<timestamp>_weekly_digests_update_policy.sql`
-- novo: `public/lidi-logo-white.png`, `src/assets/lidi-logo-white.png`
-- novo: `src/components/digest-editor.tsx` (modal editor)
-- edit: `src/lib/digests.functions.ts` (add `updateDigestDraft`)
-- edit: `src/lib/digest.functions.ts` (novo `wrapHtml` com layout Lidi)
-- edit: `src/routes/_app.novidades.tsx` (usar editor no lugar do preview read-only)
-- edit: `src/routes/login.tsx` (logo Lidi)
-- edit: `src/routes/_app.tsx` (logo Lidi no shell)
+- nova migration: `supabase/migrations/<ts>_user_roles_and_domain_restriction.sql`
+- nova: `src/lib/users.functions.ts`
+- nova: `src/lib/use-role.ts`
+- nova: `src/routes/_app.configuracoes.usuarios.tsx`
+- edit: `src/routes/login.tsx` (validação de domínio + RadioGroup de role)
+- edit: `src/routes/_app.configuracoes.tsx` (link condicional para gestão de usuários)

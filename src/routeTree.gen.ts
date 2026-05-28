@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppUsuariosRouteImport } from './routes/_app.usuarios'
 import { Route as AppNovidadesRouteImport } from './routes/_app.novidades'
 import { Route as AppKanbanRouteImport } from './routes/_app.kanban'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
@@ -34,6 +35,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppUsuariosRoute = AppUsuariosRouteImport.update({
+  id: '/usuarios',
+  path: '/usuarios',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppNovidadesRoute = AppNovidadesRouteImport.update({
   id: '/novidades',
@@ -84,6 +90,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AppDashboardRoute
   '/kanban': typeof AppKanbanRoute
   '/novidades': typeof AppNovidadesRoute
+  '/usuarios': typeof AppUsuariosRoute
   '/lead/$id': typeof AppLeadIdRoute
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AppDashboardRoute
   '/kanban': typeof AppKanbanRoute
   '/novidades': typeof AppNovidadesRoute
+  '/usuarios': typeof AppUsuariosRoute
   '/lead/$id': typeof AppLeadIdRoute
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/kanban': typeof AppKanbanRoute
   '/_app/novidades': typeof AppNovidadesRoute
+  '/_app/usuarios': typeof AppUsuariosRoute
   '/_app/lead/$id': typeof AppLeadIdRoute
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
@@ -124,6 +133,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/kanban'
     | '/novidades'
+    | '/usuarios'
     | '/lead/$id'
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
@@ -136,6 +146,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/kanban'
     | '/novidades'
+    | '/usuarios'
     | '/lead/$id'
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
@@ -149,6 +160,7 @@ export interface FileRouteTypes {
     | '/_app/dashboard'
     | '/_app/kanban'
     | '/_app/novidades'
+    | '/_app/usuarios'
     | '/_app/lead/$id'
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
@@ -186,6 +198,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/usuarios': {
+      id: '/_app/usuarios'
+      path: '/usuarios'
+      fullPath: '/usuarios'
+      preLoaderRoute: typeof AppUsuariosRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/novidades': {
       id: '/_app/novidades'
@@ -251,6 +270,7 @@ interface AppRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
   AppKanbanRoute: typeof AppKanbanRoute
   AppNovidadesRoute: typeof AppNovidadesRoute
+  AppUsuariosRoute: typeof AppUsuariosRoute
   AppLeadIdRoute: typeof AppLeadIdRoute
 }
 
@@ -259,6 +279,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
   AppKanbanRoute: AppKanbanRoute,
   AppNovidadesRoute: AppNovidadesRoute,
+  AppUsuariosRoute: AppUsuariosRoute,
   AppLeadIdRoute: AppLeadIdRoute,
 }
 

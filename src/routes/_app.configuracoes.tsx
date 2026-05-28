@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
+import { useCurrentRole } from "@/lib/use-role";
 import { getSettings, updateSetting, updateIcp } from "@/lib/settings.functions";
 import { testRdConnection, getRecentSyncLogs } from "@/lib/rd-station.functions";
 import { getRdAuthUrl, getRdConnectionStatus, disconnectRd } from "@/lib/rd-oauth.functions";
@@ -21,6 +23,7 @@ export const Route = createFileRoute("/_app/configuracoes")({
 });
 
 function SettingsPage() {
+  const { isSuperAdmin, isGestao } = useCurrentRole();
   const fetchFn = useServerFn(getSettings);
   const updFn = useServerFn(updateSetting);
   const updIcpFn = useServerFn(updateIcp);
@@ -97,6 +100,23 @@ function SettingsPage() {
   return (
     <div className="p-6 max-w-4xl space-y-4">
       <h1 className="text-2xl font-bold">Configurações</h1>
+
+      {(isSuperAdmin || isGestao) && (
+        <Card className="p-5 flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold">Usuários e papéis</h2>
+            <p className="text-xs text-muted-foreground">
+              Gerencie quem tem acesso à plataforma e ajuste os papéis do time.
+            </p>
+          </div>
+          <Link
+            to="/usuarios"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Gerenciar usuários
+          </Link>
+        </Card>
+      )}
 
       <Card className="p-5 space-y-3 border-destructive/40">
         <h2 className="font-semibold">Credenciais para o Claude</h2>

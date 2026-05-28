@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import lidiLogo from "@/assets/lidi-logo-white.png";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Entrar — SDR GROU" }] }),
@@ -19,6 +20,7 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [role, setRole] = useState<"sdr" | "executivo" | "gestao">("sdr");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -37,12 +39,15 @@ function LoginPage() {
         toast.success("Bem-vindo!");
         navigate({ to: "/kanban" });
       } else {
+        if (!/@grougp\.com\.br$/i.test(email.trim())) {
+          throw new Error("Cadastro restrito a emails @grougp.com.br");
+        }
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/kanban`,
-            data: { full_name: name },
+            data: { full_name: name, role },
           },
         });
         if (error) throw error;
@@ -91,11 +96,44 @@ function LoginPage() {
           <div>
             <Label htmlFor="email">Email</Label>
             <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            {mode === "signup" && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Cadastro restrito ao time Grou (@grougp.com.br)
+              </p>
+            )}
           </div>
           <div>
             <Label htmlFor="password">Senha</Label>
             <Input id="password" type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
+          {mode === "signup" && (
+            <div>
+              <Label>Qual é o seu papel?</Label>
+              <RadioGroup
+                value={role}
+                onValueChange={(v) => setRole(v as "sdr" | "executivo" | "gestao")}
+                className="mt-2 grid grid-cols-3 gap-2"
+              >
+                {[
+                  { v: "sdr", label: "SDR" },
+                  { v: "executivo", label: "Executivo" },
+                  { v: "gestao", label: "Gestão" },
+                ].map((opt) => (
+                  <label
+                    key={opt.v}
+                    className={`flex items-center gap-2 rounded-md border px-3 py-2 cursor-pointer text-sm ${
+                      role === opt.v
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-white/10 text-muted-foreground hover:border-white/20"
+                    }`}
+                  >
+                    <RadioGroupItem value={opt.v} id={`role-${opt.v}`} />
+                    {opt.label}
+                  </label>
+                ))}
+              </RadioGroup>
+            </div>
+          )}
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar conta"}
           </Button>

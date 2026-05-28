@@ -389,6 +389,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       weekly_digests: {
         Row: {
           content_html: string
@@ -436,9 +457,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
+      app_role: "super_admin" | "gestao" | "executivo" | "sdr"
       enrichment_status: "pending" | "found" | "not_found" | "manual"
       lead_priority: "alta" | "media" | "baixa" | "fora_icp" | "pendente"
     }
@@ -568,6 +597,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["super_admin", "gestao", "executivo", "sdr"],
       enrichment_status: ["pending", "found", "not_found", "manual"],
       lead_priority: ["alta", "media", "baixa", "fora_icp", "pendente"],
     },
