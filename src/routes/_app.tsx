@@ -10,6 +10,7 @@ import {
   Users,
   PanelLeftClose,
   PanelLeft,
+  Sparkles,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_app")({
@@ -57,6 +58,7 @@ function AppShell() {
   const nav = [
     { to: "/kanban", label: "Kanban", icon: KanbanIcon },
     { to: "/dashboard", label: "Dashboard", icon: BarChart3 },
+    { to: "/novidades", label: "Novidades", icon: Sparkles },
     { to: "/configuracoes", label: "Configurações", icon: SettingsIcon },
   ];
 
