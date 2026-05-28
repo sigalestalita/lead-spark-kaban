@@ -6,9 +6,9 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Sparkles, Mail, Send, FileText } from "lucide-react";
+import { Sparkles, Pencil, Send, FileText, Eye } from "lucide-react";
+import { DigestEditor } from "@/components/digest-editor";
 
 export const Route = createFileRoute("/_app/novidades")({
   head: () => ({ meta: [{ title: "Novidades — SDR GROU" }] }),
@@ -25,7 +25,7 @@ function NovidadesPage() {
     queryKey: ["weekly-digests"],
     queryFn: () => fetchFn(),
   });
-  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [editing, setEditing] = useState<any | null>(null);
 
   const trigger = useMutation({
     mutationFn: () => triggerFn({ data: { force: true } }),
@@ -134,20 +134,21 @@ function NovidadesPage() {
                   variant="outline"
                   size="sm"
                   className="gap-2"
-                  onClick={() => setPreviewHtml(d.content_html)}
+                  onClick={() => setEditing(d)}
                 >
-                  <Mail className="h-4 w-4" />
-                  Ver prévia
+                  {d.status === "sent" ? <Eye className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                  {d.status === "sent" ? "Ver enviado" : "Editar prévia"}
                 </Button>
                 {d.status !== "sent" && (
                   <Button
                     size="sm"
+                    variant="secondary"
                     className="gap-2"
                     onClick={() => send.mutate(d.id)}
                     disabled={send.isPending}
                   >
                     <Send className="h-4 w-4" />
-                    {send.isPending ? "Enviando…" : "Aprovar e enviar"}
+                    {send.isPending ? "Enviando…" : "Enviar sem editar"}
                   </Button>
                 )}
               </div>
@@ -156,21 +157,11 @@ function NovidadesPage() {
         ))}
       </div>
 
-      <Dialog open={!!previewHtml} onOpenChange={(o) => !o && setPreviewHtml(null)}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Pré-visualização do email</DialogTitle>
-          </DialogHeader>
-          {previewHtml && (
-            <iframe
-              srcDoc={previewHtml}
-              className="w-full flex-1 min-h-[60vh] rounded-md border border-border bg-white"
-              sandbox=""
-              title="Preview"
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <DigestEditor
+        digest={editing}
+        open={!!editing}
+        onOpenChange={(o) => !o && setEditing(null)}
+      />
     </div>
   );
 }
