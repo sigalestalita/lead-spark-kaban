@@ -118,6 +118,17 @@ async function generateContentWithAI(stats: any, briefOverride?: string) {
     ? `Você escreve a newsletter interna da Grou. Tom: leve, próximo, animado, em português brasileiro. Linguagem simples e humana, sem jargão técnico pesado. Quando falar de funcionalidades, fale com entusiasmo e clareza, traduzindo para o que muda no dia a dia do time.`
     : `Você escreve a newsletter semanal do time comercial da Grou. Tom: leve, próximo, motivador, em português brasileiro. NÃO use jargão técnico, NÃO fale de plataforma, sistema, integrações, scoring, ICP, webhooks, dashboard ou qualquer termo de tecnologia. Fale como se fosse um colega comentando os números e os destaques da semana com o time.`;
 
+  const styleGuide = `
+IMPORTANTE — paleta do email (fundo é ESCURO, use estas cores):
+- Texto principal: #e6ecff
+- Texto secundário/muted: #94a3c8
+- Títulos: #ffffff
+- Cor de destaque/links: #4A90E2
+- Fundo de cards/seções: #121a33
+- Borda de cards: #1f2a4a
+Use SEMPRE estilos inline (style="..."). Use <table> para os cards de números (grid de 2 ou 4 colunas) com fundo #121a33, borda 1px solid #1f2a4a, border-radius 10px, padding 16px. Números grandes (font-size 28px, font-weight 700, color #ffffff) e label pequena abaixo (font-size 11px, text-transform uppercase, letter-spacing 1px, color #94a3c8).
+NÃO inclua <html>, <body>, header com logo, nem footer — eles já são adicionados ao redor. Gere apenas o conteúdo interno do email.`;
+
   const userPrompt = briefOverride
     ? `${briefOverride}
 
@@ -130,7 +141,8 @@ ${JSON.stringify(stats, null, 2)}
 Instruções de saída:
 - subject: assunto curto e marcante, máx 70 caracteres, pode ter emoji.
 - summary_markdown: resumo em markdown (3 a 6 parágrafos curtos).
-- html_body: corpo COMPLETO do e-mail em HTML com estilos inline (sem <html>/<body>, só o conteúdo do container). Use fundo claro #ffffff, texto #0f172a, títulos em #1e293b, destaque #2563eb. Use tabelas e divs com style inline para os cards de números. Siga a estrutura definida no briefing acima.`
+- html_body: corpo do conteúdo do email em HTML com estilos inline.
+${styleGuide}`
     : `Escreva a newsletter desta semana para o time comercial.
 
 # Período: ${stats.week_start} a ${stats.week_end}
@@ -142,13 +154,14 @@ ${JSON.stringify(stats, null, 2)}
 Instruções de escrita:
 - subject: assunto curto e humano, máx 70 caracteres, pode ter um emoji.
 - summary_markdown: resumo em markdown (3 a 5 parágrafos curtos), em linguagem simples e amigável.
-- html_body: corpo COMPLETO do e-mail em HTML com estilos inline (sem <html>/<body>, só o conteúdo do container). Use fundo claro #ffffff, texto #0f172a, títulos em #1e293b, destaque #2563eb. Estrutura:
+- html_body: corpo do conteúdo do email em HTML. Estrutura:
   1. Saudação calorosa ao time.
   2. Bloco "Resumo da semana" — 1 parágrafo curto contando como foi.
-  3. Bloco "Nossos números" — cards/tabela visual com os principais indicadores (leads novos, enriquecidos, convertidos, interações), sempre em linguagem do dia a dia (ex: "novos contatos chegaram", "oportunidades avançaram"), nunca termos técnicos.
+  3. Bloco "Nossos números" — cards visuais com os principais indicadores (leads novos, enriquecidos, convertidos, interações), em linguagem do dia a dia.
   4. Bloco "Destaques da semana" — empresas e pessoas que se destacaram.
   5. Fechamento curto, motivador.
-Importante: ZERO jargão técnico. Nada de "pipeline", "ICP", "score", "API". Fale de pessoas, empresas, oportunidades, contatos, conversas.`;
+Importante: ZERO jargão técnico. Nada de "pipeline", "ICP", "score", "API". Fale de pessoas, empresas, oportunidades, contatos, conversas.
+${styleGuide}`;
 
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -258,17 +271,25 @@ export const generateWeeklyDigest = createServerFn({ method: "POST" })
   .inputValidator((input: { weekStart?: string; force?: boolean }) => input ?? {})
   .handler(async ({ data }) => generateWeeklyDigestInternal(data));
 
-function wrapHtml(inner: string): string {
+const PUBLIC_SITE_URL = "https://sdr-grou.lovable.app";
+const LOGO_URL = `${PUBLIC_SITE_URL}/lidi-logo-white.png`;
+
+export function wrapHtml(inner: string): string {
   return `<!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Novidades da semana — Grou</title></head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 0;"><tr><td align="center">
-<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
-<tr><td style="padding:24px 28px;">
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lidi — Newsletter do time Grou</title></head>
+<body style="margin:0;padding:0;background:#0b1226;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#e6ecff;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0b1226;padding:32px 0;"><tr><td align="center">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#0b1226;border-radius:16px;overflow:hidden;border:1px solid #1f2a4a;">
+<tr><td style="background:linear-gradient(135deg,#003DA5 0%,#4A90E2 55%,#6b46c1 100%);padding:36px 28px;text-align:center;">
+<img src="${LOGO_URL}" alt="Lidi" height="44" style="height:44px;display:inline-block;border:0;outline:none;text-decoration:none;" />
+<p style="margin:14px 0 0;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#dbe6ff;opacity:0.85;">Newsletter semanal · Time Grou</p>
+</td></tr>
+<tr><td style="padding:32px 28px;background:#0b1226;color:#e6ecff;font-size:15px;line-height:1.65;">
 ${inner}
 </td></tr>
-<tr><td style="padding:16px 28px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b;text-align:center;">
-Novidades da semana · Time Grou
+<tr><td style="padding:20px 28px;border-top:1px solid #1f2a4a;background:#080f1f;text-align:center;">
+<img src="${LOGO_URL}" alt="Lidi" height="20" style="height:20px;display:inline-block;border:0;outline:none;opacity:0.7;" />
+<p style="margin:8px 0 0;font-size:11px;color:#94a3c8;">Gerado automaticamente pela Lidi · Plataforma de leads da Grou</p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -293,7 +314,7 @@ export async function sendDigestEmail(digestId: string) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "SDR GROU <noreply@grougp.com.br>",
+      from: "Lidi <noreply@grougp.com.br>",
       to: ["time@grougp.com.br"],
       subject: digest.subject,
       html: digest.content_html,

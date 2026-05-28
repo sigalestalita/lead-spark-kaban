@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Users } from "lucide-react";
+import lidiLogo from "@/assets/lidi-logo-white.png";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Entrar — SDR GROU" }] }),
@@ -77,14 +77,9 @@ function LoginPage() {
       {/* Darken overlay for form contrast */}
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-black/40" />
       <Card className="relative w-full max-w-md p-8 border-white/10 bg-white/[0.06] backdrop-blur-2xl shadow-[0_20px_60px_-20px_rgba(0,0,0,0.6)] animate-[loginIn_700ms_cubic-bezier(0.22,1,0.36,1)_both]">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="h-10 w-10 rounded-lg bg-primary grid place-items-center text-primary-foreground">
-            <Users className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold tracking-tight">SDR GROU</h1>
-            <p className="text-xs text-muted-foreground">Qualificação de leads inbound</p>
-          </div>
+        <div className="flex flex-col items-center text-center gap-2 mb-8">
+          <img src={lidiLogo} alt="Lidi" className="h-12 w-auto" />
+          <p className="text-xs text-muted-foreground">Plataforma de qualificação de leads · Grou</p>
         </div>
         <form onSubmit={submit} className="space-y-4">
           {mode === "signup" && (

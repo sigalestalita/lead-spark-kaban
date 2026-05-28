@@ -7,11 +7,11 @@ import {
   BarChart3,
   Settings as SettingsIcon,
   LogOut,
-  Users,
   PanelLeftClose,
   PanelLeft,
   Sparkles,
 } from "lucide-react";
+import lidiLogo from "@/assets/lidi-logo-white.png";
 
 export const Route = createFileRoute("/_app")({
   component: AppShell,
@@ -69,14 +69,10 @@ function AppShell() {
       >
         <div className={`${collapsed ? "px-2" : "px-5"} py-5 border-b border-white/5 flex items-center justify-between gap-2`}>
           <div className="flex items-center gap-2 min-w-0">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-[oklch(0.55_0.22_260)] grid place-items-center text-primary-foreground shadow-[0_0_24px_-4px_oklch(0.78_0.13_215/0.5)]">
-              <Users className="h-4 w-4" />
-            </div>
-            {!collapsed && (
-              <div className="min-w-0">
-                <p className="text-sm font-bold tracking-tight text-white">SDR GROU</p>
-                <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Qualificação</p>
-              </div>
+            {collapsed ? (
+              <img src={lidiLogo} alt="Lidi" className="h-7 w-auto mx-auto" />
+            ) : (
+              <img src={lidiLogo} alt="Lidi" className="h-8 w-auto" />
             )}
           </div>
           <button
