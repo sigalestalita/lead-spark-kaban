@@ -116,6 +116,7 @@ export const updateLead = createServerFn({ method: "POST" })
       "company_description",
       "company_segment",
       "company_size",
+      "linkedin_company_size",
       "company_location",
       "company_summary",
       "probable_pain",
