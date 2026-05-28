@@ -18,8 +18,8 @@ export const triggerWeeklyDigestNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { force?: boolean }) => input ?? {})
   .handler(async ({ data }) => {
-    const { generateWeeklyDigest, sendDigestEmail } = await import("./digest.functions");
-    const gen = await generateWeeklyDigest({ data: { force: !!data.force } });
+    const { generateWeeklyDigestInternal, sendDigestEmail } = await import("./digest.functions");
+    const gen = await generateWeeklyDigestInternal({ force: !!data.force });
     if (!("digestId" in gen) || !gen.digestId) {
       throw new Error("Falha ao gerar digest");
     }
