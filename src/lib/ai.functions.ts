@@ -344,6 +344,14 @@ async function runEnrichment(supabase: any, userId: string | null, id: string) {
       company_summary: args.company_summary,
       company_segment: lead.company_segment || args.company_segment,
       company_size: lead.company_size || (args.company_size !== "desconhecido" ? args.company_size : lead.company_size),
+      // Se o lead converteu informando um porte e o LinkedIn da empresa mostra tamanho diferente,
+      // guarda o tamanho do LinkedIn em um campo separado para o SDR ver os dois.
+      ...(lead.company_size &&
+      args.company_size &&
+      args.company_size !== "desconhecido" &&
+      args.company_size !== lead.company_size
+        ? { linkedin_company_size: args.company_size }
+        : { linkedin_company_size: null }),
       ...(newLinkedin ? { linkedin_url: newLinkedin } : {}),
       ...(newCompanyLinkedin ? { company_linkedin: newCompanyLinkedin } : {}),
       ...(newCompanyWebsite ? { company_website: newCompanyWebsite } : {}),
@@ -357,6 +365,7 @@ async function runEnrichment(supabase: any, userId: string | null, id: string) {
             company_website: newCompanyWebsite ?? null,
             company_segment: args.company_segment ?? null,
             company_size: args.company_size && args.company_size !== "desconhecido" ? args.company_size : null,
+            linkedin_company_size: null,
           }
         : {}),
       enrichment_status: "found" as const,
