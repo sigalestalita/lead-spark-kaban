@@ -283,9 +283,18 @@ function LeadDetailPage() {
           <div className="bg-muted rounded-md p-3 border">
             <div className="flex justify-between mb-2">
               <p className="text-xs font-semibold text-muted-foreground">Sugestão IA</p>
-              <button onClick={() => { navigator.clipboard.writeText(suggestion); toast.success("Copiado"); }} className="text-xs text-primary hover:underline inline-flex items-center gap-1">
-                <Copy className="h-3 w-3" /> Copiar
-              </button>
+              <div className="flex items-center gap-3">
+                <button onClick={() => { navigator.clipboard.writeText(suggestion); toast.success("Copiado"); }} className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+                  <Copy className="h-3 w-3" /> Copiar
+                </button>
+                {whatsappUrl && (
+                  <a href={whatsappUrl} target="_blank" rel="noreferrer">
+                    <Button size="sm" className="bg-[#25D366] hover:bg-[#25D366]/90 text-white h-7 px-2.5">
+                      <MessageSquare className="h-3.5 w-3.5 mr-1" /> Enviar no WhatsApp
+                    </Button>
+                  </a>
+                )}
+              </div>
             </div>
             <p className="text-sm whitespace-pre-wrap">{suggestion}</p>
           </div>
