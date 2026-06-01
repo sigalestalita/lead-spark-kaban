@@ -465,6 +465,7 @@ function LeadCard({
   lead,
   stageSlug,
   stages,
+  profiles,
   onMoveTo,
   onUpdate,
   overlay,
@@ -472,6 +473,7 @@ function LeadCard({
   lead: import("@/lib/lead-types").Lead;
   stageSlug: string;
   stages: { id: string; slug: string; name: string; position: number }[];
+  profiles: { id: string; full_name: string | null; email: string | null }[];
   onMoveTo: (leadId: string, stageId: string) => void;
   onUpdate: (id: string, patch: Record<string, unknown>) => void;
   overlay?: boolean;
@@ -517,6 +519,8 @@ function LeadCard({
 
   const icpFit = evaluateIcpFit(lead);
   const isHotIcp = stageSlug === "novo" && icpFit.score >= 2;
+  const assignedProfile = lead.assigned_to ? profiles.find((p) => p.id === lead.assigned_to) : null;
+  const assignedLabel = assignedProfile?.full_name ?? assignedProfile?.email ?? null;
 
   const content = (
     <Card
@@ -556,6 +560,10 @@ function LeadCard({
           <span className="text-muted-foreground">Porte:</span> {lead.company_size}
         </p>
       )}
+      <p className="text-[11px] text-foreground/80 truncate" title={assignedLabel ?? "Sem responsável"}>
+        <span className="text-muted-foreground">Responsável:</span>{" "}
+        {assignedLabel ?? <span className="text-muted-foreground italic">não atribuído</span>}
+      </p>
 
       {stageSlug === "novo" && (
         <div className="mt-2 space-y-1">
