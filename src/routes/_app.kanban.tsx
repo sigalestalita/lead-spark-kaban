@@ -390,6 +390,7 @@ function KanbanPage() {
                     lead={l}
                     stageSlug={s.slug}
                     stages={data.stages}
+                    profiles={data.profiles}
                     onMoveTo={handleMoveTo}
                     onUpdate={handleUpdateLead}
                   />
@@ -404,6 +405,7 @@ function KanbanPage() {
               lead={activeLead}
               stageSlug={stageById.get(activeLead.stage_id ?? "")?.slug ?? ""}
               stages={data.stages}
+              profiles={data.profiles}
               onMoveTo={handleMoveTo}
               onUpdate={handleUpdateLead}
               overlay
