@@ -32,7 +32,7 @@ export const getLeadDetail = createServerFn({ method: "GET" })
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
-    const [leadRes, notesRes, interactionsRes, stagesRes] = await Promise.all([
+    const [leadRes, notesRes, interactionsRes, stagesRes, profilesRes] = await Promise.all([
       supabase.from("leads").select("*").eq("id", data.id).maybeSingle(),
       supabase
         .from("lead_notes")
@@ -45,6 +45,7 @@ export const getLeadDetail = createServerFn({ method: "GET" })
         .eq("lead_id", data.id)
         .order("created_at", { ascending: false }),
       supabase.from("stages").select("*").order("position"),
+      supabase.from("profiles").select("id, full_name, email"),
     ]);
     if (leadRes.error) throw new Error(leadRes.error.message);
     if (!leadRes.data) throw new Error("Lead não encontrado");
@@ -53,6 +54,7 @@ export const getLeadDetail = createServerFn({ method: "GET" })
       notes: notesRes.data ?? [],
       interactions: interactionsRes.data ?? [],
       stages: stagesRes.data ?? [],
+      profiles: profilesRes.data ?? [],
     };
   });
 
