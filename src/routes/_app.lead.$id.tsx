@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { PRIORITY_LABEL, PRIORITY_COLOR } from "@/lib/lead-types";
 import { ArrowLeft, MessageSquare, Linkedin, Globe, Sparkles, Wand2, Copy, Building2, ExternalLink, ArrowRight } from "lucide-react";
@@ -224,6 +225,25 @@ function LeadDetailPage() {
           <Field label="Telefone" value={lead.phone} onSave={(v) => update.mutate({ phone: v })} />
           <Field label="Cargo" value={lead.position} onSave={(v) => update.mutate({ position: v })} />
           <Field label="LinkedIn pessoal" value={lead.linkedin_url} onSave={(v) => update.mutate({ linkedin_url: v })} />
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Responsável pelo lead</p>
+            <Select
+              value={lead.assigned_to ?? "__none"}
+              onValueChange={(v) => update.mutate({ assigned_to: v === "__none" ? null : v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecionar responsável" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">— Sem responsável —</SelectItem>
+                {data.profiles.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.full_name ?? p.email ?? p.id}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </Card>
 
         <Card className="p-5 space-y-3">
