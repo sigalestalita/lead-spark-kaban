@@ -185,6 +185,7 @@ export type Database = {
           icp_signals: Json | null
           id: string
           last_action_at: string | null
+          lead_type: string | null
           linkedin_company_size: string | null
           linkedin_url: string | null
           lost_reason: string | null
@@ -230,6 +231,7 @@ export type Database = {
           icp_signals?: Json | null
           id?: string
           last_action_at?: string | null
+          lead_type?: string | null
           linkedin_company_size?: string | null
           linkedin_url?: string | null
           lost_reason?: string | null
@@ -275,6 +277,7 @@ export type Database = {
           icp_signals?: Json | null
           id?: string
           last_action_at?: string | null
+          lead_type?: string | null
           linkedin_company_size?: string | null
           linkedin_url?: string | null
           lost_reason?: string | null
