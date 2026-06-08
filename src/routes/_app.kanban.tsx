@@ -293,6 +293,18 @@ function KanbanPage() {
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
+          <select
+            value={assigned}
+            onChange={(e) => setAssigned(e.target.value)}
+            className="h-9 rounded-md border bg-background px-2 text-sm max-w-[200px]"
+            title="Responsável"
+          >
+            <option value="all">Todos responsáveis</option>
+            <option value="none">Sem responsável</option>
+            {assigneeOptions.map((p) => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
           <div className="flex items-center gap-1">
             <select
               value=""
