@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PRIORITY_LABEL, PRIORITY_COLOR } from "@/lib/lead-types";
+import { LEAD_TYPE_LABEL, LEAD_TYPE_COLOR, type LeadType } from "@/lib/lead-type";
 import { evaluateIcpFit } from "@/lib/icp-fit";
 import { toast } from "sonner";
 import { RefreshCw, Plus, Search, Calendar, Clock, Timer, Flame, Briefcase, Building2, Mail, ChevronLeft, ChevronRight, Pencil, Check, X, LinkedinIcon } from "lucide-react";
@@ -549,6 +550,20 @@ function LeadCard({
           {PRIORITY_LABEL[lead.priority]}
         </Badge>
       </div>
+      {lead.lead_type && (
+        <div className="mb-1">
+          <Badge
+            variant="outline"
+            className="text-[10px]"
+            style={{
+              borderColor: LEAD_TYPE_COLOR[lead.lead_type as LeadType],
+              color: LEAD_TYPE_COLOR[lead.lead_type as LeadType],
+            }}
+          >
+            {LEAD_TYPE_LABEL[lead.lead_type as LeadType]}
+          </Badge>
+        </div>
+      )}
       {lead.company_name && <p className="text-xs text-muted-foreground truncate">{lead.company_name}</p>}
       {lead.position && (
         <p className="mt-1 text-[11px] text-foreground/80 truncate" title={lead.position}>

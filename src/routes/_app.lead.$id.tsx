@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { PRIORITY_LABEL, PRIORITY_COLOR } from "@/lib/lead-types";
+import { LEAD_TYPE_LABEL, LEAD_TYPE_COLOR, type LeadType } from "@/lib/lead-type";
 import { ArrowLeft, MessageSquare, Linkedin, Globe, Sparkles, Wand2, Copy, Building2, ExternalLink, ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/_app/lead/$id")({
@@ -241,6 +242,37 @@ function LeadDetailPage() {
                     {p.full_name ?? p.email ?? p.id}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs text-muted-foreground">Tipo do lead</p>
+              {lead.lead_type && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px]"
+                  style={{
+                    borderColor: LEAD_TYPE_COLOR[lead.lead_type as LeadType],
+                    color: LEAD_TYPE_COLOR[lead.lead_type as LeadType],
+                  }}
+                >
+                  {LEAD_TYPE_LABEL[lead.lead_type as LeadType]}
+                </Badge>
+              )}
+            </div>
+            <Select
+              value={lead.lead_type ?? "__none"}
+              onValueChange={(v) => update.mutate({ lead_type: v === "__none" ? null : v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecionar tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">— Não definido —</SelectItem>
+                <SelectItem value="consultoria">Consultoria</SelectItem>
+                <SelectItem value="empresa">Empresa</SelectItem>
+                <SelectItem value="pessoa_fisica">Pessoa Física</SelectItem>
               </SelectContent>
             </Select>
           </div>
