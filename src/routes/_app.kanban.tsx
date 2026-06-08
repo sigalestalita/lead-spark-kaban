@@ -549,6 +549,20 @@ function LeadCard({
           {PRIORITY_LABEL[lead.priority]}
         </Badge>
       </div>
+      {lead.lead_type && (
+        <div className="mb-1">
+          <Badge
+            variant="outline"
+            className="text-[10px]"
+            style={{
+              borderColor: LEAD_TYPE_COLOR[lead.lead_type as LeadType],
+              color: LEAD_TYPE_COLOR[lead.lead_type as LeadType],
+            }}
+          >
+            {LEAD_TYPE_LABEL[lead.lead_type as LeadType]}
+          </Badge>
+        </div>
+      )}
       {lead.company_name && <p className="text-xs text-muted-foreground truncate">{lead.company_name}</p>}
       {lead.position && (
         <p className="mt-1 text-[11px] text-foreground/80 truncate" title={lead.position}>
