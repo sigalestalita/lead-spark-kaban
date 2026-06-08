@@ -145,6 +145,10 @@
   --priority-baixa: oklch(0.78 0.13 215);
   --priority-fora: oklch(0.6 0.01 260);
 
+  --lead-type-consultoria: oklch(0.72 0.18 295);
+  --lead-type-empresa: oklch(0.7 0.16 165);
+  --lead-type-pessoa-fisica: oklch(0.78 0.15 50);
+
   --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -8px rgb(0 0 0 / 0.4);
   --shadow-glow: 0 0 40px -10px oklch(0.78 0.13 215 / 0.4);
   --font-display: "Plus Jakarta Sans", system-ui, sans-serif;
