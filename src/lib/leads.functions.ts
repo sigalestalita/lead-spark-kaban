@@ -125,6 +125,7 @@ export const updateLead = createServerFn({ method: "POST" })
       "next_action",
       "approach_result",
       "assigned_to",
+      "lead_type",
       "stage_id",
       "meeting_at",
       "lost_reason",
