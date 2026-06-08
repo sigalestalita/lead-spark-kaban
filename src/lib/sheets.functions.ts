@@ -322,6 +322,9 @@ export const syncLeadsFromSheet = createServerFn({ method: "POST" })
           stage_id: novoId,
           enrichment_status: "pending" as const,
           form_payload: p.payload.form_payload as never,
+          lead_type: normalizeLeadType(
+            (p.payload.form_payload as { lead_type?: string } | null)?.lead_type ?? null,
+          ),
           created_at: createdAt,
           last_action_at: createdAt,
           stage_entered_at: createdAt,
