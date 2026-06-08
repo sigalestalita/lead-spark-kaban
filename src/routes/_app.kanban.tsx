@@ -50,6 +50,7 @@ function KanbanPage() {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [companySize, setCompanySize] = useState<string>("all");
+  const [assigned, setAssigned] = useState<string>("all");
 
   const { data, isLoading } = useQuery({
     queryKey: ["kanban"],
@@ -184,6 +185,8 @@ function KanbanPage() {
   const filtered = data.leads.filter((l) => {
     if (priority !== "all" && l.priority !== priority) return false;
     if (companySize !== "all" && (l.company_size ?? "") !== companySize) return false;
+    if (assigned === "none" && l.assigned_to) return false;
+    if (assigned !== "all" && assigned !== "none" && l.assigned_to !== assigned) return false;
     const submittedRaw = (l.form_payload as { submitted_at?: string } | null)?.submitted_at ?? null;
     const convTs = submittedRaw
       ? new Date(submittedRaw).getTime()
@@ -228,6 +231,13 @@ function KanbanPage() {
   const sizeOptions = Array.from(
     new Set(data.leads.map((l) => (l.company_size ?? "").trim()).filter(Boolean))
   ).sort();
+  const assignedIds = new Set(
+    data.leads.map((l) => l.assigned_to).filter((v): v is string => !!v)
+  );
+  const assigneeOptions = data.profiles
+    .filter((p) => assignedIds.has(p.id))
+    .map((p) => ({ id: p.id, label: (p.full_name || p.email || "—").trim() }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 
   const handleMoveTo = (leadId: string, stageId: string) => {
     const targetStage = data.stages.find((s) => s.id === stageId);
