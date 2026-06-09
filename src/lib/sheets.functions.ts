@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { normalizeLeadType } from "./lead-type";
+import { notifyNewLead } from "./lead-notify.server";
 
 const SPREADSHEET_ID = "1gGib1CJCUaS-1xNKBrexP7OzuY87u_ZDWehsJdz1U5A";
 const SHEETS: Array<{ tab: string; source: string; channel: string }> = [
@@ -300,6 +301,14 @@ export const syncLeadsFromSheet = createServerFn({ method: "POST" })
 
     let inserted = 0;
     const insertErrors: string[] = [];
+    const insertedLeads: Array<{
+      id: string;
+      name: string;
+      company_name: string | null;
+      lead_type: string | null;
+      score: number | null;
+      priority: string | null;
+    }> = [];
     const CHUNK = 100;
     for (let i = 0; i < batch.length; i += CHUNK) {
       const slice = batch.slice(i, i + CHUNK);
@@ -331,18 +340,44 @@ export const syncLeadsFromSheet = createServerFn({ method: "POST" })
           stage_entered_at: createdAt,
         };
       });
-      const { error } = await supabase.from("leads").insert(chunk as never);
+      const { data: insData, error } = await supabase
+        .from("leads")
+        .insert(chunk as never)
+        .select("id, name, company_name, lead_type, score, priority");
       if (!error) {
         inserted += chunk.length;
+        for (const r of insData ?? []) {
+          insertedLeads.push(r as never);
+        }
         continue;
       }
       // Fallback row-by-row para isolar conflitos (email duplicado, etc.).
       for (const row of chunk) {
-        const { error: rowErr } = await supabase.from("leads").insert(row as never);
-        if (!rowErr) inserted += 1;
-        else if (insertErrors.length < 10) insertErrors.push(rowErr.message);
+        const { data: rowData, error: rowErr } = await supabase
+          .from("leads")
+          .insert(row as never)
+          .select("id, name, company_name, lead_type, score, priority")
+          .maybeSingle();
+        if (!rowErr) {
+          inserted += 1;
+          if (rowData) insertedLeads.push(rowData as never);
+        } else if (insertErrors.length < 10) insertErrors.push(rowErr.message);
       }
     }
+
+    // Disparar notificações por e-mail (não bloqueia o resultado da sync).
+    await Promise.allSettled(
+      insertedLeads.map((l) =>
+        notifyNewLead({
+          id: l.id,
+          name: l.name,
+          company_name: l.company_name,
+          lead_type: (l.lead_type as never) ?? null,
+          score: l.score,
+          priority: l.priority,
+        }),
+      ),
+    );
 
     const skipped = parsed.length - inserted;
     const stateValue = {

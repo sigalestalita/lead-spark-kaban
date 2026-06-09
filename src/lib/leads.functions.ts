@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { calculateScore, type IcpRules, type IcpThresholds } from "./icp-score";
+import { notifyNewLead } from "./lead-notify.server";
+import { normalizeLeadType } from "./lead-type";
 
 /** Lista leads + stages + perfis (para o Kanban). */
 export const listKanbanData = createServerFn({ method: "GET" })
@@ -212,8 +214,16 @@ export const createManualLead = createServerFn({ method: "POST" })
         stage_id: stage?.id ?? null,
         last_action_at: new Date().toISOString(),
       })
-      .select("id")
+      .select("id, name, company_name, lead_type, score, priority")
       .single();
     if (error) throw new Error(error.message);
+    await notifyNewLead({
+      id: inserted.id,
+      name: inserted.name,
+      company_name: inserted.company_name,
+      lead_type: normalizeLeadType(inserted.lead_type),
+      score: inserted.score,
+      priority: inserted.priority,
+    });
     return { id: inserted.id };
   });
