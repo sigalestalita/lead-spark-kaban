@@ -586,6 +586,16 @@ function LeadCard({
           </Badge>
         </div>
       )}
+      {lead.demo_free === true && (
+        <div className="mb-1">
+          <Badge
+            variant="outline"
+            className="text-[10px] border-emerald-500 text-emerald-600 dark:text-emerald-400"
+          >
+            Demo Free
+          </Badge>
+        </div>
+      )}
       {lead.company_name && <p className="text-xs text-muted-foreground truncate">{lead.company_name}</p>}
       {lead.position && (
         <p className="mt-1 text-[11px] text-foreground/80 truncate" title={lead.position}>
