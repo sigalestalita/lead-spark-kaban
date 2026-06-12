@@ -441,3 +441,41 @@ export const getSheetSyncState = createServerFn({ method: "GET" })
       spreadsheet_url: `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`,
     };
   });
+
+/** Backfill: lê a planilha e popula `demo_free` nos leads já importados. */
+export const backfillDemoFreeFromSheet = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data: isAdmin } = await supabase.rpc("has_role", {
+      _user_id: userId,
+      _role: "admin",
+    });
+    const { data: isSuper } = await supabase.rpc("has_role", {
+      _user_id: userId,
+      _role: "super_admin",
+    });
+    if (!isAdmin && !isSuper) throw new Error("Forbidden");
+
+    const sheetResult = await fetchSheetRows();
+    if (!sheetResult.ok) {
+      return { ok: false as const, error: sheetResult.message };
+    }
+    const parsed: Array<{ lead_id: string; demo_free: boolean }> = [];
+    for (const item of sheetResult.rows) {
+      const r = rowToLead(item.row, item.sheetIndex, item.rowIndex);
+      if (!r) continue;
+      if (r.payload.demo_free === null) continue;
+      parsed.push({ lead_id: r.meta_lead_id, demo_free: r.payload.demo_free });
+    }
+    let updated = 0;
+    for (const p of parsed) {
+      const { data: rows, error } = await supabase
+        .from("leads")
+        .update({ demo_free: p.demo_free } as never)
+        .filter("form_payload->>lead_id", "eq", p.lead_id)
+        .select("id");
+      if (!error && rows && rows.length > 0) updated += rows.length;
+    }
+    return { ok: true as const, scanned: parsed.length, updated };
+  });
