@@ -26,6 +26,7 @@ const C = {
   porte: 9,
   cargo: 10,
   dor: 11,
+  demo_free: 12,
   campanha: 13,
   conjunto: 14,
   ad: 15,
@@ -59,6 +60,15 @@ function parseDate(v: unknown): string | null {
   return isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+function parseDemoFree(v: unknown): boolean | null {
+  const s = cleanStr(v);
+  if (!s) return null;
+  const t = s.toLowerCase();
+  if (/^(sim|s|yes|y|true|1|x|✓)$/.test(t)) return true;
+  if (/^(não|nao|n|no|false|0)$/.test(t)) return false;
+  return null;
+}
+
 type LeadRow = {
   meta_lead_id: string;
   source: string;
@@ -72,6 +82,8 @@ type LeadRow = {
     company_segment: string | null;
     company_size: string | null;
     probable_pain: string | null;
+    demo_free: boolean | null;
+    demo_free_raw: string | null;
     campaign: string | null;
     ad_name: string | null;
     form_name: string | null;
@@ -129,6 +141,8 @@ function rowToLead(row: string[], sheetIndex: number, rowIndex: number): LeadRow
       company_segment: cleanStr(row[C.area]),
       company_size: cleanStr(row[C.porte]),
       probable_pain: cleanStr(row[C.dor]),
+      demo_free: parseDemoFree(row[C.demo_free]),
+      demo_free_raw: cleanStr(row[C.demo_free]),
       campaign: cleanStr(row[C.campanha]),
       ad_name: cleanStr(row[C.ad]),
       form_name: cleanStr(row[C.form_id]),
@@ -138,6 +152,7 @@ function rowToLead(row: string[], sheetIndex: number, rowIndex: number): LeadRow
         sheet_tab: sheet.tab,
         form_id: cleanStr(row[C.form_id]),
         lead_type: cleanStr(row[C.tipo]),
+        demo_free_raw: cleanStr(row[C.demo_free]),
         ad_set: cleanStr(row[C.conjunto]),
         meta_ids: {
           campaign_id: cleanStr(row[C.campanha_id]),
@@ -324,6 +339,7 @@ export const syncLeadsFromSheet = createServerFn({ method: "POST" })
           company_segment: p.payload.company_segment,
           company_size: p.payload.company_size,
           probable_pain: p.payload.probable_pain,
+          demo_free: p.payload.demo_free,
           campaign: p.payload.campaign,
           ad_name: p.payload.ad_name,
           form_name: p.payload.form_name,
@@ -424,4 +440,42 @@ export const getSheetSyncState = createServerFn({ method: "GET" })
       updated_at: data?.updated_at ?? null,
       spreadsheet_url: `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`,
     };
+  });
+
+/** Backfill: lê a planilha e popula `demo_free` nos leads já importados. */
+export const backfillDemoFreeFromSheet = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data: isGestao } = await supabase.rpc("has_role", {
+      _user_id: userId,
+      _role: "gestao",
+    });
+    const { data: isSuper } = await supabase.rpc("has_role", {
+      _user_id: userId,
+      _role: "super_admin",
+    });
+    if (!isGestao && !isSuper) throw new Error("Forbidden");
+
+    const sheetResult = await fetchSheetRows();
+    if (!sheetResult.ok) {
+      return { ok: false as const, error: sheetResult.message };
+    }
+    const parsed: Array<{ lead_id: string; demo_free: boolean }> = [];
+    for (const item of sheetResult.rows) {
+      const r = rowToLead(item.row, item.sheetIndex, item.rowIndex);
+      if (!r) continue;
+      if (r.payload.demo_free === null) continue;
+      parsed.push({ lead_id: r.meta_lead_id, demo_free: r.payload.demo_free });
+    }
+    let updated = 0;
+    for (const p of parsed) {
+      const { data: rows, error } = await supabase
+        .from("leads")
+        .update({ demo_free: p.demo_free } as never)
+        .filter("form_payload->>lead_id", "eq", p.lead_id)
+        .select("id");
+      if (!error && rows && rows.length > 0) updated += rows.length;
+    }
+    return { ok: true as const, scanned: parsed.length, updated };
   });

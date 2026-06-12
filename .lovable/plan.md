@@ -1,42 +1,45 @@
-## Objetivo
-Disparar um e-mail automaticamente quando um novo lead é inserido (via sincronização do Google Sheets ou criação manual), avisando o responsável conforme o `lead_type`:
+# Plano: campo "Demo Free" no lead
 
-- `empresa` ou `pessoa_fisica` → **lisiane@grougp.com.br** (Lisiane Baudini)
-- `consultoria` → **mariana.borges@grougp.com.br** (Mariana Borges)
-- Sem `lead_type` identificado → não dispara (evita ruído).
+## 1. Banco
 
-Conteúdo do e-mail: nome do lead, empresa, classificação (Consultoria/Empresa/Pessoa Física) e nota (score/priority).
+Migração adicionando coluna `demo_free boolean` (nullable) em `public.leads`. Sem default — `null` significa "não informado".
 
-## Provedor
-Usar o **Resend** já conectado no projeto (`RESEND_API_KEY` já existe nos secrets) via gateway de connectors. Sem necessidade de configurar domínio novo — usar `onboarding@resend.dev` como remetente até que um domínio próprio seja verificado (posso trocar depois se preferirem).
+## 2. Ingestão da planilha (`src/lib/sheets.functions.ts`)
 
-## Mudanças
+- Adicionar `demo_free: 12` no mapa `C` (coluna M = índice 12).
+- Helper `parseDemoFree(v)`: `true` para `sim/yes/true/1/x`, `false` para `não/nao/no/false/0`, `null` caso vazio.
+- No `rowToLead`, incluir `demo_free` no `payload` e também guardar o valor bruto em `form_payload.demo_free_raw`.
+- No `INSERT` do chunk, gravar `demo_free`.
 
-### 1. `src/lib/lead-notify.server.ts` (novo, server-only)
-- Função `notifyNewLead(lead)` que:
-  - Mapeia `lead_type` → destinatário (Lisiane/Mariana). Retorna cedo se não houver match.
-  - Monta assunto: `Novo lead: {nome} — {Classificação}`.
-  - Monta HTML simples com: Nome, Empresa, Classificação (badge colorida por tipo), Score/Priority, link para `/lead/{id}` no app.
-  - POST para `https://connector-gateway.lovable.dev/resend/emails` com headers `Authorization: Bearer LOVABLE_API_KEY` + `X-Connection-Api-Key: RESEND_API_KEY`.
-  - Captura erro e loga em `integration_logs` (provider `resend`, action `notify_new_lead`) — nunca derruba o fluxo de inserção.
+## 3. Backfill dos leads já importados
 
-### 2. `src/lib/sheets.functions.ts`
-- Após o loop de inserção de leads (no `syncLeadsFromSheet`), para cada linha efetivamente inserida, chamar `notifyNewLead(...)` em paralelo (`Promise.allSettled`) usando os dados do `payload` + `lead_type` já normalizado.
-- Disparo só ocorre para leads recém-inseridos (não para skipped/existentes).
+Nova server fn `backfillDemoFreeFromSheet` (autenticada, role admin ou super_admin):
 
-### 3. `src/lib/leads.functions.ts`
-- No `createManualLead`, após o insert bem-sucedido, chamar `notifyNewLead(...)` com os dados do lead criado (normalizando o `lead_type` se vier preenchido).
+- Busca a planilha (mesma rotina `fetchSheetRows`).
+- Para cada linha com `demo_free` não-nulo, faz `UPDATE leads SET demo_free = $1 WHERE form_payload->>'lead_id' = $2 AND demo_free IS DISTINCT FROM $1`.
+- Retorna `{ updated, scanned }`.
+- Disparada uma vez automaticamente após o deploy via botão na tela de Configurações (ou simplesmente invocada uma vez via `invoke-server-function` após o merge — opção mais simples e sem UI nova). **Vou seguir a opção sem UI nova:** após aprovado, chamo a fn uma vez via tool de invocação.
 
-### 4. URL base para o link "Abrir lead"
-- Usar `process.env.APP_PUBLIC_URL` se existir, fallback para `https://sdr-grou.lovable.app`. Sem novo secret obrigatório.
+## 4. UI
 
-## Fora de escopo
-- Configurar domínio próprio no Resend (posso fazer depois se quiserem o remetente `@grougp.com.br`).
-- Templates React Email com infra de fila / Lovable Emails — overkill para 2 destinatários internos.
-- Notificação para mudanças de estágio, atualizações ou re-importações.
-- UI de configuração dos destinatários (mapeamento fica fixo no código por enquanto; trivial mover para `app_settings` depois).
+### Card do Kanban (`src/routes/_app.kanban.tsx`)
 
-## Arquivos afetados
-- create: `src/lib/lead-notify.server.ts`
-- edit: `src/lib/sheets.functions.ts`
-- edit: `src/lib/leads.functions.ts`
+Quando `lead.demo_free === true`, mostrar um badge verde compacto "Demo Free" logo abaixo do nome/tipo, antes da empresa.
+
+### Detalhe do lead (`src/routes/_app.lead.$id.tsx`)
+
+- Em "Dados do Lead" (bloco com tipo de lead), adicionar linha **Demo Free** com `Select` (Sim / Não / Não informado), salvando via `update.mutate({ demo_free: ... })`.
+- Incluir `"demo_free"` em `allowedKeys` de `updateLead` (`src/lib/leads.functions.ts`).
+
+## 5. Fora de escopo
+
+- Filtro do Kanban por "tem demo free".
+
+## Arquivos
+
+- nova migração SQL
+- `src/lib/sheets.functions.ts`
+- nova `src/lib/leads-backfill.functions.ts` (ou anexar em `sheets.functions.ts`)
+- `src/lib/leads.functions.ts`
+- `src/routes/_app.kanban.tsx`
+- `src/routes/_app.lead.$id.tsx`

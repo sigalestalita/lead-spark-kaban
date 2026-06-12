@@ -176,6 +176,7 @@ export type Database = {
           company_website: string | null
           converted_at: string | null
           created_at: string
+          demo_free: boolean | null
           email: string | null
           enriched_at: string | null
           enrichment_status: Database["public"]["Enums"]["enrichment_status"]
@@ -222,6 +223,7 @@ export type Database = {
           company_website?: string | null
           converted_at?: string | null
           created_at?: string
+          demo_free?: boolean | null
           email?: string | null
           enriched_at?: string | null
           enrichment_status?: Database["public"]["Enums"]["enrichment_status"]
@@ -268,6 +270,7 @@ export type Database = {
           company_website?: string | null
           converted_at?: string | null
           created_at?: string
+          demo_free?: boolean | null
           email?: string | null
           enriched_at?: string | null
           enrichment_status?: Database["public"]["Enums"]["enrichment_status"]

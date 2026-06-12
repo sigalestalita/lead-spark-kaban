@@ -276,6 +276,24 @@ function LeadDetailPage() {
               </SelectContent>
             </Select>
           </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Demo Free</p>
+            <Select
+              value={lead.demo_free === null || lead.demo_free === undefined ? "__none" : lead.demo_free ? "yes" : "no"}
+              onValueChange={(v) =>
+                update.mutate({ demo_free: v === "__none" ? null : v === "yes" })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecionar" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">— Não informado —</SelectItem>
+                <SelectItem value="yes">Sim</SelectItem>
+                <SelectItem value="no">Não</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </Card>
 
         <Card className="p-5 space-y-3">
