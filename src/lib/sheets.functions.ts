@@ -447,15 +447,15 @@ export const backfillDemoFreeFromSheet = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    const { data: isAdmin } = await supabase.rpc("has_role", {
+    const { data: isGestao } = await supabase.rpc("has_role", {
       _user_id: userId,
-      _role: "admin",
+      _role: "gestao",
     });
     const { data: isSuper } = await supabase.rpc("has_role", {
       _user_id: userId,
       _role: "super_admin",
     });
-    if (!isAdmin && !isSuper) throw new Error("Forbidden");
+    if (!isGestao && !isSuper) throw new Error("Forbidden");
 
     const sheetResult = await fetchSheetRows();
     if (!sheetResult.ok) {
