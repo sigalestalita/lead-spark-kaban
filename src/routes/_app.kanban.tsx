@@ -309,6 +309,17 @@ function KanbanPage() {
               <option key={p.id} value={p.id}>{p.label}</option>
             ))}
           </select>
+          <select
+            value={demoFree}
+            onChange={(e) => setDemoFree(e.target.value)}
+            className="h-9 rounded-md border bg-background px-2 text-sm"
+            title="Demo Free"
+          >
+            <option value="all">Demo Free: todos</option>
+            <option value="sim">Demo Free: sim</option>
+            <option value="nao">Demo Free: não</option>
+            <option value="nd">Demo Free: não informado</option>
+          </select>
           <div className="flex items-center gap-1">
             <select
               value=""
