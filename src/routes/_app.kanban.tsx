@@ -51,6 +51,7 @@ function KanbanPage() {
   const [dateTo, setDateTo] = useState<string>("");
   const [companySize, setCompanySize] = useState<string>("all");
   const [assigned, setAssigned] = useState<string>("all");
+  const [demoFree, setDemoFree] = useState<string>("all");
 
   const { data, isLoading } = useQuery({
     queryKey: ["kanban"],
@@ -187,6 +188,9 @@ function KanbanPage() {
     if (companySize !== "all" && (l.company_size ?? "") !== companySize) return false;
     if (assigned === "none" && l.assigned_to) return false;
     if (assigned !== "all" && assigned !== "none" && l.assigned_to !== assigned) return false;
+    if (demoFree === "sim" && l.demo_free !== true) return false;
+    if (demoFree === "nao" && l.demo_free !== false) return false;
+    if (demoFree === "nd" && l.demo_free != null) return false;
     const submittedRaw = (l.form_payload as { submitted_at?: string } | null)?.submitted_at ?? null;
     const convTs = submittedRaw
       ? new Date(submittedRaw).getTime()
@@ -304,6 +308,17 @@ function KanbanPage() {
             {assigneeOptions.map((p) => (
               <option key={p.id} value={p.id}>{p.label}</option>
             ))}
+          </select>
+          <select
+            value={demoFree}
+            onChange={(e) => setDemoFree(e.target.value)}
+            className="h-9 rounded-md border bg-background px-2 text-sm"
+            title="Demo Free"
+          >
+            <option value="all">Demo Free: todos</option>
+            <option value="sim">Demo Free: sim</option>
+            <option value="nao">Demo Free: não</option>
+            <option value="nd">Demo Free: não informado</option>
           </select>
           <div className="flex items-center gap-1">
             <select
