@@ -188,6 +188,9 @@ function KanbanPage() {
     if (companySize !== "all" && (l.company_size ?? "") !== companySize) return false;
     if (assigned === "none" && l.assigned_to) return false;
     if (assigned !== "all" && assigned !== "none" && l.assigned_to !== assigned) return false;
+    if (demoFree === "sim" && l.demo_free !== true) return false;
+    if (demoFree === "nao" && l.demo_free !== false) return false;
+    if (demoFree === "nd" && l.demo_free != null) return false;
     const submittedRaw = (l.form_payload as { submitted_at?: string } | null)?.submitted_at ?? null;
     const convTs = submittedRaw
       ? new Date(submittedRaw).getTime()
