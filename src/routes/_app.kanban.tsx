@@ -51,6 +51,7 @@ function KanbanPage() {
   const [dateTo, setDateTo] = useState<string>("");
   const [companySize, setCompanySize] = useState<string>("all");
   const [assigned, setAssigned] = useState<string>("all");
+  const [demoFree, setDemoFree] = useState<string>("all");
 
   const { data, isLoading } = useQuery({
     queryKey: ["kanban"],
