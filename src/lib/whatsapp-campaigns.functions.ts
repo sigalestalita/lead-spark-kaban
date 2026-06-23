@@ -314,7 +314,7 @@ export const getCampaignFilterMeta = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase } = context;
     const [{ data: stages }, { data: types }] = await Promise.all([
-      supabase.from("stages").select("id, name, order_index").order("order_index"),
+      supabase.from("stages").select("id, name, position").order("position"),
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       supabase.from("leads").select("lead_type").not("lead_type", "is", null).limit(2000),
     ]);
