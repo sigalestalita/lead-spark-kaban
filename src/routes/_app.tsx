@@ -10,6 +10,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   Sparkles,
+  MessageCircle,
 } from "lucide-react";
 import lidiLogo from "@/assets/lidi-logo-white.png";
 
@@ -57,6 +58,7 @@ function AppShell() {
   const currentPath = router.state.location.pathname;
   const nav = [
     { to: "/kanban", label: "Kanban", icon: KanbanIcon },
+    { to: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
     { to: "/dashboard", label: "Dashboard", icon: BarChart3 },
     { to: "/novidades", label: "Novidades", icon: Sparkles },
     { to: "/configuracoes", label: "Configurações", icon: SettingsIcon },
