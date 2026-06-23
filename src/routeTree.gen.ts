@@ -27,6 +27,7 @@ import { Route as AppWhatsappContasRouteImport } from './routes/_app.whatsapp.co
 import { Route as AppWhatsappCampanhasRouteImport } from './routes/_app.whatsapp.campanhas'
 import { Route as AppWhatsappAutomacoesRouteImport } from './routes/_app.whatsapp.automacoes'
 import { Route as AppLeadIdRouteImport } from './routes/_app.lead.$id'
+import { Route as AppAnalyticsChatThreadIdRouteImport } from './routes/_app.analytics-chat.$threadId'
 import { Route as ApiPublicRdCallbackRouteImport } from './routes/api/public/rd/callback'
 import { Route as ApiPublicHooksSyncRdRouteImport } from './routes/api/public/hooks/sync-rd'
 import { Route as ApiPublicHooksSendWeeklyDigestRouteImport } from './routes/api/public/hooks/send-weekly-digest'
@@ -123,6 +124,12 @@ const AppLeadIdRoute = AppLeadIdRouteImport.update({
   path: '/lead/$id',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAnalyticsChatThreadIdRoute =
+  AppAnalyticsChatThreadIdRouteImport.update({
+    id: '/$threadId',
+    path: '/$threadId',
+    getParentRoute: () => AppAnalyticsChatRoute,
+  } as any)
 const ApiPublicRdCallbackRoute = ApiPublicRdCallbackRouteImport.update({
   id: '/api/public/rd/callback',
   path: '/api/public/rd/callback',
@@ -160,7 +167,7 @@ const ApiPublicWhatsappAutomationsTickRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/analytics-chat': typeof AppAnalyticsChatRoute
+  '/analytics-chat': typeof AppAnalyticsChatRouteWithChildren
   '/configuracoes': typeof AppConfiguracoesRoute
   '/dashboard': typeof AppDashboardRoute
   '/kanban': typeof AppKanbanRoute
@@ -168,6 +175,7 @@ export interface FileRoutesByFullPath {
   '/novidades': typeof AppNovidadesRoute
   '/usuarios': typeof AppUsuariosRoute
   '/whatsapp': typeof AppWhatsappRouteWithChildren
+  '/analytics-chat/$threadId': typeof AppAnalyticsChatThreadIdRoute
   '/lead/$id': typeof AppLeadIdRoute
   '/whatsapp/automacoes': typeof AppWhatsappAutomacoesRoute
   '/whatsapp/campanhas': typeof AppWhatsappCampanhasRouteWithChildren
@@ -185,13 +193,14 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/analytics-chat': typeof AppAnalyticsChatRoute
+  '/analytics-chat': typeof AppAnalyticsChatRouteWithChildren
   '/configuracoes': typeof AppConfiguracoesRoute
   '/dashboard': typeof AppDashboardRoute
   '/kanban': typeof AppKanbanRoute
   '/leads-analytics': typeof AppLeadsAnalyticsRoute
   '/novidades': typeof AppNovidadesRoute
   '/usuarios': typeof AppUsuariosRoute
+  '/analytics-chat/$threadId': typeof AppAnalyticsChatThreadIdRoute
   '/lead/$id': typeof AppLeadIdRoute
   '/whatsapp/automacoes': typeof AppWhatsappAutomacoesRoute
   '/whatsapp/campanhas': typeof AppWhatsappCampanhasRouteWithChildren
@@ -211,7 +220,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
-  '/_app/analytics-chat': typeof AppAnalyticsChatRoute
+  '/_app/analytics-chat': typeof AppAnalyticsChatRouteWithChildren
   '/_app/configuracoes': typeof AppConfiguracoesRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/kanban': typeof AppKanbanRoute
@@ -219,6 +228,7 @@ export interface FileRoutesById {
   '/_app/novidades': typeof AppNovidadesRoute
   '/_app/usuarios': typeof AppUsuariosRoute
   '/_app/whatsapp': typeof AppWhatsappRouteWithChildren
+  '/_app/analytics-chat/$threadId': typeof AppAnalyticsChatThreadIdRoute
   '/_app/lead/$id': typeof AppLeadIdRoute
   '/_app/whatsapp/automacoes': typeof AppWhatsappAutomacoesRoute
   '/_app/whatsapp/campanhas': typeof AppWhatsappCampanhasRouteWithChildren
@@ -246,6 +256,7 @@ export interface FileRouteTypes {
     | '/novidades'
     | '/usuarios'
     | '/whatsapp'
+    | '/analytics-chat/$threadId'
     | '/lead/$id'
     | '/whatsapp/automacoes'
     | '/whatsapp/campanhas'
@@ -270,6 +281,7 @@ export interface FileRouteTypes {
     | '/leads-analytics'
     | '/novidades'
     | '/usuarios'
+    | '/analytics-chat/$threadId'
     | '/lead/$id'
     | '/whatsapp/automacoes'
     | '/whatsapp/campanhas'
@@ -296,6 +308,7 @@ export interface FileRouteTypes {
     | '/_app/novidades'
     | '/_app/usuarios'
     | '/_app/whatsapp'
+    | '/_app/analytics-chat/$threadId'
     | '/_app/lead/$id'
     | '/_app/whatsapp/automacoes'
     | '/_app/whatsapp/campanhas'
@@ -450,6 +463,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppLeadIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/analytics-chat/$threadId': {
+      id: '/_app/analytics-chat/$threadId'
+      path: '/$threadId'
+      fullPath: '/analytics-chat/$threadId'
+      preLoaderRoute: typeof AppAnalyticsChatThreadIdRouteImport
+      parentRoute: typeof AppAnalyticsChatRoute
+    }
     '/api/public/rd/callback': {
       id: '/api/public/rd/callback'
       path: '/api/public/rd/callback'
@@ -495,6 +515,17 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppAnalyticsChatRouteChildren {
+  AppAnalyticsChatThreadIdRoute: typeof AppAnalyticsChatThreadIdRoute
+}
+
+const AppAnalyticsChatRouteChildren: AppAnalyticsChatRouteChildren = {
+  AppAnalyticsChatThreadIdRoute: AppAnalyticsChatThreadIdRoute,
+}
+
+const AppAnalyticsChatRouteWithChildren =
+  AppAnalyticsChatRoute._addFileChildren(AppAnalyticsChatRouteChildren)
+
 interface AppWhatsappCampanhasRouteChildren {
   AppWhatsappCampanhasIdRoute: typeof AppWhatsappCampanhasIdRoute
 }
@@ -529,7 +560,7 @@ const AppWhatsappRouteWithChildren = AppWhatsappRoute._addFileChildren(
 )
 
 interface AppRouteChildren {
-  AppAnalyticsChatRoute: typeof AppAnalyticsChatRoute
+  AppAnalyticsChatRoute: typeof AppAnalyticsChatRouteWithChildren
   AppConfiguracoesRoute: typeof AppConfiguracoesRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppKanbanRoute: typeof AppKanbanRoute
@@ -541,7 +572,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppAnalyticsChatRoute: AppAnalyticsChatRoute,
+  AppAnalyticsChatRoute: AppAnalyticsChatRouteWithChildren,
   AppConfiguracoesRoute: AppConfiguracoesRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppKanbanRoute: AppKanbanRoute,
