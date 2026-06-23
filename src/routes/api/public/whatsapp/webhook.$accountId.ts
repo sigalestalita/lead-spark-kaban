@@ -8,6 +8,28 @@ import { createFileRoute } from "@tanstack/react-router";
 export const Route = createFileRoute("/api/public/whatsapp/webhook/$accountId")({
   server: {
     handlers: {
+      GET: async ({ request, params }) => {
+        // Verificação inicial do webhook Meta Cloud:
+        //   GET ?hub.mode=subscribe&hub.verify_token=...&hub.challenge=...
+        const url = new URL(request.url);
+        const mode = url.searchParams.get("hub.mode");
+        const token = url.searchParams.get("hub.verify_token");
+        const challenge = url.searchParams.get("hub.challenge");
+        if (mode !== "subscribe" || !token || !challenge) {
+          return new Response("bad request", { status: 400 });
+        }
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data: account } = await supabaseAdmin
+          .from("whatsapp_accounts")
+          .select("metadata")
+          .eq("id", params.accountId)
+          .maybeSingle();
+        const expected = (account?.metadata as { verify_token?: string } | null)?.verify_token;
+        if (!expected || token !== expected) {
+          return new Response("forbidden", { status: 403 });
+        }
+        return new Response(challenge, { status: 200, headers: { "Content-Type": "text/plain" } });
+      },
       POST: async ({ request, params }) => {
         const accountId = params.accountId;
         const rawBody = await request.text();
