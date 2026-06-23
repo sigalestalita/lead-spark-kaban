@@ -13,8 +13,7 @@ const AudienceFilters = z
   })
   .default({});
 type AudienceFiltersT = z.infer<typeof AudienceFilters>;
-
-type _AudienceFiltersT = AudienceFiltersT;
+export type CampaignAudienceFilters = AudienceFiltersT;
 
 /** Lista campanhas com contagem de mensagens. */
 export const listCampaigns = createServerFn({ method: "GET" })
