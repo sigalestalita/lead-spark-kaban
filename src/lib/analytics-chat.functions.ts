@@ -376,8 +376,9 @@ export const sendMessage = createServerFn({ method: "POST" })
     const messages: ChatMsg[] = [{ role: "system", content: SYSTEM }];
     for (const m of ordered) {
       if (m.role === "assistant" && m.tool_calls) {
-        messages.push({ role: "assistant", content: m.content || null, tool_calls: m.tool_calls });
-        const results = (m.tool_results as Array<{ id: string; name: string; result: unknown }>) ?? [];
+        const tc = m.tool_calls as unknown as ChatMsg["tool_calls"];
+        messages.push({ role: "assistant", content: m.content || null, tool_calls: tc });
+        const results = (m.tool_results as unknown as Array<{ id: string; name: string; result: unknown }>) ?? [];
         for (const r of results) {
           messages.push({
             role: "tool",
@@ -441,14 +442,14 @@ export const sendMessage = createServerFn({ method: "POST" })
         user_id: userId,
         role: "assistant",
         content: finalContent || "(sem resposta)",
-        tool_calls: pendingToolCalls ?? null,
-        tool_results: pendingToolResults.length ? pendingToolResults : null,
+        tool_calls: (pendingToolCalls ?? null) as never,
+        tool_results: (pendingToolResults.length ? pendingToolResults : null) as never,
       })
       .select("id")
       .single();
 
     // Atualiza updated_at e título se ainda for default
-    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    const patch: { updated_at: string; title?: string } = { updated_at: new Date().toISOString() };
     if (thread.title === "Nova conversa") {
       patch.title = data.content.slice(0, 60);
     }
