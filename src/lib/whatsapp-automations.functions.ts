@@ -85,7 +85,14 @@ export const updateAutomationRule = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { id, triggerType, triggerConfig, templateId, delayMinutes, ...rest } = data;
-    const patch: Record<string, unknown> = { ...rest };
+    const patch: {
+      name?: string;
+      active?: boolean;
+      trigger_type?: string;
+      trigger_config?: z.infer<typeof TriggerConfig>;
+      template_id?: string;
+      delay_minutes?: number;
+    } = { ...rest };
     if (triggerType !== undefined) patch.trigger_type = triggerType;
     if (triggerConfig !== undefined) patch.trigger_config = triggerConfig;
     if (templateId !== undefined) patch.template_id = templateId;
