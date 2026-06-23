@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, Link, useRouterState } from "@tanstack/react-router";
-import { MessageCircle, FileText, Megaphone } from "lucide-react";
+import { MessageCircle, FileText, Megaphone, Zap } from "lucide-react";
 
 export const Route = createFileRoute("/_app/whatsapp")({
   component: WhatsappLayout,
@@ -12,6 +12,7 @@ function WhatsappLayout() {
     { to: "/whatsapp", label: "Inbox", icon: MessageCircle, exact: true },
     { to: "/whatsapp/templates", label: "Templates", icon: FileText, exact: false },
     { to: "/whatsapp/campanhas", label: "Campanhas", icon: Megaphone, exact: false },
+    { to: "/whatsapp/automacoes", label: "Automações", icon: Zap, exact: false },
   ];
 
   return (

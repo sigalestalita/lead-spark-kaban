@@ -21,12 +21,14 @@ import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoe
 import { Route as AppWhatsappIndexRouteImport } from './routes/_app.whatsapp.index'
 import { Route as AppWhatsappTemplatesRouteImport } from './routes/_app.whatsapp.templates'
 import { Route as AppWhatsappCampanhasRouteImport } from './routes/_app.whatsapp.campanhas'
+import { Route as AppWhatsappAutomacoesRouteImport } from './routes/_app.whatsapp.automacoes'
 import { Route as AppLeadIdRouteImport } from './routes/_app.lead.$id'
 import { Route as ApiPublicRdCallbackRouteImport } from './routes/api/public/rd/callback'
 import { Route as ApiPublicHooksSyncRdRouteImport } from './routes/api/public/hooks/sync-rd'
 import { Route as ApiPublicHooksSendWeeklyDigestRouteImport } from './routes/api/public/hooks/send-weekly-digest'
 import { Route as AppWhatsappCampanhasIdRouteImport } from './routes/_app.whatsapp.campanhas.$id'
 import { Route as ApiPublicWhatsappWebhookAccountIdRouteImport } from './routes/api/public/whatsapp/webhook.$accountId'
+import { Route as ApiPublicWhatsappAutomationsTickRouteImport } from './routes/api/public/whatsapp/automations.tick'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -87,6 +89,11 @@ const AppWhatsappCampanhasRoute = AppWhatsappCampanhasRouteImport.update({
   path: '/campanhas',
   getParentRoute: () => AppWhatsappRoute,
 } as any)
+const AppWhatsappAutomacoesRoute = AppWhatsappAutomacoesRouteImport.update({
+  id: '/automacoes',
+  path: '/automacoes',
+  getParentRoute: () => AppWhatsappRoute,
+} as any)
 const AppLeadIdRoute = AppLeadIdRouteImport.update({
   id: '/lead/$id',
   path: '/lead/$id',
@@ -119,6 +126,12 @@ const ApiPublicWhatsappWebhookAccountIdRoute =
     path: '/api/public/whatsapp/webhook/$accountId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicWhatsappAutomationsTickRoute =
+  ApiPublicWhatsappAutomationsTickRouteImport.update({
+    id: '/api/public/whatsapp/automations/tick',
+    path: '/api/public/whatsapp/automations/tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -130,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/usuarios': typeof AppUsuariosRoute
   '/whatsapp': typeof AppWhatsappRouteWithChildren
   '/lead/$id': typeof AppLeadIdRoute
+  '/whatsapp/automacoes': typeof AppWhatsappAutomacoesRoute
   '/whatsapp/campanhas': typeof AppWhatsappCampanhasRouteWithChildren
   '/whatsapp/templates': typeof AppWhatsappTemplatesRoute
   '/whatsapp/': typeof AppWhatsappIndexRoute
@@ -137,6 +151,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
   '/api/public/rd/callback': typeof ApiPublicRdCallbackRoute
+  '/api/public/whatsapp/automations/tick': typeof ApiPublicWhatsappAutomationsTickRoute
   '/api/public/whatsapp/webhook/$accountId': typeof ApiPublicWhatsappWebhookAccountIdRoute
 }
 export interface FileRoutesByTo {
@@ -148,6 +163,7 @@ export interface FileRoutesByTo {
   '/novidades': typeof AppNovidadesRoute
   '/usuarios': typeof AppUsuariosRoute
   '/lead/$id': typeof AppLeadIdRoute
+  '/whatsapp/automacoes': typeof AppWhatsappAutomacoesRoute
   '/whatsapp/campanhas': typeof AppWhatsappCampanhasRouteWithChildren
   '/whatsapp/templates': typeof AppWhatsappTemplatesRoute
   '/whatsapp': typeof AppWhatsappIndexRoute
@@ -155,6 +171,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
   '/api/public/rd/callback': typeof ApiPublicRdCallbackRoute
+  '/api/public/whatsapp/automations/tick': typeof ApiPublicWhatsappAutomationsTickRoute
   '/api/public/whatsapp/webhook/$accountId': typeof ApiPublicWhatsappWebhookAccountIdRoute
 }
 export interface FileRoutesById {
@@ -169,6 +186,7 @@ export interface FileRoutesById {
   '/_app/usuarios': typeof AppUsuariosRoute
   '/_app/whatsapp': typeof AppWhatsappRouteWithChildren
   '/_app/lead/$id': typeof AppLeadIdRoute
+  '/_app/whatsapp/automacoes': typeof AppWhatsappAutomacoesRoute
   '/_app/whatsapp/campanhas': typeof AppWhatsappCampanhasRouteWithChildren
   '/_app/whatsapp/templates': typeof AppWhatsappTemplatesRoute
   '/_app/whatsapp/': typeof AppWhatsappIndexRoute
@@ -176,6 +194,7 @@ export interface FileRoutesById {
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
   '/api/public/rd/callback': typeof ApiPublicRdCallbackRoute
+  '/api/public/whatsapp/automations/tick': typeof ApiPublicWhatsappAutomationsTickRoute
   '/api/public/whatsapp/webhook/$accountId': typeof ApiPublicWhatsappWebhookAccountIdRoute
 }
 export interface FileRouteTypes {
@@ -190,6 +209,7 @@ export interface FileRouteTypes {
     | '/usuarios'
     | '/whatsapp'
     | '/lead/$id'
+    | '/whatsapp/automacoes'
     | '/whatsapp/campanhas'
     | '/whatsapp/templates'
     | '/whatsapp/'
@@ -197,6 +217,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
     | '/api/public/rd/callback'
+    | '/api/public/whatsapp/automations/tick'
     | '/api/public/whatsapp/webhook/$accountId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -208,6 +229,7 @@ export interface FileRouteTypes {
     | '/novidades'
     | '/usuarios'
     | '/lead/$id'
+    | '/whatsapp/automacoes'
     | '/whatsapp/campanhas'
     | '/whatsapp/templates'
     | '/whatsapp'
@@ -215,6 +237,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
     | '/api/public/rd/callback'
+    | '/api/public/whatsapp/automations/tick'
     | '/api/public/whatsapp/webhook/$accountId'
   id:
     | '__root__'
@@ -228,6 +251,7 @@ export interface FileRouteTypes {
     | '/_app/usuarios'
     | '/_app/whatsapp'
     | '/_app/lead/$id'
+    | '/_app/whatsapp/automacoes'
     | '/_app/whatsapp/campanhas'
     | '/_app/whatsapp/templates'
     | '/_app/whatsapp/'
@@ -235,6 +259,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
     | '/api/public/rd/callback'
+    | '/api/public/whatsapp/automations/tick'
     | '/api/public/whatsapp/webhook/$accountId'
   fileRoutesById: FileRoutesById
 }
@@ -245,6 +270,7 @@ export interface RootRouteChildren {
   ApiPublicHooksSendWeeklyDigestRoute: typeof ApiPublicHooksSendWeeklyDigestRoute
   ApiPublicHooksSyncRdRoute: typeof ApiPublicHooksSyncRdRoute
   ApiPublicRdCallbackRoute: typeof ApiPublicRdCallbackRoute
+  ApiPublicWhatsappAutomationsTickRoute: typeof ApiPublicWhatsappAutomationsTickRoute
   ApiPublicWhatsappWebhookAccountIdRoute: typeof ApiPublicWhatsappWebhookAccountIdRoute
 }
 
@@ -334,6 +360,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppWhatsappCampanhasRouteImport
       parentRoute: typeof AppWhatsappRoute
     }
+    '/_app/whatsapp/automacoes': {
+      id: '/_app/whatsapp/automacoes'
+      path: '/automacoes'
+      fullPath: '/whatsapp/automacoes'
+      preLoaderRoute: typeof AppWhatsappAutomacoesRouteImport
+      parentRoute: typeof AppWhatsappRoute
+    }
     '/_app/lead/$id': {
       id: '/_app/lead/$id'
       path: '/lead/$id'
@@ -376,6 +409,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWhatsappWebhookAccountIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/whatsapp/automations/tick': {
+      id: '/api/public/whatsapp/automations/tick'
+      path: '/api/public/whatsapp/automations/tick'
+      fullPath: '/api/public/whatsapp/automations/tick'
+      preLoaderRoute: typeof ApiPublicWhatsappAutomationsTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -391,12 +431,14 @@ const AppWhatsappCampanhasRouteWithChildren =
   AppWhatsappCampanhasRoute._addFileChildren(AppWhatsappCampanhasRouteChildren)
 
 interface AppWhatsappRouteChildren {
+  AppWhatsappAutomacoesRoute: typeof AppWhatsappAutomacoesRoute
   AppWhatsappCampanhasRoute: typeof AppWhatsappCampanhasRouteWithChildren
   AppWhatsappTemplatesRoute: typeof AppWhatsappTemplatesRoute
   AppWhatsappIndexRoute: typeof AppWhatsappIndexRoute
 }
 
 const AppWhatsappRouteChildren: AppWhatsappRouteChildren = {
+  AppWhatsappAutomacoesRoute: AppWhatsappAutomacoesRoute,
   AppWhatsappCampanhasRoute: AppWhatsappCampanhasRouteWithChildren,
   AppWhatsappTemplatesRoute: AppWhatsappTemplatesRoute,
   AppWhatsappIndexRoute: AppWhatsappIndexRoute,
@@ -435,6 +477,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksSendWeeklyDigestRoute: ApiPublicHooksSendWeeklyDigestRoute,
   ApiPublicHooksSyncRdRoute: ApiPublicHooksSyncRdRoute,
   ApiPublicRdCallbackRoute: ApiPublicRdCallbackRoute,
+  ApiPublicWhatsappAutomationsTickRoute: ApiPublicWhatsappAutomationsTickRoute,
   ApiPublicWhatsappWebhookAccountIdRoute:
     ApiPublicWhatsappWebhookAccountIdRoute,
 }
