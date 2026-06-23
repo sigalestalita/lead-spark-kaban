@@ -20,6 +20,7 @@ import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppWhatsappIndexRouteImport } from './routes/_app.whatsapp.index'
 import { Route as AppWhatsappTemplatesRouteImport } from './routes/_app.whatsapp.templates'
+import { Route as AppWhatsappCampanhasRouteImport } from './routes/_app.whatsapp.campanhas'
 import { Route as AppLeadIdRouteImport } from './routes/_app.lead.$id'
 import { Route as ApiPublicRdCallbackRouteImport } from './routes/api/public/rd/callback'
 import { Route as ApiPublicHooksSyncRdRouteImport } from './routes/api/public/hooks/sync-rd'
@@ -80,6 +81,11 @@ const AppWhatsappTemplatesRoute = AppWhatsappTemplatesRouteImport.update({
   path: '/templates',
   getParentRoute: () => AppWhatsappRoute,
 } as any)
+const AppWhatsappCampanhasRoute = AppWhatsappCampanhasRouteImport.update({
+  id: '/campanhas',
+  path: '/campanhas',
+  getParentRoute: () => AppWhatsappRoute,
+} as any)
 const AppLeadIdRoute = AppLeadIdRouteImport.update({
   id: '/lead/$id',
   path: '/lead/$id',
@@ -118,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/usuarios': typeof AppUsuariosRoute
   '/whatsapp': typeof AppWhatsappRouteWithChildren
   '/lead/$id': typeof AppLeadIdRoute
+  '/whatsapp/campanhas': typeof AppWhatsappCampanhasRoute
   '/whatsapp/templates': typeof AppWhatsappTemplatesRoute
   '/whatsapp/': typeof AppWhatsappIndexRoute
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
@@ -134,6 +141,7 @@ export interface FileRoutesByTo {
   '/novidades': typeof AppNovidadesRoute
   '/usuarios': typeof AppUsuariosRoute
   '/lead/$id': typeof AppLeadIdRoute
+  '/whatsapp/campanhas': typeof AppWhatsappCampanhasRoute
   '/whatsapp/templates': typeof AppWhatsappTemplatesRoute
   '/whatsapp': typeof AppWhatsappIndexRoute
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
@@ -153,6 +161,7 @@ export interface FileRoutesById {
   '/_app/usuarios': typeof AppUsuariosRoute
   '/_app/whatsapp': typeof AppWhatsappRouteWithChildren
   '/_app/lead/$id': typeof AppLeadIdRoute
+  '/_app/whatsapp/campanhas': typeof AppWhatsappCampanhasRoute
   '/_app/whatsapp/templates': typeof AppWhatsappTemplatesRoute
   '/_app/whatsapp/': typeof AppWhatsappIndexRoute
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
@@ -172,6 +181,7 @@ export interface FileRouteTypes {
     | '/usuarios'
     | '/whatsapp'
     | '/lead/$id'
+    | '/whatsapp/campanhas'
     | '/whatsapp/templates'
     | '/whatsapp/'
     | '/api/public/hooks/send-weekly-digest'
@@ -188,6 +198,7 @@ export interface FileRouteTypes {
     | '/novidades'
     | '/usuarios'
     | '/lead/$id'
+    | '/whatsapp/campanhas'
     | '/whatsapp/templates'
     | '/whatsapp'
     | '/api/public/hooks/send-weekly-digest'
@@ -206,6 +217,7 @@ export interface FileRouteTypes {
     | '/_app/usuarios'
     | '/_app/whatsapp'
     | '/_app/lead/$id'
+    | '/_app/whatsapp/campanhas'
     | '/_app/whatsapp/templates'
     | '/_app/whatsapp/'
     | '/api/public/hooks/send-weekly-digest'
@@ -303,6 +315,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppWhatsappTemplatesRouteImport
       parentRoute: typeof AppWhatsappRoute
     }
+    '/_app/whatsapp/campanhas': {
+      id: '/_app/whatsapp/campanhas'
+      path: '/campanhas'
+      fullPath: '/whatsapp/campanhas'
+      preLoaderRoute: typeof AppWhatsappCampanhasRouteImport
+      parentRoute: typeof AppWhatsappRoute
+    }
     '/_app/lead/$id': {
       id: '/_app/lead/$id'
       path: '/lead/$id'
@@ -342,11 +361,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppWhatsappRouteChildren {
+  AppWhatsappCampanhasRoute: typeof AppWhatsappCampanhasRoute
   AppWhatsappTemplatesRoute: typeof AppWhatsappTemplatesRoute
   AppWhatsappIndexRoute: typeof AppWhatsappIndexRoute
 }
 
 const AppWhatsappRouteChildren: AppWhatsappRouteChildren = {
+  AppWhatsappCampanhasRoute: AppWhatsappCampanhasRoute,
   AppWhatsappTemplatesRoute: AppWhatsappTemplatesRoute,
   AppWhatsappIndexRoute: AppWhatsappIndexRoute,
 }
