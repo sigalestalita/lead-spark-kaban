@@ -29,13 +29,24 @@ export const getWhatsappMetrics = createServerFn({ method: "GET" })
     // --- mensagens no período ---
     const { data: msgs, error: mErr } = await supabase
       .from("whatsapp_messages")
-      .select("id, conversation_id, sender_type, status, created_at, sent_at, delivered_at, read_at, sdr_user_id, campaign_id")
+      .select("id, conversation_id, sender_type, status, created_at, sent_at, delivered_at, read_at, sender_user_id")
       .gte("created_at", fromISO)
       .lte("created_at", toISO)
       .limit(20000);
     if (mErr) throw new Error(mErr.message);
 
-    const messages = msgs ?? [];
+    type Msg = {
+      id: string;
+      conversation_id: string;
+      sender_type: string;
+      status: string;
+      created_at: string;
+      sent_at: string | null;
+      delivered_at: string | null;
+      read_at: string | null;
+      sender_user_id: string | null;
+    };
+    const messages = (msgs ?? []) as Msg[];
     const outbound = messages.filter((m) => m.sender_type === "sdr" || m.sender_type === "bot");
     const inbound = messages.filter((m) => m.sender_type === "lead");
 
@@ -83,7 +94,7 @@ export const getWhatsappMetrics = createServerFn({ method: "GET" })
 
     // --- tempo médio de primeira resposta do SDR (por conversa) ---
     // Agrupa mensagens por conversa; pra cada msg de lead, mede até a próxima outbound.
-    const byConv = new Map<string, typeof messages>();
+    const byConv = new Map<string, Msg[]>();
     for (const m of messages) {
       const arr = byConv.get(m.conversation_id) ?? [];
       arr.push(m);
@@ -112,7 +123,7 @@ export const getWhatsappMetrics = createServerFn({ method: "GET" })
     // --- por SDR ---
     const sdrMap = new Map<string, { sent: number; received: number; conversations: number; quente: number }>();
     for (const m of outbound) {
-      const id = (m.sdr_user_id as string | null) ?? "—";
+      const id = m.sender_user_id ?? "—";
       const e = sdrMap.get(id) ?? { sent: 0, received: 0, conversations: 0, quente: 0 };
       e.sent += 1;
       sdrMap.set(id, e);
