@@ -96,7 +96,7 @@ function WhatsappInbox() {
               </p>
             )}
             {conversations.map((c) => {
-              const lead = c.leads as { id: string; name: string | null; company: string | null } | null;
+              const lead = c.leads as { id: string; name: string | null; company_name: string | null } | null;
               const isSel = c.id === selected;
               return (
                 <button
@@ -116,8 +116,8 @@ function WhatsappInbox() {
                       </Badge>
                     )}
                   </div>
-                  {lead?.company && (
-                    <p className="text-xs text-muted-foreground truncate">{lead.company}</p>
+                  {lead?.company_name && (
+                    <p className="text-xs text-muted-foreground truncate">{lead.company_name}</p>
                   )}
                   <p className="text-xs text-muted-foreground truncate mt-1">
                     {c.last_preview ?? "—"}
@@ -151,13 +151,13 @@ function WhatsappInbox() {
                     {(selectedConv.leads as { name?: string | null } | null)?.name ?? "Sem nome"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {(selectedConv.leads as { company?: string | null } | null)?.company ?? ""}
+                    {(selectedConv.leads as { company_name?: string | null } | null)?.company_name ?? ""}
                   </p>
                 </div>
-                {(selectedConv.leads as { id?: string } | null)?.id && (
+                {(selectedConv.leads as unknown as { id?: string } | null)?.id && (
                   <Link
                     to="/lead/$id"
-                    params={{ id: (selectedConv.leads as { id: string }).id }}
+                    params={{ id: (selectedConv.leads as unknown as { id: string }).id }}
                     className="text-xs text-primary hover:underline flex items-center gap-1"
                   >
                     Abrir lead <ExternalLink className="h-3 w-3" />

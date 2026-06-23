@@ -25,7 +25,7 @@ export const listConversations = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     let q = supabase
       .from("whatsapp_conversations")
-      .select("*, leads:lead_id(id,name,company,email,phone,priority,stage_id,assigned_to)")
+      .select("*, leads:lead_id(id,name,company_name,email,phone,priority,stage_id,assigned_to)")
       .order("last_message_at", { ascending: false, nullsFirst: false })
       .limit(300);
     if (data?.status && data.status !== "all") q = q.eq("status", data.status);
@@ -38,10 +38,10 @@ export const listConversations = createServerFn({ method: "GET" })
     if (data?.search) {
       const s = data.search.toLowerCase();
       result = result.filter((r) => {
-        const lead = r.leads as { name?: string | null; company?: string | null } | null;
+        const lead = r.leads as { name?: string | null; company_name?: string | null } | null;
         return (
           lead?.name?.toLowerCase().includes(s) ||
-          lead?.company?.toLowerCase().includes(s) ||
+          lead?.company_name?.toLowerCase().includes(s) ||
           r.last_preview?.toLowerCase().includes(s)
         );
       });
