@@ -38,22 +38,84 @@ async function loadContext(
 ) {
   const { data: conv, error: cErr } = await supabase
     .from("whatsapp_conversations")
-    .select("*, leads(id,name,company_name,position,company_segment,stage_id,priority,demo_free,lead_type,assigned_to,phone,email)")
+    .select(
+      "*, leads(id,name,company_name,position,company_segment,company_size,company_website,stage_id,priority,score,demo_free,lead_type,assigned_to,phone,email,linkedin_url)",
+    )
     .eq("id", conversationId)
     .maybeSingle();
   if (cErr) throw new Error(cErr.message);
   if (!conv) throw new Error("Conversa não encontrada");
 
-  const { data: msgs, error: mErr } = await supabase
-    .from("whatsapp_messages")
-    .select("sender_type, message_type, body, created_at")
-    .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  if (mErr) throw new Error(mErr.message);
+  const leadId = (conv as { lead_id?: string }).lead_id;
+  const stageId = (conv as { leads?: { stage_id?: string | null } }).leads?.stage_id ?? null;
+  const [msgsRes, notesRes, stageRes, icpRes] = await Promise.all([
+    supabase
+      .from("whatsapp_messages")
+      .select("sender_type, message_type, body, created_at")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: false })
+      .limit(limit),
+    leadId
+      ? supabase
+          .from("lead_notes")
+          .select("content, created_at")
+          .eq("lead_id", leadId)
+          .order("created_at", { ascending: false })
+          .limit(5)
+      : Promise.resolve({ data: [], error: null }),
+    stageId
+      ? supabase.from("stages").select("name, slug").eq("id", stageId).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    supabase.from("icp_config").select("rules").eq("is_active", true).maybeSingle(),
+  ]);
+  if (msgsRes.error) throw new Error(msgsRes.error.message);
 
-  const messages = (msgs ?? []).slice().reverse();
-  return { conv, messages };
+  const messages = (msgsRes.data ?? []).slice().reverse();
+  return {
+    conv,
+    messages,
+    notes: (notesRes.data ?? []) as Array<{ content: string; created_at: string }>,
+    stage: (stageRes.data ?? null) as { name: string; slug: string } | null,
+    icp: (icpRes.data?.rules ?? null) as Record<string, unknown> | null,
+  };
+}
+
+function leadBrief(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  lead: any,
+  stage: { name: string; slug: string } | null,
+  notes: Array<{ content: string; created_at: string }>,
+  icp: Record<string, unknown> | null,
+) {
+  const lines: string[] = [];
+  lines.push(
+    `Lead: ${JSON.stringify({
+      nome: lead?.name,
+      cargo: lead?.position,
+      empresa: lead?.company_name,
+      segmento: lead?.company_segment,
+      tamanho: lead?.company_size,
+      site: lead?.company_website,
+      prioridade: lead?.priority,
+      score: lead?.score,
+      tipo: lead?.lead_type,
+      etapa_funil: stage?.name,
+    })}`,
+  );
+  if (notes.length > 0) {
+    lines.push(
+      `Observações internas do CRM (mais recentes primeiro):\n` +
+        notes
+          .map((n) => `- (${new Date(n.created_at).toLocaleDateString("pt-BR")}) ${n.content}`)
+          .join("\n"),
+    );
+  }
+  if (icp && Object.keys(icp).length > 0) {
+    lines.push(
+      `ICP da operação (referência interna de fit — não cite ao lead): ${JSON.stringify(icp).slice(0, 800)}`,
+    );
+  }
+  return lines.join("\n\n");
 }
 
 function transcript(messages: Array<{ sender_type: string; message_type: string; body: string | null; created_at: string }>) {
@@ -67,16 +129,27 @@ function transcript(messages: Array<{ sender_type: string; message_type: string;
     .join("\n");
 }
 
-const SYSTEM_BASE =
-  "Você é um assistente de pré-vendas B2B brasileiro. Sua função é ajudar SDRs a qualificarem e responderem leads via WhatsApp. " +
-  "Tom: humano, direto, cordial, sem jargão. Português do Brasil. Sem emojis salvo se o lead usar primeiro.";
+const SYSTEM_BASE = [
+  "Você é um SDR sênior B2B brasileiro, especialista em prospecção outbound consultiva e qualificação via WhatsApp.",
+  "Domina e aplica naturalmente: SPIN Selling (Situação, Problema, Implicação, Necessidade-Solução), MEDDIC (Métricas, Decisor, Critério, Processo, Dor, Champion), Challenger Sale e tratamento de objeções (acolher → reformular → prova → reabrir).",
+  "Objetivo PRIMÁRIO: agendar reunião/demo com o decisor. Cada mensagem move o lead 1 passo no funil.",
+  "Princípios:",
+  "1) Foco em DOR e IMPACTO mensurável (receita, custo, tempo, risco) — nunca em features soltas.",
+  "2) Personalize por cargo, segmento, tamanho e sinais observados. Não invente fatos.",
+  "3) Mensagens curtas (2-5 linhas, máx. 600 caracteres), 1 ideia por mensagem, sempre terminando em UMA pergunta aberta OU CTA específico (data/horário, link de agenda).",
+  "4) Tom humano, direto, consultivo. Sem 'tudo bem?', sem 'espero que esteja bem', sem jargão, sem CAIXA ALTA, sem promessas irreais. Português do Brasil.",
+  "5) Sem emojis a menos que o lead use primeiro.",
+  "6) Objeções: acolha, reformule a dor, traga prova social/dado curto, reabra com pergunta. Nunca rebata de frente.",
+  "7) Lead frio/sem resposta: use quebra-padrão baseada no segmento OU ofereça opt-out educado para gerar resposta.",
+  "8) Respeite estágio do funil e histórico. Após muitos follow-ups sem resposta, sugira encerrar com elegância.",
+].join(" ");
 
 /** Gera resumo curto da conversa e persiste em whatsapp_conversations.ai_summary. */
 export const summarizeConversation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ conversationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { conv, messages } = await loadContext(context.supabase, data.conversationId, 60);
+    const { conv, messages, notes, stage, icp } = await loadContext(context.supabase, data.conversationId, 60);
     if (messages.length === 0) return { summary: "Conversa ainda sem mensagens." };
 
     const lead = (conv.leads ?? {}) as Record<string, unknown>;
@@ -86,9 +159,9 @@ export const summarizeConversation = createServerFn({ method: "POST" })
         role: "user",
         content:
           `Resuma esta conversa de WhatsApp em até 6 bullets curtos (máx. 1 linha cada). ` +
-          `Cubra: contexto do lead, principais dúvidas/objeções, próximos passos sugeridos. ` +
+          `Cubra: contexto do lead, dor identificada, objeções, sinais de compra, fit com ICP, próximo passo recomendado. ` +
           `Não invente fatos.\n\n` +
-          `Lead: ${JSON.stringify({ nome: lead.name, empresa: lead.company_name, cargo: lead.position, segmento: lead.company_segment })}\n\n` +
+          `${leadBrief(lead, stage, notes, icp)}\n\n` +
           `Conversa:\n${transcript(messages)}`,
       },
     ]);
@@ -115,22 +188,20 @@ export const suggestReply = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { conv, messages } = await loadContext(context.supabase, data.conversationId, 30);
+    const { conv, messages, notes, stage, icp } = await loadContext(context.supabase, data.conversationId, 30);
     const lead = (conv.leads ?? {}) as Record<string, unknown>;
     const result = await callAI([
       { role: "system", content: SYSTEM_BASE },
       {
         role: "user",
         content:
-          `Sugira a PRÓXIMA mensagem do SDR para este lead. Regras: ` +
-          `1) Curta (2-5 linhas), 2) Personalizada com base na conversa, ` +
-          `3) Termine com 1 pergunta clara OU um CTA específico, ` +
-          `4) Não use saudações genéricas se a conversa já está em andamento, ` +
-          `5) Não invente dados que não estão na conversa.\n\n` +
+          `Sugira a PRÓXIMA mensagem que o SDR deve enviar para maximizar conversão (resposta + avanço de funil). ` +
+          `Aplique SPIN/MEDDIC implicitamente: identifique a dor mais provável do cargo/segmento, conecte a um impacto mensurável e termine com 1 pergunta aberta OU CTA claro (ex: "terça 15h ou quinta 10h?"). ` +
+          `Não use saudações genéricas se a conversa já está em andamento. Não invente dados.\n\n` +
           (data.instructions ? `Direção adicional do SDR: ${data.instructions}\n\n` : "") +
-          `Lead: ${JSON.stringify({ nome: lead.name, empresa: lead.company_name, cargo: lead.position })}\n\n` +
+          `${leadBrief(lead, stage, notes, icp)}\n\n` +
           `Conversa:\n${transcript(messages)}\n\n` +
-          `Responda APENAS com o texto da mensagem sugerida, sem aspas, sem prefixos.`,
+          `Responda APENAS com o texto da mensagem, sem aspas, sem prefixos, sem assinatura.`,
       },
     ]);
     const reply = result.choices?.[0]?.message?.content?.trim() ?? "";
@@ -143,7 +214,7 @@ export const classifyTemperature = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ conversationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { conv, messages } = await loadContext(context.supabase, data.conversationId, 40);
+    const { conv, messages, notes, stage, icp } = await loadContext(context.supabase, data.conversationId, 40);
     if (messages.length === 0) throw new Error("Sem mensagens para classificar");
 
     const tool = {
@@ -188,8 +259,8 @@ export const classifyTemperature = createServerFn({ method: "POST" })
         {
           role: "user",
           content:
-            `Classifique a temperatura comercial deste lead com base na conversa.\n\n` +
-            `Lead: ${JSON.stringify({ nome: lead.name, empresa: lead.company_name, cargo: lead.position, segmento: lead.company_segment, prioridade: lead.priority })}\n\n` +
+            `Classifique a temperatura comercial deste lead com base nos sinais concretos da conversa e no fit com o ICP.\n\n` +
+            `${leadBrief(lead, stage, notes, icp)}\n\n` +
             `Conversa:\n${transcript(messages)}`,
         },
       ],
