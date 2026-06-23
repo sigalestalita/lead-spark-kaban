@@ -770,6 +770,8 @@ export type Database = {
       whatsapp_conversations: {
         Row: {
           account_id: string | null
+          ai_summary: string | null
+          ai_summary_at: string | null
           assigned_user_id: string | null
           contact_id: string | null
           created_at: string
@@ -778,11 +780,16 @@ export type Database = {
           last_preview: string | null
           lead_id: string
           status: string
+          temperature: string | null
+          temperature_at: string | null
+          temperature_reason: string | null
           unread_count: number
           updated_at: string
         }
         Insert: {
           account_id?: string | null
+          ai_summary?: string | null
+          ai_summary_at?: string | null
           assigned_user_id?: string | null
           contact_id?: string | null
           created_at?: string
@@ -791,11 +798,16 @@ export type Database = {
           last_preview?: string | null
           lead_id: string
           status?: string
+          temperature?: string | null
+          temperature_at?: string | null
+          temperature_reason?: string | null
           unread_count?: number
           updated_at?: string
         }
         Update: {
           account_id?: string | null
+          ai_summary?: string | null
+          ai_summary_at?: string | null
           assigned_user_id?: string | null
           contact_id?: string | null
           created_at?: string
@@ -804,6 +816,9 @@ export type Database = {
           last_preview?: string | null
           lead_id?: string
           status?: string
+          temperature?: string | null
+          temperature_at?: string | null
+          temperature_reason?: string | null
           unread_count?: number
           updated_at?: string
         }

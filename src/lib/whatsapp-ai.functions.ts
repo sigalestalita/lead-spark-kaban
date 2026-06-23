@@ -1,0 +1,231 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const MODEL = "google/gemini-2.5-flash";
+
+async function callAI(messages: Array<{ role: string; content: string }>, tool?: unknown) {
+  const key = process.env.LOVABLE_API_KEY;
+  if (!key) throw new Error("LOVABLE_API_KEY ausente");
+  const body: Record<string, unknown> = { model: MODEL, messages };
+  if (tool) {
+    body.tools = [tool];
+    body.tool_choice = {
+      type: "function",
+      function: { name: (tool as { function: { name: string } }).function.name },
+    };
+  }
+  const res = await fetch(GATEWAY, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 429) throw new Error("Rate limit atingido. Tente novamente em alguns segundos.");
+  if (res.status === 402) throw new Error("Créditos de IA esgotados. Adicione créditos em Settings → Workspace → Usage.");
+  if (!res.ok) throw new Error(`AI gateway ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return res.json() as Promise<{
+    choices: Array<{ message: { content?: string; tool_calls?: Array<{ function: { arguments: string } }> } }>;
+  }>;
+}
+
+/** Carrega conversa + últimas N mensagens + dados do lead. */
+async function loadContext(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  conversationId: string,
+  limit = 40,
+) {
+  const { data: conv, error: cErr } = await supabase
+    .from("whatsapp_conversations")
+    .select("*, leads(id,name,company_name,position,company_segment,stage_id,priority,demo_free,lead_type,assigned_to,phone,email)")
+    .eq("id", conversationId)
+    .maybeSingle();
+  if (cErr) throw new Error(cErr.message);
+  if (!conv) throw new Error("Conversa não encontrada");
+
+  const { data: msgs, error: mErr } = await supabase
+    .from("whatsapp_messages")
+    .select("sender_type, message_type, body, created_at")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (mErr) throw new Error(mErr.message);
+
+  const messages = (msgs ?? []).slice().reverse();
+  return { conv, messages };
+}
+
+function transcript(messages: Array<{ sender_type: string; message_type: string; body: string | null; created_at: string }>) {
+  return messages
+    .map((m) => {
+      const who = m.sender_type === "lead" ? "Lead" : m.sender_type === "sdr" ? "SDR" : m.sender_type === "bot" ? "Bot" : m.sender_type;
+      const ts = new Date(m.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+      const body = m.body?.trim() || `[${m.message_type}]`;
+      return `[${ts}] ${who}: ${body}`;
+    })
+    .join("\n");
+}
+
+const SYSTEM_BASE =
+  "Você é um assistente de pré-vendas B2B brasileiro. Sua função é ajudar SDRs a qualificarem e responderem leads via WhatsApp. " +
+  "Tom: humano, direto, cordial, sem jargão. Português do Brasil. Sem emojis salvo se o lead usar primeiro.";
+
+/** Gera resumo curto da conversa e persiste em whatsapp_conversations.ai_summary. */
+export const summarizeConversation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ conversationId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { conv, messages } = await loadContext(context.supabase, data.conversationId, 60);
+    if (messages.length === 0) return { summary: "Conversa ainda sem mensagens." };
+
+    const lead = (conv.leads ?? {}) as Record<string, unknown>;
+    const result = await callAI([
+      { role: "system", content: SYSTEM_BASE },
+      {
+        role: "user",
+        content:
+          `Resuma esta conversa de WhatsApp em até 6 bullets curtos (máx. 1 linha cada). ` +
+          `Cubra: contexto do lead, principais dúvidas/objeções, próximos passos sugeridos. ` +
+          `Não invente fatos.\n\n` +
+          `Lead: ${JSON.stringify({ nome: lead.name, empresa: lead.company_name, cargo: lead.position, segmento: lead.company_segment })}\n\n` +
+          `Conversa:\n${transcript(messages)}`,
+      },
+    ]);
+    const summary = result.choices?.[0]?.message?.content?.trim() ?? "";
+    if (!summary) throw new Error("IA não retornou resumo");
+
+    await context.supabase
+      .from("whatsapp_conversations")
+      .update({ ai_summary: summary, ai_summary_at: new Date().toISOString() })
+      .eq("id", data.conversationId);
+
+    return { summary, summarized_at: new Date().toISOString() };
+  });
+
+/** Sugere a próxima mensagem do SDR (não envia — devolve para o composer). */
+export const suggestReply = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        conversationId: z.string().uuid(),
+        instructions: z.string().max(500).optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { conv, messages } = await loadContext(context.supabase, data.conversationId, 30);
+    const lead = (conv.leads ?? {}) as Record<string, unknown>;
+    const result = await callAI([
+      { role: "system", content: SYSTEM_BASE },
+      {
+        role: "user",
+        content:
+          `Sugira a PRÓXIMA mensagem do SDR para este lead. Regras: ` +
+          `1) Curta (2-5 linhas), 2) Personalizada com base na conversa, ` +
+          `3) Termine com 1 pergunta clara OU um CTA específico, ` +
+          `4) Não use saudações genéricas se a conversa já está em andamento, ` +
+          `5) Não invente dados que não estão na conversa.\n\n` +
+          (data.instructions ? `Direção adicional do SDR: ${data.instructions}\n\n` : "") +
+          `Lead: ${JSON.stringify({ nome: lead.name, empresa: lead.company_name, cargo: lead.position })}\n\n` +
+          `Conversa:\n${transcript(messages)}\n\n` +
+          `Responda APENAS com o texto da mensagem sugerida, sem aspas, sem prefixos.`,
+      },
+    ]);
+    const reply = result.choices?.[0]?.message?.content?.trim() ?? "";
+    if (!reply) throw new Error("IA não retornou sugestão");
+    return { reply };
+  });
+
+/** Classifica temperatura do lead (quente/morno/frio) e persiste. */
+export const classifyTemperature = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ conversationId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { conv, messages } = await loadContext(context.supabase, data.conversationId, 40);
+    if (messages.length === 0) throw new Error("Sem mensagens para classificar");
+
+    const tool = {
+      type: "function",
+      function: {
+        name: "classify_lead",
+        description: "Classifica a temperatura comercial do lead a partir da conversa.",
+        parameters: {
+          type: "object",
+          properties: {
+            temperature: {
+              type: "string",
+              enum: ["quente", "morno", "frio"],
+              description:
+                "quente = demonstrou intenção clara de compra/agendamento; morno = engajado mas explorando; frio = sem resposta ou sem interesse claro",
+            },
+            reason: {
+              type: "string",
+              description: "Justificativa curta (1-2 frases) baseada em sinais concretos da conversa",
+            },
+            buying_signals: {
+              type: "array",
+              items: { type: "string" },
+              description: "Lista curta de sinais de compra observados (vazio se não houver)",
+            },
+            objections: {
+              type: "array",
+              items: { type: "string" },
+              description: "Objeções/atritos identificados (vazio se não houver)",
+            },
+          },
+          required: ["temperature", "reason", "buying_signals", "objections"],
+          additionalProperties: false,
+        },
+      },
+    };
+
+    const lead = (conv.leads ?? {}) as Record<string, unknown>;
+    const result = await callAI(
+      [
+        { role: "system", content: SYSTEM_BASE },
+        {
+          role: "user",
+          content:
+            `Classifique a temperatura comercial deste lead com base na conversa.\n\n` +
+            `Lead: ${JSON.stringify({ nome: lead.name, empresa: lead.company_name, cargo: lead.position, segmento: lead.company_segment, prioridade: lead.priority })}\n\n` +
+            `Conversa:\n${transcript(messages)}`,
+        },
+      ],
+      tool,
+    );
+    const call = result.choices?.[0]?.message?.tool_calls?.[0];
+    if (!call) throw new Error("IA não retornou estrutura esperada");
+    const args = JSON.parse(call.function.arguments) as {
+      temperature: "quente" | "morno" | "frio";
+      reason: string;
+      buying_signals: string[];
+      objections: string[];
+    };
+
+    await context.supabase
+      .from("whatsapp_conversations")
+      .update({
+        temperature: args.temperature,
+        temperature_reason: args.reason,
+        temperature_at: new Date().toISOString(),
+      })
+      .eq("id", data.conversationId);
+
+    return args;
+  });
+
+/** Devolve o estado AI persistido da conversa. */
+export const getConversationAi = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ conversationId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("whatsapp_conversations")
+      .select("ai_summary, ai_summary_at, temperature, temperature_reason, temperature_at")
+      .eq("id", data.conversationId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return row ?? null;
+  });
