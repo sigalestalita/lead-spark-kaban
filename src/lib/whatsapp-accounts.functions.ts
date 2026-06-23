@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Json } from "@/integrations/supabase/types";
 
 const REDACT = "••••••";
 
@@ -69,10 +70,11 @@ export const upsertAccount = createServerFn({ method: "POST" })
       }
     }
 
-    const metaPrev = current?.metadata ?? {};
-    const nextMeta: Record<string, unknown> = { ...metaPrev };
-    if (data.verify_token) nextMeta.verify_token = data.verify_token;
-    if (data.waba_id !== undefined) nextMeta.waba_id = data.waba_id || undefined;
+    const metaPrev = (current?.metadata ?? {}) as Record<string, unknown>;
+    const nextMetaObj: Record<string, unknown> = { ...metaPrev };
+    if (data.verify_token) nextMetaObj.verify_token = data.verify_token;
+    if (data.waba_id !== undefined) nextMetaObj.waba_id = data.waba_id || undefined;
+    const nextMeta = nextMetaObj as unknown as Json;
 
     const payload = {
       label: data.label,
