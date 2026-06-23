@@ -300,3 +300,86 @@ export const getConversationAi = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     return row ?? null;
   });
+
+/** Plano de abordagem: 3 próximos passos com táticas distintas (estratégia, ângulo, mensagem pronta). */
+export const suggestApproachPlan = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ conversationId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { conv, messages, notes, stage, icp } = await loadContext(context.supabase, data.conversationId, 40);
+    const lead = (conv.leads ?? {}) as Record<string, unknown>;
+
+    const tool = {
+      type: "function",
+      function: {
+        name: "approach_plan",
+        description: "Plano de abordagem do SDR com 3 opções de próximo passo, ordenadas por probabilidade de conversão.",
+        parameters: {
+          type: "object",
+          properties: {
+            diagnosis: {
+              type: "string",
+              description: "1-2 frases: onde o lead está no funil e qual o bloqueio/oportunidade principal agora.",
+            },
+            options: {
+              type: "array",
+              minItems: 3,
+              maxItems: 3,
+              items: {
+                type: "object",
+                properties: {
+                  strategy: {
+                    type: "string",
+                    description: "Nome curto da tática (ex: 'CTA direto de agenda', 'Quebra-padrão por dor', 'Prova social do segmento', 'Reframe de objeção').",
+                  },
+                  rationale: {
+                    type: "string",
+                    description: "Por que essa tática é a melhor agora, em 1 frase, baseada em sinais concretos.",
+                  },
+                  message: {
+                    type: "string",
+                    description: "Mensagem PRONTA para enviar no WhatsApp (2-5 linhas, termina em pergunta ou CTA específico).",
+                  },
+                  expected_conversion: {
+                    type: "string",
+                    enum: ["alta", "média", "baixa"],
+                  },
+                },
+                required: ["strategy", "rationale", "message", "expected_conversion"],
+                additionalProperties: false,
+              },
+            },
+          },
+          required: ["diagnosis", "options"],
+          additionalProperties: false,
+        },
+      },
+    };
+
+    const result = await callAI(
+      [
+        { role: "system", content: SYSTEM_BASE },
+        {
+          role: "user",
+          content:
+            `Monte um plano de abordagem com 3 opções de PRÓXIMO PASSO para este lead, ordenadas pela maior probabilidade de conversão. ` +
+            `Cada opção deve usar uma tática DIFERENTE (não 3 variações da mesma). ` +
+            `Considere o histórico, a etapa do funil, sinais de compra/objeção e o fit com o ICP.\n\n` +
+            `${leadBrief(lead, stage, notes, icp)}\n\n` +
+            `Conversa:\n${transcript(messages) || "(sem mensagens ainda — é primeira abordagem)"}`,
+        },
+      ],
+      tool,
+    );
+    const call = result.choices?.[0]?.message?.tool_calls?.[0];
+    if (!call) throw new Error("IA não retornou plano estruturado");
+    return JSON.parse(call.function.arguments) as {
+      diagnosis: string;
+      options: Array<{
+        strategy: string;
+        rationale: string;
+        message: string;
+        expected_conversion: "alta" | "média" | "baixa";
+      }>;
+    };
+  });
