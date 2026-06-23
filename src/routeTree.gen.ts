@@ -19,6 +19,7 @@ import { Route as AppKanbanRouteImport } from './routes/_app.kanban'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppWhatsappIndexRouteImport } from './routes/_app.whatsapp.index'
+import { Route as AppWhatsappTemplatesRouteImport } from './routes/_app.whatsapp.templates'
 import { Route as AppLeadIdRouteImport } from './routes/_app.lead.$id'
 import { Route as ApiPublicRdCallbackRouteImport } from './routes/api/public/rd/callback'
 import { Route as ApiPublicHooksSyncRdRouteImport } from './routes/api/public/hooks/sync-rd'
@@ -74,6 +75,11 @@ const AppWhatsappIndexRoute = AppWhatsappIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppWhatsappRoute,
 } as any)
+const AppWhatsappTemplatesRoute = AppWhatsappTemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
+  getParentRoute: () => AppWhatsappRoute,
+} as any)
 const AppLeadIdRoute = AppLeadIdRouteImport.update({
   id: '/lead/$id',
   path: '/lead/$id',
@@ -112,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/usuarios': typeof AppUsuariosRoute
   '/whatsapp': typeof AppWhatsappRouteWithChildren
   '/lead/$id': typeof AppLeadIdRoute
+  '/whatsapp/templates': typeof AppWhatsappTemplatesRoute
   '/whatsapp/': typeof AppWhatsappIndexRoute
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
@@ -127,6 +134,7 @@ export interface FileRoutesByTo {
   '/novidades': typeof AppNovidadesRoute
   '/usuarios': typeof AppUsuariosRoute
   '/lead/$id': typeof AppLeadIdRoute
+  '/whatsapp/templates': typeof AppWhatsappTemplatesRoute
   '/whatsapp': typeof AppWhatsappIndexRoute
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
@@ -145,6 +153,7 @@ export interface FileRoutesById {
   '/_app/usuarios': typeof AppUsuariosRoute
   '/_app/whatsapp': typeof AppWhatsappRouteWithChildren
   '/_app/lead/$id': typeof AppLeadIdRoute
+  '/_app/whatsapp/templates': typeof AppWhatsappTemplatesRoute
   '/_app/whatsapp/': typeof AppWhatsappIndexRoute
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
@@ -163,6 +172,7 @@ export interface FileRouteTypes {
     | '/usuarios'
     | '/whatsapp'
     | '/lead/$id'
+    | '/whatsapp/templates'
     | '/whatsapp/'
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
@@ -178,6 +188,7 @@ export interface FileRouteTypes {
     | '/novidades'
     | '/usuarios'
     | '/lead/$id'
+    | '/whatsapp/templates'
     | '/whatsapp'
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
@@ -195,6 +206,7 @@ export interface FileRouteTypes {
     | '/_app/usuarios'
     | '/_app/whatsapp'
     | '/_app/lead/$id'
+    | '/_app/whatsapp/templates'
     | '/_app/whatsapp/'
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
@@ -284,6 +296,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppWhatsappIndexRouteImport
       parentRoute: typeof AppWhatsappRoute
     }
+    '/_app/whatsapp/templates': {
+      id: '/_app/whatsapp/templates'
+      path: '/templates'
+      fullPath: '/whatsapp/templates'
+      preLoaderRoute: typeof AppWhatsappTemplatesRouteImport
+      parentRoute: typeof AppWhatsappRoute
+    }
     '/_app/lead/$id': {
       id: '/_app/lead/$id'
       path: '/lead/$id'
@@ -323,10 +342,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppWhatsappRouteChildren {
+  AppWhatsappTemplatesRoute: typeof AppWhatsappTemplatesRoute
   AppWhatsappIndexRoute: typeof AppWhatsappIndexRoute
 }
 
 const AppWhatsappRouteChildren: AppWhatsappRouteChildren = {
+  AppWhatsappTemplatesRoute: AppWhatsappTemplatesRoute,
   AppWhatsappIndexRoute: AppWhatsappIndexRoute,
 }
 
