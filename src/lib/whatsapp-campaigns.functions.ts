@@ -14,25 +14,7 @@ const AudienceFilters = z
   .default({});
 type AudienceFiltersT = z.infer<typeof AudienceFilters>;
 
-function applyFilters(
-  q: ReturnType<ReturnType<typeof selectLeads>["from"]>,
-  filters: AudienceFiltersT,
-  userId: string,
-) {
-  let query = q;
-  if (filters.stageIds?.length) query = query.in("stage_id", filters.stageIds);
-  if (filters.priorities?.length) query = query.in("priority", filters.priorities);
-  if (filters.demoFree === "yes") query = query.eq("demo_free", true);
-  if (filters.demoFree === "no") query = query.eq("demo_free", false);
-  if (filters.assignedToMe) query = query.eq("assigned_to", userId);
-  if (filters.leadType?.length) query = query.in("lead_type", filters.leadType);
-  return query.not("phone", "is", null);
-}
-
-// helper só pra tipar o builder acima
-function selectLeads() {
-  return { from: (..._a: unknown[]) => ({}) as unknown as ReturnType<typeof Object> };
-}
+type _AudienceFiltersT = AudienceFiltersT;
 
 /** Lista campanhas com contagem de mensagens. */
 export const listCampaigns = createServerFn({ method: "GET" })
@@ -334,6 +316,7 @@ export const getCampaignFilterMeta = createServerFn({ method: "GET" })
     const { supabase } = context;
     const [{ data: stages }, { data: types }] = await Promise.all([
       supabase.from("stages").select("id, name, order_index").order("order_index"),
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       supabase.from("leads").select("lead_type").not("lead_type", "is", null).limit(2000),
     ]);
     const leadTypes = Array.from(
