@@ -17,7 +17,6 @@ import { Route as AppUsuariosRouteImport } from './routes/_app.usuarios'
 import { Route as AppNovidadesRouteImport } from './routes/_app.novidades'
 import { Route as AppLeadsAnalyticsRouteImport } from './routes/_app.leads-analytics'
 import { Route as AppKanbanRouteImport } from './routes/_app.kanban'
-import { Route as AppLeadsAnalyticsRouteImport } from './routes/_app.leads-analytics'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppWhatsappIndexRouteImport } from './routes/_app.whatsapp.index'
@@ -71,11 +70,6 @@ const AppLeadsAnalyticsRoute = AppLeadsAnalyticsRouteImport.update({
 const AppKanbanRoute = AppKanbanRouteImport.update({
   id: '/kanban',
   path: '/kanban',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppLeadsAnalyticsRoute = AppLeadsAnalyticsRouteImport.update({
-  id: '/leads-analytics',
-  path: '/leads-analytics',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
