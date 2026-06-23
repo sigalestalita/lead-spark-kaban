@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppWhatsappRouteImport } from './routes/_app.whatsapp'
 import { Route as AppUsuariosRouteImport } from './routes/_app.usuarios'
 import { Route as AppNovidadesRouteImport } from './routes/_app.novidades'
+import { Route as AppLeadsAnalyticsRouteImport } from './routes/_app.leads-analytics'
 import { Route as AppKanbanRouteImport } from './routes/_app.kanban'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
@@ -59,6 +60,11 @@ const AppUsuariosRoute = AppUsuariosRouteImport.update({
 const AppNovidadesRoute = AppNovidadesRouteImport.update({
   id: '/novidades',
   path: '/novidades',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppLeadsAnalyticsRoute = AppLeadsAnalyticsRouteImport.update({
+  id: '/leads-analytics',
+  path: '/leads-analytics',
   getParentRoute: () => AppRoute,
 } as any)
 const AppKanbanRoute = AppKanbanRouteImport.update({
@@ -151,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/configuracoes': typeof AppConfiguracoesRoute
   '/dashboard': typeof AppDashboardRoute
   '/kanban': typeof AppKanbanRoute
+  '/leads-analytics': typeof AppLeadsAnalyticsRoute
   '/novidades': typeof AppNovidadesRoute
   '/usuarios': typeof AppUsuariosRoute
   '/whatsapp': typeof AppWhatsappRouteWithChildren
@@ -174,6 +181,7 @@ export interface FileRoutesByTo {
   '/configuracoes': typeof AppConfiguracoesRoute
   '/dashboard': typeof AppDashboardRoute
   '/kanban': typeof AppKanbanRoute
+  '/leads-analytics': typeof AppLeadsAnalyticsRoute
   '/novidades': typeof AppNovidadesRoute
   '/usuarios': typeof AppUsuariosRoute
   '/lead/$id': typeof AppLeadIdRoute
@@ -198,6 +206,7 @@ export interface FileRoutesById {
   '/_app/configuracoes': typeof AppConfiguracoesRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/kanban': typeof AppKanbanRoute
+  '/_app/leads-analytics': typeof AppLeadsAnalyticsRoute
   '/_app/novidades': typeof AppNovidadesRoute
   '/_app/usuarios': typeof AppUsuariosRoute
   '/_app/whatsapp': typeof AppWhatsappRouteWithChildren
@@ -223,6 +232,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/dashboard'
     | '/kanban'
+    | '/leads-analytics'
     | '/novidades'
     | '/usuarios'
     | '/whatsapp'
@@ -246,6 +256,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/dashboard'
     | '/kanban'
+    | '/leads-analytics'
     | '/novidades'
     | '/usuarios'
     | '/lead/$id'
@@ -269,6 +280,7 @@ export interface FileRouteTypes {
     | '/_app/configuracoes'
     | '/_app/dashboard'
     | '/_app/kanban'
+    | '/_app/leads-analytics'
     | '/_app/novidades'
     | '/_app/usuarios'
     | '/_app/whatsapp'
@@ -340,6 +352,13 @@ declare module '@tanstack/react-router' {
       path: '/novidades'
       fullPath: '/novidades'
       preLoaderRoute: typeof AppNovidadesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/leads-analytics': {
+      id: '/_app/leads-analytics'
+      path: '/leads-analytics'
+      fullPath: '/leads-analytics'
+      preLoaderRoute: typeof AppLeadsAnalyticsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/kanban': {
@@ -494,6 +513,7 @@ interface AppRouteChildren {
   AppConfiguracoesRoute: typeof AppConfiguracoesRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppKanbanRoute: typeof AppKanbanRoute
+  AppLeadsAnalyticsRoute: typeof AppLeadsAnalyticsRoute
   AppNovidadesRoute: typeof AppNovidadesRoute
   AppUsuariosRoute: typeof AppUsuariosRoute
   AppWhatsappRoute: typeof AppWhatsappRouteWithChildren
@@ -504,6 +524,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppConfiguracoesRoute: AppConfiguracoesRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppKanbanRoute: AppKanbanRoute,
+  AppLeadsAnalyticsRoute: AppLeadsAnalyticsRoute,
   AppNovidadesRoute: AppNovidadesRoute,
   AppUsuariosRoute: AppUsuariosRoute,
   AppWhatsappRoute: AppWhatsappRouteWithChildren,
