@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { PRIORITY_LABEL, PRIORITY_COLOR } from "@/lib/lead-types";
 import { LEAD_TYPE_LABEL, LEAD_TYPE_COLOR, type LeadType } from "@/lib/lead-type";
 import { ArrowLeft, MessageSquare, Linkedin, Globe, Sparkles, Wand2, Copy, Building2, ExternalLink, ArrowRight } from "lucide-react";
+import { LeadWhatsappTab } from "@/components/whatsapp/lead-whatsapp-tab";
 
 export const Route = createFileRoute("/_app/lead/$id")({
   component: LeadDetailPage,
@@ -375,6 +376,18 @@ function LeadDetailPage() {
             <p className="text-sm whitespace-pre-wrap">{suggestion}</p>
           </div>
         )}
+      </Card>
+
+      <Card className="p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" /> WhatsApp
+          </h2>
+          {lead.phone && (
+            <span className="text-xs text-muted-foreground">{lead.phone}</span>
+          )}
+        </div>
+        <LeadWhatsappTab leadId={lead.id} leadHasPhone={!!lead.phone} />
       </Card>
 
       <div className="grid md:grid-cols-2 gap-4">
