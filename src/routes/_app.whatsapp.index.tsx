@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { listConversations } from "@/lib/whatsapp.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { ConversationView } from "@/components/whatsapp/conversation-view";
+import { LeadSidePanel } from "@/components/whatsapp/lead-side-panel";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -118,7 +119,7 @@ function WhatsappInbox() {
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0 flex flex-col">
+      <main className="flex-1 min-w-0 flex">
         {!selectedConv && (
           <div className="flex-1 grid place-items-center text-sm text-muted-foreground">
             Selecione uma conversa
@@ -126,28 +127,35 @@ function WhatsappInbox() {
         )}
         {selectedConv && (
           <>
-            <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">
-                  {(selectedConv.leads as { name?: string | null } | null)?.name ?? "Sem nome"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {(selectedConv.leads as { company_name?: string | null } | null)?.company_name ?? ""}
-                </p>
+            <div className="flex-1 min-w-0 flex flex-col">
+              <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">
+                    {(selectedConv.leads as { name?: string | null } | null)?.name ?? "Sem nome"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {(selectedConv.leads as { company_name?: string | null } | null)?.company_name ?? ""}
+                  </p>
+                </div>
+                {(selectedConv.leads as unknown as { id?: string } | null)?.id && (
+                  <Link
+                    to="/lead/$id"
+                    params={{ id: (selectedConv.leads as unknown as { id: string }).id }}
+                    className="text-xs text-primary hover:underline flex items-center gap-1"
+                  >
+                    Abrir lead <ExternalLink className="h-3 w-3" />
+                  </Link>
+                )}
               </div>
-              {(selectedConv.leads as unknown as { id?: string } | null)?.id && (
-                <Link
-                  to="/lead/$id"
-                  params={{ id: (selectedConv.leads as unknown as { id: string }).id }}
-                  className="text-xs text-primary hover:underline flex items-center gap-1"
-                >
-                  Abrir lead <ExternalLink className="h-3 w-3" />
-                </Link>
-              )}
+              <div className="flex-1 min-h-0">
+                <ConversationView conversationId={selectedConv.id} />
+              </div>
             </div>
-            <div className="flex-1 min-h-0">
-              <ConversationView conversationId={selectedConv.id} />
-            </div>
+            {(selectedConv.leads as unknown as { id?: string } | null)?.id && (
+              <aside className="hidden lg:flex w-[320px] shrink-0 border-l border-white/5 flex-col">
+                <LeadSidePanel leadId={(selectedConv.leads as unknown as { id: string }).id} />
+              </aside>
+            )}
           </>
         )}
       </main>
