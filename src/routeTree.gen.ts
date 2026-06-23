@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppWhatsappRouteImport } from './routes/_app.whatsapp'
 import { Route as AppUsuariosRouteImport } from './routes/_app.usuarios'
 import { Route as AppNovidadesRouteImport } from './routes/_app.novidades'
 import { Route as AppKanbanRouteImport } from './routes/_app.kanban'
@@ -36,6 +37,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppWhatsappRoute = AppWhatsappRouteImport.update({
+  id: '/whatsapp',
+  path: '/whatsapp',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppUsuariosRoute = AppUsuariosRouteImport.update({
   id: '/usuarios',
@@ -98,6 +104,7 @@ export interface FileRoutesByFullPath {
   '/kanban': typeof AppKanbanRoute
   '/novidades': typeof AppNovidadesRoute
   '/usuarios': typeof AppUsuariosRoute
+  '/whatsapp': typeof AppWhatsappRoute
   '/lead/$id': typeof AppLeadIdRoute
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByTo {
   '/kanban': typeof AppKanbanRoute
   '/novidades': typeof AppNovidadesRoute
   '/usuarios': typeof AppUsuariosRoute
+  '/whatsapp': typeof AppWhatsappRoute
   '/lead/$id': typeof AppLeadIdRoute
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   '/_app/kanban': typeof AppKanbanRoute
   '/_app/novidades': typeof AppNovidadesRoute
   '/_app/usuarios': typeof AppUsuariosRoute
+  '/_app/whatsapp': typeof AppWhatsappRoute
   '/_app/lead/$id': typeof AppLeadIdRoute
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
     | '/kanban'
     | '/novidades'
     | '/usuarios'
+    | '/whatsapp'
     | '/lead/$id'
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
@@ -158,6 +168,7 @@ export interface FileRouteTypes {
     | '/kanban'
     | '/novidades'
     | '/usuarios'
+    | '/whatsapp'
     | '/lead/$id'
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '/_app/kanban'
     | '/_app/novidades'
     | '/_app/usuarios'
+    | '/_app/whatsapp'
     | '/_app/lead/$id'
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
@@ -212,6 +224,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/whatsapp': {
+      id: '/_app/whatsapp'
+      path: '/whatsapp'
+      fullPath: '/whatsapp'
+      preLoaderRoute: typeof AppWhatsappRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/usuarios': {
       id: '/_app/usuarios'
@@ -292,6 +311,7 @@ interface AppRouteChildren {
   AppKanbanRoute: typeof AppKanbanRoute
   AppNovidadesRoute: typeof AppNovidadesRoute
   AppUsuariosRoute: typeof AppUsuariosRoute
+  AppWhatsappRoute: typeof AppWhatsappRoute
   AppLeadIdRoute: typeof AppLeadIdRoute
 }
 
@@ -301,6 +321,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppKanbanRoute: AppKanbanRoute,
   AppNovidadesRoute: AppNovidadesRoute,
   AppUsuariosRoute: AppUsuariosRoute,
+  AppWhatsappRoute: AppWhatsappRoute,
   AppLeadIdRoute: AppLeadIdRoute,
 }
 
