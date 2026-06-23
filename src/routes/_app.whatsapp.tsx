@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, Link, useRouterState } from "@tanstack/react-router";
-import { MessageCircle, FileText, Megaphone, Zap, Settings2 } from "lucide-react";
+import { MessageCircle, FileText, Megaphone, Zap, Settings2, BarChart3 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/whatsapp")({
   component: WhatsappLayout,
@@ -10,6 +10,7 @@ function WhatsappLayout() {
 
   const tabs = [
     { to: "/whatsapp", label: "Inbox", icon: MessageCircle, exact: true },
+    { to: "/whatsapp/metricas", label: "Métricas", icon: BarChart3, exact: false },
     { to: "/whatsapp/templates", label: "Templates", icon: FileText, exact: false },
     { to: "/whatsapp/campanhas", label: "Campanhas", icon: Megaphone, exact: false },
     { to: "/whatsapp/automacoes", label: "Automações", icon: Zap, exact: false },
