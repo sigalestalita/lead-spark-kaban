@@ -213,3 +213,109 @@ function StatusIcon({ status }: { status: string }) {
   if (status === "failed") return <AlertCircle className="h-3 w-3 text-red-300" />;
   return null;
 }
+
+type AiState = {
+  ai_summary: string | null;
+  ai_summary_at: string | null;
+  temperature: string | null;
+  temperature_reason: string | null;
+  temperature_at: string | null;
+} | null;
+
+function AiToolbar({
+  ai,
+  summarizing,
+  classifying,
+  onSummarize,
+  onClassify,
+}: {
+  ai: AiState;
+  summarizing: boolean;
+  classifying: boolean;
+  onSummarize: () => void;
+  onClassify: () => void;
+}) {
+  const tempColor =
+    ai?.temperature === "quente"
+      ? "border-red-500/40 text-red-300 bg-red-500/10"
+      : ai?.temperature === "morno"
+        ? "border-amber-500/40 text-amber-300 bg-amber-500/10"
+        : ai?.temperature === "frio"
+          ? "border-sky-500/40 text-sky-300 bg-sky-500/10"
+          : "border-white/10 text-muted-foreground";
+  return (
+    <div className="px-3 py-2 border-b border-white/5 flex items-center gap-2 bg-background/40">
+      <span className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1 shrink-0">
+        <Sparkles className="h-3 w-3" /> IA
+      </span>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
+            <FileText className="h-3.5 w-3.5" /> Resumo
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-96" align="start">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium">Resumo da conversa</p>
+              <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={onSummarize} disabled={summarizing}>
+                {summarizing ? <Loader2 className="h-3 w-3 animate-spin" /> : ai?.ai_summary ? "Atualizar" : "Gerar"}
+              </Button>
+            </div>
+            {ai?.ai_summary ? (
+              <>
+                <p className="text-xs whitespace-pre-wrap text-foreground">{ai.ai_summary}</p>
+                {ai.ai_summary_at && (
+                  <p className="text-[10px] text-muted-foreground">
+                    Gerado em {new Date(ai.ai_summary_at).toLocaleString("pt-BR")}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                Sem resumo ainda. Clique em <strong>Gerar</strong>.
+              </p>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className={`h-7 text-xs gap-1 ${tempColor}`}>
+            <Thermometer className="h-3.5 w-3.5" />
+            {ai?.temperature ?? "Classificar"}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-80" align="start">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium">Temperatura do lead</p>
+              <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={onClassify} disabled={classifying}>
+                {classifying ? <Loader2 className="h-3 w-3 animate-spin" /> : ai?.temperature ? "Reclassificar" : "Classificar"}
+              </Button>
+            </div>
+            {ai?.temperature ? (
+              <>
+                <Badge variant="outline" className={`text-[10px] ${tempColor}`}>{ai.temperature}</Badge>
+                {ai.temperature_reason && (
+                  <p className="text-xs text-muted-foreground">{ai.temperature_reason}</p>
+                )}
+                {ai.temperature_at && (
+                  <p className="text-[10px] text-muted-foreground">
+                    Avaliado em {new Date(ai.temperature_at).toLocaleString("pt-BR")}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                A IA vai analisar a conversa e indicar se o lead está quente, morno ou frio.
+              </p>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
