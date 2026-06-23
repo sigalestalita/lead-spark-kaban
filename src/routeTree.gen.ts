@@ -19,6 +19,7 @@ import { Route as AppLeadsAnalyticsRouteImport } from './routes/_app.leads-analy
 import { Route as AppKanbanRouteImport } from './routes/_app.kanban'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
+import { Route as AppAnalyticsChatRouteImport } from './routes/_app.analytics-chat'
 import { Route as AppWhatsappIndexRouteImport } from './routes/_app.whatsapp.index'
 import { Route as AppWhatsappTemplatesRouteImport } from './routes/_app.whatsapp.templates'
 import { Route as AppWhatsappMetricasRouteImport } from './routes/_app.whatsapp.metricas'
@@ -80,6 +81,11 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
 const AppConfiguracoesRoute = AppConfiguracoesRouteImport.update({
   id: '/configuracoes',
   path: '/configuracoes',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAnalyticsChatRoute = AppAnalyticsChatRouteImport.update({
+  id: '/analytics-chat',
+  path: '/analytics-chat',
   getParentRoute: () => AppRoute,
 } as any)
 const AppWhatsappIndexRoute = AppWhatsappIndexRouteImport.update({
@@ -154,6 +160,7 @@ const ApiPublicWhatsappAutomationsTickRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/analytics-chat': typeof AppAnalyticsChatRoute
   '/configuracoes': typeof AppConfiguracoesRoute
   '/dashboard': typeof AppDashboardRoute
   '/kanban': typeof AppKanbanRoute
@@ -178,6 +185,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/analytics-chat': typeof AppAnalyticsChatRoute
   '/configuracoes': typeof AppConfiguracoesRoute
   '/dashboard': typeof AppDashboardRoute
   '/kanban': typeof AppKanbanRoute
@@ -203,6 +211,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/_app/analytics-chat': typeof AppAnalyticsChatRoute
   '/_app/configuracoes': typeof AppConfiguracoesRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/kanban': typeof AppKanbanRoute
@@ -229,6 +238,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/analytics-chat'
     | '/configuracoes'
     | '/dashboard'
     | '/kanban'
@@ -253,6 +263,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/analytics-chat'
     | '/configuracoes'
     | '/dashboard'
     | '/kanban'
@@ -277,6 +288,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_app'
     | '/login'
+    | '/_app/analytics-chat'
     | '/_app/configuracoes'
     | '/_app/dashboard'
     | '/_app/kanban'
@@ -380,6 +392,13 @@ declare module '@tanstack/react-router' {
       path: '/configuracoes'
       fullPath: '/configuracoes'
       preLoaderRoute: typeof AppConfiguracoesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/analytics-chat': {
+      id: '/_app/analytics-chat'
+      path: '/analytics-chat'
+      fullPath: '/analytics-chat'
+      preLoaderRoute: typeof AppAnalyticsChatRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/whatsapp/': {
@@ -510,6 +529,7 @@ const AppWhatsappRouteWithChildren = AppWhatsappRoute._addFileChildren(
 )
 
 interface AppRouteChildren {
+  AppAnalyticsChatRoute: typeof AppAnalyticsChatRoute
   AppConfiguracoesRoute: typeof AppConfiguracoesRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppKanbanRoute: typeof AppKanbanRoute
@@ -521,6 +541,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAnalyticsChatRoute: AppAnalyticsChatRoute,
   AppConfiguracoesRoute: AppConfiguracoesRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppKanbanRoute: AppKanbanRoute,
