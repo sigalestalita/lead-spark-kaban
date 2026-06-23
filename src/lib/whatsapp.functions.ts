@@ -252,6 +252,118 @@ export const sendMessage = createServerFn({ method: "POST" })
     }
   });
 
+/** Cria signed URL para arquivo já enviado ao bucket whatsapp-media e dispara como mensagem. */
+export const sendMediaFromStorage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        conversationId: z.string().uuid(),
+        storagePath: z.string().min(1),
+        mime: z.string().min(1),
+        caption: z.string().max(1024).optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { data: conv, error: convErr } = await supabase
+      .from("whatsapp_conversations")
+      .select("*, leads:lead_id(id,name,phone)")
+      .eq("id", data.conversationId)
+      .maybeSingle();
+    if (convErr) throw new Error(convErr.message);
+    if (!conv) throw new Error("Conversa não encontrada");
+    const lead = conv.leads as { phone: string | null } | null;
+    if (!lead?.phone) throw new Error("Lead sem telefone");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { getProvider } = await import("./whatsapp/provider-registry.server");
+
+    // signed URL com validade longa (Meta busca em segundos, mas deixamos 24h por segurança)
+    const { data: signed, error: signErr } = await supabaseAdmin.storage
+      .from("whatsapp-media")
+      .createSignedUrl(data.storagePath, 60 * 60 * 24);
+    if (signErr || !signed?.signedUrl) throw new Error(signErr?.message ?? "Falha ao gerar URL do anexo");
+
+    const messageType: "image" | "video" | "audio" | "file" = data.mime.startsWith("image/")
+      ? "image"
+      : data.mime.startsWith("video/")
+        ? "video"
+        : data.mime.startsWith("audio/")
+          ? "audio"
+          : "file";
+
+    const { data: msg, error: msgErr } = await supabase
+      .from("whatsapp_messages")
+      .insert({
+        conversation_id: data.conversationId,
+        lead_id: conv.lead_id,
+        sender_type: "sdr",
+        sender_user_id: userId,
+        message_type: messageType,
+        body: data.caption ?? null,
+        media_url: signed.signedUrl,
+        media_mime: data.mime,
+        status: "sending",
+      })
+      .select("*")
+      .single();
+    if (msgErr) throw new Error(msgErr.message);
+
+    try {
+      const accountQuery = conv.account_id
+        ? supabaseAdmin.from("whatsapp_accounts").select("*").eq("id", conv.account_id).maybeSingle()
+        : supabaseAdmin.from("whatsapp_accounts").select("*").eq("is_default", true).maybeSingle();
+      const { data: account } = await accountQuery;
+      if (!account) throw new Error("Nenhuma conta de WhatsApp configurada");
+
+      const provider = getProvider(account.provider);
+      const result = await provider.sendMessage({
+        account: {
+          id: account.id,
+          phone_number: account.phone_number,
+          provider: account.provider,
+          provider_instance_id: account.provider_instance_id,
+          provider_base_url: account.provider_base_url,
+          access_token: account.access_token,
+          webhook_secret: account.webhook_secret,
+        },
+        to: lead.phone.replace(/\D+/g, ""),
+        type: messageType,
+        body: data.caption,
+        mediaUrl: signed.signedUrl,
+        mediaMime: data.mime,
+      });
+
+      await supabaseAdmin
+        .from("whatsapp_messages")
+        .update({
+          provider_message_id: result.providerMessageId,
+          status: result.status === "failed" ? "failed" : "sent",
+          error: result.error ?? null,
+          sent_at: new Date().toISOString(),
+        })
+        .eq("id", msg.id);
+
+      await supabaseAdmin
+        .from("whatsapp_conversations")
+        .update({
+          last_message_at: new Date().toISOString(),
+          last_preview: data.caption?.slice(0, 200) ?? `[${messageType}]`,
+          status: "open",
+        })
+        .eq("id", data.conversationId);
+
+      return { ok: true, messageId: msg.id };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Falha desconhecida";
+      await supabase.from("whatsapp_messages").update({ status: "failed", error: message }).eq("id", msg.id);
+      throw new Error(message);
+    }
+  });
+
 /** Atribuir conversa a um usuário. */
 export const assignConversation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
