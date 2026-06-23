@@ -12,6 +12,7 @@ import {
   Sparkles,
   MessageCircle,
   LineChart,
+  Bot,
 } from "lucide-react";
 import lidiLogo from "@/assets/lidi-logo-white.png";
 
@@ -62,6 +63,7 @@ function AppShell() {
     { to: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
     { to: "/dashboard", label: "Dashboard", icon: BarChart3 },
     { to: "/leads-analytics", label: "Analytics", icon: LineChart },
+    { to: "/analytics-chat", label: "Chat Analytics", icon: Bot },
     { to: "/novidades", label: "Novidades", icon: Sparkles },
     { to: "/configuracoes", label: "Configurações", icon: SettingsIcon },
   ];
