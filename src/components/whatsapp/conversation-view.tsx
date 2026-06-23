@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { listMessages, sendMessage } from "@/lib/whatsapp.functions";
+import { listMessages, sendMessage, sendMediaFromStorage } from "@/lib/whatsapp.functions";
 import {
   summarizeConversation,
   suggestReply,
   classifyTemperature,
   getConversationAi,
+  suggestApproachPlan,
 } from "@/lib/whatsapp-ai.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ import {
 import { toast } from "sonner";
 import {
   Send, Check, CheckCheck, AlertCircle, Clock,
-  Sparkles, FileText, Thermometer, Loader2,
+  Sparkles, FileText, Thermometer, Loader2, Paperclip, Target,
 } from "lucide-react";
 
 type Msg = {
@@ -39,13 +40,17 @@ type Msg = {
 export function ConversationView({ conversationId }: { conversationId: string }) {
   const listFn = useServerFn(listMessages);
   const sendFn = useServerFn(sendMessage);
+  const sendMediaFn = useServerFn(sendMediaFromStorage);
   const aiGet = useServerFn(getConversationAi);
   const aiSummarize = useServerFn(summarizeConversation);
   const aiSuggest = useServerFn(suggestReply);
   const aiClassify = useServerFn(classifyTemperature);
+  const aiPlan = useServerFn(suggestApproachPlan);
   const qc = useQueryClient();
   const [text, setText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["wa-messages", conversationId],
@@ -113,6 +118,45 @@ export function ConversationView({ conversationId }: { conversationId: string })
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao sugerir"),
   });
 
+  const plan = useMutation({
+    mutationFn: () => aiPlan({ data: { conversationId } }),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao gerar plano"),
+  });
+
+  async function handleFile(file: File) {
+    if (!file) return;
+    if (file.size > 16 * 1024 * 1024) {
+      toast.error("Arquivo maior que 16MB.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const ext = file.name.includes(".") ? file.name.split(".").pop() : "";
+      const path = `conversations/${conversationId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext ? "." + ext : ""}`;
+      const { error: upErr } = await supabase.storage
+        .from("whatsapp-media")
+        .upload(path, file, { contentType: file.type, upsert: false });
+      if (upErr) throw upErr;
+      await sendMediaFn({
+        data: {
+          conversationId,
+          storagePath: path,
+          mime: file.type || "application/octet-stream",
+          caption: text.trim() || undefined,
+        },
+      });
+      setText("");
+      qc.invalidateQueries({ queryKey: ["wa-messages", conversationId] });
+      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+      toast.success("Anexo enviado.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao enviar anexo");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const v = text.trim();
@@ -126,8 +170,12 @@ export function ConversationView({ conversationId }: { conversationId: string })
         ai={ai ?? null}
         summarizing={summarize.isPending}
         classifying={classify.isPending}
+        planning={plan.isPending}
+        plan={plan.data ?? null}
         onSummarize={() => summarize.mutate()}
         onClassify={() => classify.mutate()}
+        onPlan={() => plan.mutate()}
+        onUsePlanMessage={(m) => setText(m)}
       />
       <div
         ref={scrollRef}
@@ -156,6 +204,25 @@ export function ConversationView({ conversationId }: { conversationId: string })
         >
           {suggest.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
         </Button>
+        <input
+          ref={fileRef}
+          type="file"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void handleFile(f);
+          }}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          title="Anexar arquivo (imagem, vídeo, áudio, documento)"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading || send.isPending}
+        >
+          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+        </Button>
         <Textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -165,11 +232,11 @@ export function ConversationView({ conversationId }: { conversationId: string })
               onSubmit(e);
             }
           }}
-          placeholder="Digite uma mensagem… (Enter envia, Shift+Enter quebra linha)"
+          placeholder="Digite uma mensagem ou anexe um arquivo (Enter envia, Shift+Enter quebra linha)"
           className="min-h-[44px] max-h-[160px] resize-none"
-          disabled={send.isPending}
+          disabled={send.isPending || uploading}
         />
-        <Button type="submit" disabled={send.isPending || !text.trim()} size="sm">
+        <Button type="submit" disabled={send.isPending || uploading || !text.trim()} size="sm">
           <Send className="h-4 w-4" />
         </Button>
       </form>
@@ -226,14 +293,32 @@ function AiToolbar({
   ai,
   summarizing,
   classifying,
+  planning,
+  plan,
   onSummarize,
   onClassify,
+  onPlan,
+  onUsePlanMessage,
 }: {
   ai: AiState;
   summarizing: boolean;
   classifying: boolean;
+  planning: boolean;
+  plan:
+    | {
+        diagnosis: string;
+        options: Array<{
+          strategy: string;
+          rationale: string;
+          message: string;
+          expected_conversion: "alta" | "média" | "baixa";
+        }>;
+      }
+    | null;
   onSummarize: () => void;
   onClassify: () => void;
+  onPlan: () => void;
+  onUsePlanMessage: (m: string) => void;
 }) {
   const tempColor =
     ai?.temperature === "quente"
@@ -312,6 +397,54 @@ function AiToolbar({
               <p className="text-[11px] text-muted-foreground">
                 A IA vai analisar a conversa e indicar se o lead está quente, morno ou frio.
               </p>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
+            <Target className="h-3.5 w-3.5" /> Plano
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[420px]" align="start">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium">Plano de abordagem (SDR sênior)</p>
+              <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={onPlan} disabled={planning}>
+                {planning ? <Loader2 className="h-3 w-3 animate-spin" /> : plan ? "Atualizar" : "Gerar"}
+              </Button>
+            </div>
+            {!plan && (
+              <p className="text-[11px] text-muted-foreground">
+                Gera 3 próximos passos com táticas distintas, ordenados por probabilidade de conversão.
+              </p>
+            )}
+            {plan && (
+              <>
+                <p className="text-[11px] text-muted-foreground italic">{plan.diagnosis}</p>
+                <div className="space-y-2">
+                  {plan.options.map((opt, i) => (
+                    <div key={i} className="rounded-md border border-white/10 p-2 space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium">{i + 1}. {opt.strategy}</p>
+                        <Badge variant="outline" className="text-[10px]">{opt.expected_conversion}</Badge>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">{opt.rationale}</p>
+                      <p className="text-xs whitespace-pre-wrap bg-muted/30 rounded p-1.5">{opt.message}</p>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 text-[11px] w-full"
+                        onClick={() => onUsePlanMessage(opt.message)}
+                      >
+                        Usar esta mensagem
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </PopoverContent>
