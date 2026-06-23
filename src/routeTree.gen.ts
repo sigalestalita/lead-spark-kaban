@@ -21,6 +21,7 @@ import { Route as AppLeadIdRouteImport } from './routes/_app.lead.$id'
 import { Route as ApiPublicRdCallbackRouteImport } from './routes/api/public/rd/callback'
 import { Route as ApiPublicHooksSyncRdRouteImport } from './routes/api/public/hooks/sync-rd'
 import { Route as ApiPublicHooksSendWeeklyDigestRouteImport } from './routes/api/public/hooks/send-weekly-digest'
+import { Route as ApiPublicWhatsappWebhookAccountIdRouteImport } from './routes/api/public/whatsapp/webhook.$accountId'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -82,6 +83,12 @@ const ApiPublicHooksSendWeeklyDigestRoute =
     path: '/api/public/hooks/send-weekly-digest',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicWhatsappWebhookAccountIdRoute =
+  ApiPublicWhatsappWebhookAccountIdRouteImport.update({
+    id: '/api/public/whatsapp/webhook/$accountId',
+    path: '/api/public/whatsapp/webhook/$accountId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -95,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
   '/api/public/rd/callback': typeof ApiPublicRdCallbackRoute
+  '/api/public/whatsapp/webhook/$accountId': typeof ApiPublicWhatsappWebhookAccountIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -108,6 +116,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
   '/api/public/rd/callback': typeof ApiPublicRdCallbackRoute
+  '/api/public/whatsapp/webhook/$accountId': typeof ApiPublicWhatsappWebhookAccountIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -123,6 +132,7 @@ export interface FileRoutesById {
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
   '/api/public/rd/callback': typeof ApiPublicRdCallbackRoute
+  '/api/public/whatsapp/webhook/$accountId': typeof ApiPublicWhatsappWebhookAccountIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -138,6 +148,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
     | '/api/public/rd/callback'
+    | '/api/public/whatsapp/webhook/$accountId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -151,6 +162,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
     | '/api/public/rd/callback'
+    | '/api/public/whatsapp/webhook/$accountId'
   id:
     | '__root__'
     | '/'
@@ -165,6 +177,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
     | '/api/public/rd/callback'
+    | '/api/public/whatsapp/webhook/$accountId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -174,6 +187,7 @@ export interface RootRouteChildren {
   ApiPublicHooksSendWeeklyDigestRoute: typeof ApiPublicHooksSendWeeklyDigestRoute
   ApiPublicHooksSyncRdRoute: typeof ApiPublicHooksSyncRdRoute
   ApiPublicRdCallbackRoute: typeof ApiPublicRdCallbackRoute
+  ApiPublicWhatsappWebhookAccountIdRoute: typeof ApiPublicWhatsappWebhookAccountIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -262,6 +276,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksSendWeeklyDigestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/whatsapp/webhook/$accountId': {
+      id: '/api/public/whatsapp/webhook/$accountId'
+      path: '/api/public/whatsapp/webhook/$accountId'
+      fullPath: '/api/public/whatsapp/webhook/$accountId'
+      preLoaderRoute: typeof ApiPublicWhatsappWebhookAccountIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -292,6 +313,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksSendWeeklyDigestRoute: ApiPublicHooksSendWeeklyDigestRoute,
   ApiPublicHooksSyncRdRoute: ApiPublicHooksSyncRdRoute,
   ApiPublicRdCallbackRoute: ApiPublicRdCallbackRoute,
+  ApiPublicWhatsappWebhookAccountIdRoute:
+    ApiPublicWhatsappWebhookAccountIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

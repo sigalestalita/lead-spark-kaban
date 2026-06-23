@@ -168,8 +168,13 @@ async function handleStatus(
   admin: Awaited<ReturnType<typeof getAdmin>>,
   st: { providerMessageId: string; status: string; error?: string; timestamp: number },
 ) {
-  const patch: Record<string, unknown> = { status: st.status };
   const ts = new Date(st.timestamp).toISOString();
+  const patch: {
+    status: string;
+    delivered_at?: string;
+    read_at?: string;
+    error?: string | null;
+  } = { status: st.status };
   if (st.status === "delivered") patch.delivered_at = ts;
   if (st.status === "read") patch.read_at = ts;
   if (st.status === "failed") patch.error = st.error ?? null;
