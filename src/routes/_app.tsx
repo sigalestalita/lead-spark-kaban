@@ -11,6 +11,7 @@ import {
   PanelLeft,
   Sparkles,
   MessageCircle,
+  LineChart,
 } from "lucide-react";
 import lidiLogo from "@/assets/lidi-logo-white.png";
 
@@ -60,6 +61,7 @@ function AppShell() {
     { to: "/kanban", label: "Kanban", icon: KanbanIcon },
     { to: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
     { to: "/dashboard", label: "Dashboard", icon: BarChart3 },
+    { to: "/leads-analytics", label: "Analytics", icon: LineChart },
     { to: "/novidades", label: "Novidades", icon: Sparkles },
     { to: "/configuracoes", label: "Configurações", icon: SettingsIcon },
   ];
