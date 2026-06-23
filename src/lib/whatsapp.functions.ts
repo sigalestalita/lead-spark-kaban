@@ -62,6 +62,7 @@ export const getOrCreateConversationForLead = createServerFn({ method: "POST" })
       .maybeSingle();
     if (leadErr) throw new Error(leadErr.message);
     if (!lead) throw new Error("Lead não encontrado");
+    if (!lead.phone) throw new Error("Lead sem telefone — adicione um número para iniciar a conversa");
 
     const { data: existing } = await supabase
       .from("whatsapp_conversations")
@@ -104,6 +105,21 @@ export const getOrCreateConversationForLead = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
     return { conversation: created };
+  });
+
+/** Apenas busca a conversa existente do lead (sem criar). */
+export const findConversationForLead = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ leadId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: existing, error } = await supabase
+      .from("whatsapp_conversations")
+      .select("*")
+      .eq("lead_id", data.leadId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return { conversation: existing ?? null };
   });
 
 /** Lista mensagens de uma conversa. */
