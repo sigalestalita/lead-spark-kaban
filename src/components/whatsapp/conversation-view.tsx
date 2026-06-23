@@ -2,11 +2,26 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listMessages, sendMessage } from "@/lib/whatsapp.functions";
+import {
+  summarizeConversation,
+  suggestReply,
+  classifyTemperature,
+  getConversationAi,
+} from "@/lib/whatsapp-ai.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { toast } from "sonner";
-import { Send, Check, CheckCheck, AlertCircle, Clock } from "lucide-react";
+import {
+  Send, Check, CheckCheck, AlertCircle, Clock,
+  Sparkles, FileText, Thermometer, Loader2,
+} from "lucide-react";
 
 type Msg = {
   id: string;
@@ -24,6 +39,10 @@ type Msg = {
 export function ConversationView({ conversationId }: { conversationId: string }) {
   const listFn = useServerFn(listMessages);
   const sendFn = useServerFn(sendMessage);
+  const aiGet = useServerFn(getConversationAi);
+  const aiSummarize = useServerFn(summarizeConversation);
+  const aiSuggest = useServerFn(suggestReply);
+  const aiClassify = useServerFn(classifyTemperature);
   const qc = useQueryClient();
   const [text, setText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -31,6 +50,11 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const { data, isLoading } = useQuery({
     queryKey: ["wa-messages", conversationId],
     queryFn: () => listFn({ data: { conversationId } }),
+  });
+
+  const { data: ai } = useQuery({
+    queryKey: ["wa-ai", conversationId],
+    queryFn: () => aiGet({ data: { conversationId } }),
   });
 
   // Realtime
@@ -65,6 +89,30 @@ export function ConversationView({ conversationId }: { conversationId: string })
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao enviar"),
   });
 
+  const summarize = useMutation({
+    mutationFn: () => aiSummarize({ data: { conversationId } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["wa-ai", conversationId] }),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao resumir"),
+  });
+
+  const classify = useMutation({
+    mutationFn: () => aiClassify({ data: { conversationId } }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["wa-ai", conversationId] });
+      toast.success(`Temperatura: ${r.temperature}`);
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao classificar"),
+  });
+
+  const suggest = useMutation({
+    mutationFn: () => aiSuggest({ data: { conversationId } }),
+    onSuccess: (r) => {
+      setText(r.reply);
+      toast.success("Sugestão pronta no campo de mensagem.");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao sugerir"),
+  });
+
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const v = text.trim();
@@ -74,6 +122,13 @@ export function ConversationView({ conversationId }: { conversationId: string })
 
   return (
     <div className="flex flex-col h-full min-h-0">
+      <AiToolbar
+        ai={ai ?? null}
+        summarizing={summarize.isPending}
+        classifying={classify.isPending}
+        onSummarize={() => summarize.mutate()}
+        onClassify={() => classify.mutate()}
+      />
       <div
         ref={scrollRef}
         className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-2 bg-muted/20"
@@ -91,6 +146,16 @@ export function ConversationView({ conversationId }: { conversationId: string })
         ))}
       </div>
       <form onSubmit={onSubmit} className="border-t border-white/5 p-3 flex gap-2 items-end">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          title="Sugerir resposta com IA"
+          onClick={() => suggest.mutate()}
+          disabled={suggest.isPending || send.isPending}
+        >
+          {suggest.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+        </Button>
         <Textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
