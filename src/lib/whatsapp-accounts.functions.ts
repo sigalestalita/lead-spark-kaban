@@ -1,0 +1,156 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+const REDACT = "••••••";
+
+function redact<T extends { access_token?: string | null; webhook_secret?: string | null; metadata?: unknown }>(row: T) {
+  const meta = (row.metadata ?? {}) as Record<string, unknown>;
+  return {
+    ...row,
+    access_token: row.access_token ? REDACT : null,
+    webhook_secret: row.webhook_secret ? REDACT : null,
+    metadata: {
+      ...meta,
+      verify_token: meta.verify_token ? REDACT : undefined,
+    },
+  };
+}
+
+export const listAccounts = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("whatsapp_accounts")
+      .select("*")
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    return { accounts: (data ?? []).map(redact) };
+  });
+
+const upsertSchema = z.object({
+  id: z.string().uuid().optional(),
+  label: z.string().min(1).max(120),
+  phone_number: z.string().min(5).max(32),
+  provider: z.enum(["meta_cloud", "mock"]).default("meta_cloud"),
+  provider_instance_id: z.string().min(1).max(64), // phone_number_id
+  access_token: z.string().optional(), // omit to keep current
+  webhook_secret: z.string().optional(), // app_secret; omit to keep current
+  verify_token: z.string().optional(), // omit to keep current
+  waba_id: z.string().optional(),
+  provider_base_url: z.string().optional(),
+  is_default: z.boolean().default(false),
+  status: z.enum(["active", "disabled"]).default("active"),
+});
+
+export const upsertAccount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => upsertSchema.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    // manager-only enforced by RLS (wa_accounts_manager_write), mas validamos para erro melhor:
+    const { data: isMgr } = await supabase.rpc("is_manager", { _user_id: userId });
+    if (!isMgr) throw new Error("Apenas gestores podem editar contas de WhatsApp.");
+
+    // carrega atual para preservar segredos quando vazios
+    let current: { access_token: string | null; webhook_secret: string; metadata: Record<string, unknown> } | null = null;
+    if (data.id) {
+      const { data: row } = await supabase
+        .from("whatsapp_accounts")
+        .select("access_token, webhook_secret, metadata")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (row) {
+        current = {
+          access_token: row.access_token,
+          webhook_secret: row.webhook_secret,
+          metadata: (row.metadata as Record<string, unknown>) ?? {},
+        };
+      }
+    }
+
+    const metaPrev = current?.metadata ?? {};
+    const nextMeta: Record<string, unknown> = { ...metaPrev };
+    if (data.verify_token) nextMeta.verify_token = data.verify_token;
+    if (data.waba_id !== undefined) nextMeta.waba_id = data.waba_id || undefined;
+
+    const payload = {
+      label: data.label,
+      phone_number: data.phone_number,
+      provider: data.provider,
+      provider_instance_id: data.provider_instance_id,
+      provider_base_url: data.provider_base_url || null,
+      access_token: data.access_token ? data.access_token : (current?.access_token ?? null),
+      webhook_secret: data.webhook_secret ? data.webhook_secret : (current?.webhook_secret ?? ""),
+      metadata: nextMeta,
+      is_default: data.is_default,
+      status: data.status,
+      owner_user_id: userId,
+    };
+
+    if (!payload.webhook_secret && data.provider === "meta_cloud") {
+      throw new Error("Informe o App Secret (webhook_secret) — usado para validar a assinatura HMAC.");
+    }
+
+    // garante apenas uma default
+    if (data.is_default) {
+      await supabase.from("whatsapp_accounts").update({ is_default: false }).neq("id", data.id ?? "00000000-0000-0000-0000-000000000000");
+    }
+
+    if (data.id) {
+      const { error } = await supabase.from("whatsapp_accounts").update(payload).eq("id", data.id);
+      if (error) throw new Error(error.message);
+      return { ok: true, id: data.id };
+    }
+    const { data: ins, error } = await supabase
+      .from("whatsapp_accounts")
+      .insert(payload)
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    return { ok: true, id: ins.id };
+  });
+
+export const deleteAccount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("whatsapp_accounts").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Envia uma mensagem de teste via a conta (texto livre) — útil para validar credenciais. */
+export const testSendAccount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({ id: z.string().uuid(), to: z.string().min(5), body: z.string().min(1).max(1000) }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: isMgr } = await context.supabase.rpc("is_manager", { _user_id: context.userId });
+    if (!isMgr) throw new Error("Apenas gestores.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: account, error } = await supabaseAdmin
+      .from("whatsapp_accounts")
+      .select("*")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error || !account) throw new Error(error?.message || "Conta não encontrada.");
+    const { getProvider } = await import("@/lib/whatsapp/provider-registry.server");
+    const provider = getProvider(account.provider);
+    const result = await provider.sendMessage({
+      account: {
+        id: account.id,
+        phone_number: account.phone_number,
+        provider: account.provider,
+        provider_instance_id: account.provider_instance_id,
+        provider_base_url: account.provider_base_url,
+        access_token: account.access_token,
+        webhook_secret: account.webhook_secret,
+      },
+      to: data.to,
+      type: "text",
+      body: data.body,
+    });
+    return result;
+  });
