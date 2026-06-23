@@ -20,6 +20,7 @@ import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppWhatsappIndexRouteImport } from './routes/_app.whatsapp.index'
 import { Route as AppWhatsappTemplatesRouteImport } from './routes/_app.whatsapp.templates'
+import { Route as AppWhatsappMetricasRouteImport } from './routes/_app.whatsapp.metricas'
 import { Route as AppWhatsappContasRouteImport } from './routes/_app.whatsapp.contas'
 import { Route as AppWhatsappCampanhasRouteImport } from './routes/_app.whatsapp.campanhas'
 import { Route as AppWhatsappAutomacoesRouteImport } from './routes/_app.whatsapp.automacoes'
@@ -83,6 +84,11 @@ const AppWhatsappIndexRoute = AppWhatsappIndexRouteImport.update({
 const AppWhatsappTemplatesRoute = AppWhatsappTemplatesRouteImport.update({
   id: '/templates',
   path: '/templates',
+  getParentRoute: () => AppWhatsappRoute,
+} as any)
+const AppWhatsappMetricasRoute = AppWhatsappMetricasRouteImport.update({
+  id: '/metricas',
+  path: '/metricas',
   getParentRoute: () => AppWhatsappRoute,
 } as any)
 const AppWhatsappContasRoute = AppWhatsappContasRouteImport.update({
@@ -152,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/whatsapp/automacoes': typeof AppWhatsappAutomacoesRoute
   '/whatsapp/campanhas': typeof AppWhatsappCampanhasRouteWithChildren
   '/whatsapp/contas': typeof AppWhatsappContasRoute
+  '/whatsapp/metricas': typeof AppWhatsappMetricasRoute
   '/whatsapp/templates': typeof AppWhatsappTemplatesRoute
   '/whatsapp/': typeof AppWhatsappIndexRoute
   '/whatsapp/campanhas/$id': typeof AppWhatsappCampanhasIdRoute
@@ -173,6 +180,7 @@ export interface FileRoutesByTo {
   '/whatsapp/automacoes': typeof AppWhatsappAutomacoesRoute
   '/whatsapp/campanhas': typeof AppWhatsappCampanhasRouteWithChildren
   '/whatsapp/contas': typeof AppWhatsappContasRoute
+  '/whatsapp/metricas': typeof AppWhatsappMetricasRoute
   '/whatsapp/templates': typeof AppWhatsappTemplatesRoute
   '/whatsapp': typeof AppWhatsappIndexRoute
   '/whatsapp/campanhas/$id': typeof AppWhatsappCampanhasIdRoute
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   '/_app/whatsapp/automacoes': typeof AppWhatsappAutomacoesRoute
   '/_app/whatsapp/campanhas': typeof AppWhatsappCampanhasRouteWithChildren
   '/_app/whatsapp/contas': typeof AppWhatsappContasRoute
+  '/_app/whatsapp/metricas': typeof AppWhatsappMetricasRoute
   '/_app/whatsapp/templates': typeof AppWhatsappTemplatesRoute
   '/_app/whatsapp/': typeof AppWhatsappIndexRoute
   '/_app/whatsapp/campanhas/$id': typeof AppWhatsappCampanhasIdRoute
@@ -221,6 +230,7 @@ export interface FileRouteTypes {
     | '/whatsapp/automacoes'
     | '/whatsapp/campanhas'
     | '/whatsapp/contas'
+    | '/whatsapp/metricas'
     | '/whatsapp/templates'
     | '/whatsapp/'
     | '/whatsapp/campanhas/$id'
@@ -242,6 +252,7 @@ export interface FileRouteTypes {
     | '/whatsapp/automacoes'
     | '/whatsapp/campanhas'
     | '/whatsapp/contas'
+    | '/whatsapp/metricas'
     | '/whatsapp/templates'
     | '/whatsapp'
     | '/whatsapp/campanhas/$id'
@@ -265,6 +276,7 @@ export interface FileRouteTypes {
     | '/_app/whatsapp/automacoes'
     | '/_app/whatsapp/campanhas'
     | '/_app/whatsapp/contas'
+    | '/_app/whatsapp/metricas'
     | '/_app/whatsapp/templates'
     | '/_app/whatsapp/'
     | '/_app/whatsapp/campanhas/$id'
@@ -365,6 +377,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppWhatsappTemplatesRouteImport
       parentRoute: typeof AppWhatsappRoute
     }
+    '/_app/whatsapp/metricas': {
+      id: '/_app/whatsapp/metricas'
+      path: '/metricas'
+      fullPath: '/whatsapp/metricas'
+      preLoaderRoute: typeof AppWhatsappMetricasRouteImport
+      parentRoute: typeof AppWhatsappRoute
+    }
     '/_app/whatsapp/contas': {
       id: '/_app/whatsapp/contas'
       path: '/contas'
@@ -453,6 +472,7 @@ interface AppWhatsappRouteChildren {
   AppWhatsappAutomacoesRoute: typeof AppWhatsappAutomacoesRoute
   AppWhatsappCampanhasRoute: typeof AppWhatsappCampanhasRouteWithChildren
   AppWhatsappContasRoute: typeof AppWhatsappContasRoute
+  AppWhatsappMetricasRoute: typeof AppWhatsappMetricasRoute
   AppWhatsappTemplatesRoute: typeof AppWhatsappTemplatesRoute
   AppWhatsappIndexRoute: typeof AppWhatsappIndexRoute
 }
@@ -461,6 +481,7 @@ const AppWhatsappRouteChildren: AppWhatsappRouteChildren = {
   AppWhatsappAutomacoesRoute: AppWhatsappAutomacoesRoute,
   AppWhatsappCampanhasRoute: AppWhatsappCampanhasRouteWithChildren,
   AppWhatsappContasRoute: AppWhatsappContasRoute,
+  AppWhatsappMetricasRoute: AppWhatsappMetricasRoute,
   AppWhatsappTemplatesRoute: AppWhatsappTemplatesRoute,
   AppWhatsappIndexRoute: AppWhatsappIndexRoute,
 }
