@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PRIORITY_LABEL, PRIORITY_COLOR } from "@/lib/lead-types";
 import { LEAD_TYPE_LABEL, LEAD_TYPE_COLOR, type LeadType } from "@/lib/lead-type";
+import { normalizeLeadType } from "@/lib/lead-type";
 import { evaluateIcpFit } from "@/lib/icp-fit";
 import { toast } from "sonner";
 import { RefreshCw, Plus, Search, Calendar, Clock, Timer, Flame, Briefcase, Building2, Mail, ChevronLeft, ChevronRight, Pencil, Check, X, LinkedinIcon } from "lucide-react";
@@ -52,6 +53,7 @@ function KanbanPage() {
   const [companySize, setCompanySize] = useState<string>("all");
   const [assigned, setAssigned] = useState<string>("all");
   const [demoFree, setDemoFree] = useState<string>("all");
+  const [leadTypeFilter, setLeadTypeFilter] = useState<string>("all");
 
   const { data, isLoading } = useQuery({
     queryKey: ["kanban"],
@@ -191,6 +193,15 @@ function KanbanPage() {
     if (demoFree === "sim" && l.demo_free !== true) return false;
     if (demoFree === "nao" && l.demo_free !== false) return false;
     if (demoFree === "nd" && l.demo_free != null) return false;
+    if (leadTypeFilter !== "all") {
+      const raw = (l.form_payload as { lead_type?: string } | null)?.lead_type ?? null;
+      const t = (l.lead_type as LeadType | null) ?? normalizeLeadType(raw);
+      if (leadTypeFilter === "nd") {
+        if (t) return false;
+      } else if (t !== leadTypeFilter) {
+        return false;
+      }
+    }
     const submittedRaw = (l.form_payload as { submitted_at?: string } | null)?.submitted_at ?? null;
     const convTs = submittedRaw
       ? new Date(submittedRaw).getTime()
