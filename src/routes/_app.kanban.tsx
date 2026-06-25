@@ -331,6 +331,18 @@ function KanbanPage() {
             <option value="nao">Demo Free: não</option>
             <option value="nd">Demo Free: não informado</option>
           </select>
+          <select
+            value={leadTypeFilter}
+            onChange={(e) => setLeadTypeFilter(e.target.value)}
+            className="h-9 rounded-md border bg-background px-2 text-sm"
+            title="Tipo de lead"
+          >
+            <option value="all">Tipo: todos</option>
+            <option value="empresa">Empresa</option>
+            <option value="consultoria">Consultoria</option>
+            <option value="pessoa_fisica">Pessoa física</option>
+            <option value="nd">Não informado</option>
+          </select>
           <div className="flex items-center gap-1">
             <select
               value=""
