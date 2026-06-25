@@ -181,6 +181,11 @@ function LeadDetailPage() {
               {PRIORITY_LABEL[lead.priority]} · {lead.score} pts
             </Badge>
             <Button size="sm" variant="ghost" onClick={() => recalc.mutate()}>Recalcular</Button>
+            {currentStage?.slug === "desqualificado" && (
+              <Badge variant="outline" className="border-rose-500/60 text-rose-600 dark:text-rose-400">
+                Descartado: {lead.lost_reason ?? "sem motivo"}
+              </Badge>
+            )}
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -295,6 +300,50 @@ function LeadDetailPage() {
               </SelectContent>
             </Select>
           </div>
+          {currentStage?.slug === "desqualificado" && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs text-muted-foreground">Motivo de descarte</p>
+                <Badge variant="outline" className="text-[10px] border-rose-500/60 text-rose-600 dark:text-rose-400">
+                  {lead.lost_reason ?? "Sem motivo"}
+                </Badge>
+              </div>
+              {(() => {
+                const presets = ["Sem perfil", "Sem fit com soluções", "Sem contato"];
+                const current = lead.lost_reason ?? "";
+                const isPreset = presets.includes(current);
+                return (
+                  <div className="space-y-2">
+                    <Select
+                      value={current === "" ? "__none" : isPreset ? current : "__custom"}
+                      onValueChange={(v) => {
+                        if (v === "__none") update.mutate({ lost_reason: null });
+                        else if (v !== "__custom") update.mutate({ lost_reason: v });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecionar motivo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none">— Sem motivo —</SelectItem>
+                        {presets.map((r) => (
+                          <SelectItem key={r} value={r}>{r}</SelectItem>
+                        ))}
+                        <SelectItem value="__custom">Outro…</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {!isPreset && current !== "" && (
+                      <Field
+                        label="Motivo customizado"
+                        value={lead.lost_reason}
+                        onSave={(v) => update.mutate({ lost_reason: v })}
+                      />
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
         </Card>
 
         <Card className="p-5 space-y-3">
