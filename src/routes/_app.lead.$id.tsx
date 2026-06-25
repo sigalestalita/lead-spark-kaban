@@ -181,6 +181,11 @@ function LeadDetailPage() {
               {PRIORITY_LABEL[lead.priority]} · {lead.score} pts
             </Badge>
             <Button size="sm" variant="ghost" onClick={() => recalc.mutate()}>Recalcular</Button>
+            {currentStage?.slug === "desqualificado" && (
+              <Badge variant="outline" className="border-rose-500/60 text-rose-600 dark:text-rose-400">
+                Descartado: {lead.lost_reason ?? "sem motivo"}
+              </Badge>
+            )}
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
