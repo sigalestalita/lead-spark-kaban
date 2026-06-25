@@ -19,5 +19,6 @@ export function normalizeLeadType(raw: string | null | undefined): LeadType | nu
   if (/consultor/.test(s)) return "consultoria";
   if (/empresa/.test(s)) return "empresa";
   if (/f[ií]sic/.test(s)) return "pessoa_fisica";
+  if (/b2c|interesse[_\s-]*pessoal|pessoal/.test(s)) return "pessoa_fisica";
   return null;
 }
