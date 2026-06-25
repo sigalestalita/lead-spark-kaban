@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PRIORITY_LABEL, PRIORITY_COLOR } from "@/lib/lead-types";
-import { LEAD_TYPE_LABEL, LEAD_TYPE_COLOR, type LeadType } from "@/lib/lead-type";
+import { LEAD_TYPE_LABEL, LEAD_TYPE_COLOR, normalizeLeadType, type LeadType } from "@/lib/lead-type";
 import { evaluateIcpFit } from "@/lib/icp-fit";
 import { toast } from "sonner";
 import { RefreshCw, Plus, Search, Calendar, Clock, Timer, Flame, Briefcase, Building2, Mail, ChevronLeft, ChevronRight, Pencil, Check, X, LinkedinIcon } from "lucide-react";
@@ -52,6 +52,7 @@ function KanbanPage() {
   const [companySize, setCompanySize] = useState<string>("all");
   const [assigned, setAssigned] = useState<string>("all");
   const [demoFree, setDemoFree] = useState<string>("all");
+  const [leadTypeFilter, setLeadTypeFilter] = useState<string>("all");
 
   const { data, isLoading } = useQuery({
     queryKey: ["kanban"],
@@ -191,6 +192,15 @@ function KanbanPage() {
     if (demoFree === "sim" && l.demo_free !== true) return false;
     if (demoFree === "nao" && l.demo_free !== false) return false;
     if (demoFree === "nd" && l.demo_free != null) return false;
+    if (leadTypeFilter !== "all") {
+      const raw = (l.form_payload as { lead_type?: string } | null)?.lead_type ?? null;
+      const t = (l.lead_type as LeadType | null) ?? normalizeLeadType(raw);
+      if (leadTypeFilter === "nd") {
+        if (t) return false;
+      } else if (t !== leadTypeFilter) {
+        return false;
+      }
+    }
     const submittedRaw = (l.form_payload as { submitted_at?: string } | null)?.submitted_at ?? null;
     const convTs = submittedRaw
       ? new Date(submittedRaw).getTime()
@@ -319,6 +329,18 @@ function KanbanPage() {
             <option value="sim">Demo Free: sim</option>
             <option value="nao">Demo Free: não</option>
             <option value="nd">Demo Free: não informado</option>
+          </select>
+          <select
+            value={leadTypeFilter}
+            onChange={(e) => setLeadTypeFilter(e.target.value)}
+            className="h-9 rounded-md border bg-background px-2 text-sm"
+            title="Tipo de lead"
+          >
+            <option value="all">Tipo: todos</option>
+            <option value="empresa">Empresa</option>
+            <option value="consultoria">Consultoria</option>
+            <option value="pessoa_fisica">Pessoa física</option>
+            <option value="nd">Não informado</option>
           </select>
           <div className="flex items-center gap-1">
             <select
