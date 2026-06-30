@@ -144,12 +144,12 @@ Estrutura obrigatória do email:
    - **Filtros poderosos no kanban**: por responsável, tipo de lead, demo free, prioridade e mais. Bate o olho e enxerga só o que importa.
    - **Kanban completo**: limite antigo de 1000 leads acabou — agora aparece TUDO.
 
-MOCKUPS — OBRIGATÓRIO: cada uma das 4 grandes novidades abaixo PRECISA aparecer ilustrada com a imagem correspondente, embutida logo acima ou ao lado do card explicativo. Use exatamente estas URLs em tags <img>, com width="100%" max-width 560px, border-radius:12px, border:1px solid #1f2a4a, display:block, margin: 0 auto 12px. NÃO invente outras URLs. NÃO use placeholders.
+PRINTS REAIS DA PLATAFORMA — OBRIGATÓRIO: estas são capturas de tela REAIS da Lidi em produção (não são mockups, não são ilustrações). Cada uma das 4 grandes novidades abaixo PRECISA aparecer ilustrada com o print correspondente, embutida logo acima ou ao lado do card explicativo. Use exatamente estas URLs em tags <img>, com width="100%" max-width 600px, border-radius:12px, border:1px solid #1f2a4a, display:block, margin: 0 auto 12px. NÃO invente outras URLs. NÃO use placeholders. NÃO chame de "mockup" no texto — chame de "print" ou "tela".
 
-- IA de atendimento (SDR virtual) → https://vlfohgirjbgpqhqbnuks.supabase.co/storage/v1/object/public/email-assets/mockups/ai-sdr.jpg (alt="Conversa da IA da Lidi atendendo um lead no WhatsApp")
-- FUPs automatizados no WhatsApp → https://vlfohgirjbgpqhqbnuks.supabase.co/storage/v1/object/public/email-assets/mockups/fups.jpg (alt="Editor de sequência de follow-up automatizado")
-- Disparador de mensagens em massa → https://vlfohgirjbgpqhqbnuks.supabase.co/storage/v1/object/public/email-assets/mockups/disparador.jpg (alt="Tela de criação de campanha de disparo em massa no WhatsApp")
-- WhatsApp integrado / Kanban com responsável, tipo de lead, demo free → https://vlfohgirjbgpqhqbnuks.supabase.co/storage/v1/object/public/email-assets/mockups/kanban.jpg (alt="Kanban da Lidi com badges de responsável, tipo de lead e demo free")
+- WhatsApp integrado / Inbox com painel do lead → https://vlfohgirjbgpqhqbnuks.supabase.co/storage/v1/object/public/email-assets/mockups/ai-sdr.png (alt="Inbox de WhatsApp da Lidi com conversa aberta e painel do lead")
+- FUPs automatizados no WhatsApp → https://vlfohgirjbgpqhqbnuks.supabase.co/storage/v1/object/public/email-assets/mockups/fups.png (alt="Criação de FUP com gatilho de entrada e filtros de audiência")
+- Disparador de mensagens em massa → https://vlfohgirjbgpqhqbnuks.supabase.co/storage/v1/object/public/email-assets/mockups/disparador.png (alt="Tela de criação de campanha em massa no WhatsApp com filtros de audiência")
+- Kanban com responsável, tipo de lead, demo free → https://vlfohgirjbgpqhqbnuks.supabase.co/storage/v1/object/public/email-assets/mockups/kanban.png (alt="Kanban da Lidi com badges de responsável, tipo de lead e demo free")
 
 Distribua as 4 imagens ao longo do email, uma para cada bloco principal. Estrutura sugerida: imagem grande → título da feature → descrição.
 
