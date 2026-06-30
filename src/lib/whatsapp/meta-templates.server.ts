@@ -105,6 +105,28 @@ export async function listMetaTemplates(account: GraphAccount): Promise<MetaTemp
   return json.data ?? [];
 }
 
+export type MetaTemplateComponent = {
+  type?: string;
+  format?: string;
+  text?: string;
+  buttons?: unknown[];
+};
+
+export async function fetchMetaTemplateDetails(
+  account: GraphAccount,
+  templateId: string,
+): Promise<{ components: MetaTemplateComponent[] }> {
+  const url = `${baseUrl(account)}/${templateId}?fields=name,language,status,category,components`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${account.access_token}` },
+  });
+  const text = await res.text();
+  let json: { components?: MetaTemplateComponent[]; error?: { message?: string } } = {};
+  try { json = JSON.parse(text); } catch { /* ignore */ }
+  if (!res.ok) throw new Error(json.error?.message || `HTTP ${res.status}: ${text.slice(0, 300)}`);
+  return { components: json.components ?? [] };
+}
+
 export async function deleteMetaTemplate(account: GraphAccount, name: string): Promise<void> {
   const url = `${baseUrl(account)}/${wabaId(account)}/message_templates?name=${encodeURIComponent(name)}`;
   const res = await fetch(url, {

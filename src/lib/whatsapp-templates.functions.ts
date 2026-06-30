@@ -252,6 +252,12 @@ export const syncTemplatesFromMeta = createServerFn({ method: "POST" })
       .select("id,provider_template_name,language");
 
     let updated = 0;
+    let imported = 0;
+    const localKeys = new Set(
+      (local ?? [])
+        .filter((t) => t.provider_template_name)
+        .map((t) => `${t.provider_template_name}::${t.language ?? ""}`),
+    );
     for (const tpl of local ?? []) {
       if (!tpl.provider_template_name) continue;
       const match = remote.find(
@@ -269,5 +275,60 @@ export const syncTemplatesFromMeta = createServerFn({ method: "POST" })
         .eq("id", tpl.id);
       updated += 1;
     }
-    return { ok: true, updated, remoteCount: remote.length };
+
+    // Importa templates que existem só na Meta (criados direto no gerenciador).
+    const { fetchMetaTemplateDetails } = await import("@/lib/whatsapp/meta-templates.server");
+    const accountForDetails = {
+      access_token: account.access_token as string,
+      provider_base_url: account.provider_base_url as string | null,
+      metadata: (account.metadata as Record<string, unknown>) ?? null,
+    };
+    for (const r of remote) {
+      const key = `${r.name}::${r.language ?? ""}`;
+      if (localKeys.has(key)) continue;
+      let body = "";
+      let header: string | null = null;
+      let footer: string | null = null;
+      let buttons: unknown[] = [];
+      let varCount = 0;
+      try {
+        const det = await fetchMetaTemplateDetails(accountForDetails, r.id);
+        for (const c of det.components ?? []) {
+          const type = String(c.type ?? "").toUpperCase();
+          if (type === "BODY") {
+            body = String(c.text ?? "");
+            const matches = body.match(/\{\{\s*\d+\s*\}\}/g);
+            varCount = matches ? matches.length : 0;
+          } else if (type === "HEADER" && String(c.format ?? "").toUpperCase() === "TEXT") {
+            header = String(c.text ?? "") || null;
+          } else if (type === "FOOTER") {
+            footer = String(c.text ?? "") || null;
+          } else if (type === "BUTTONS" && Array.isArray(c.buttons)) {
+            buttons = c.buttons as unknown[];
+          }
+        }
+      } catch {
+        body = `[importado da Meta: ${r.name}]`;
+      }
+      const variables = Array.from({ length: varCount }, (_, i) => `var${i + 1}`);
+      const { error: insErr } = await supabase.from("whatsapp_templates").insert({
+        name: r.name,
+        category: (r.category ?? "utility").toLowerCase(),
+        language: r.language,
+        body: body || " ",
+        variables,
+        provider_template_name: r.name,
+        meta_template_id: r.id,
+        status: statusMap[r.status] ?? "pending",
+        rejection_reason: r.rejected_reason ?? null,
+        header_text: header,
+        header_type: header ? "TEXT" : null,
+        footer_text: footer,
+        buttons: buttons as never,
+        meta_last_synced_at: new Date().toISOString(),
+      });
+      if (!insErr) imported += 1;
+    }
+
+    return { ok: true, updated, imported, remoteCount: remote.length };
   });
