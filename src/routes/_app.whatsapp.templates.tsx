@@ -7,6 +7,8 @@ import {
   createTemplate,
   updateTemplate,
   deleteTemplate,
+  submitTemplateToMeta,
+  syncTemplatesFromMeta,
 } from "@/lib/whatsapp-templates.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +23,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Send, RefreshCw, X } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/whatsapp/templates")({
   component: TemplatesPage,
@@ -36,7 +39,17 @@ type TemplateRow = {
   variables: unknown;
   status: string | null;
   provider_template_name: string | null;
+  header_text: string | null;
+  footer_text: string | null;
+  buttons: unknown;
+  rejection_reason: string | null;
 };
+
+type BtnType = "QUICK_REPLY" | "URL" | "PHONE_NUMBER";
+type Btn =
+  | { type: "QUICK_REPLY"; text: string }
+  | { type: "URL"; text: string; url: string }
+  | { type: "PHONE_NUMBER"; text: string; phone_number: string };
 
 function extractVars(body: string): string[] {
   const m = body.match(/\{\{\s*([\w.]+)\s*\}\}/g) ?? [];
@@ -48,6 +61,8 @@ function TemplatesPage() {
   const createFn = useServerFn(createTemplate);
   const updateFn = useServerFn(updateTemplate);
   const deleteFn = useServerFn(deleteTemplate);
+  const submitFn = useServerFn(submitTemplateToMeta);
+  const syncFn = useServerFn(syncTemplatesFromMeta);
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -62,6 +77,9 @@ function TemplatesPage() {
   const [language, setLanguage] = useState("pt_BR");
   const [body, setBody] = useState("");
   const [providerTemplateName, setProviderTemplateName] = useState("");
+  const [headerText, setHeaderText] = useState("");
+  const [footerText, setFooterText] = useState("");
+  const [buttons, setButtons] = useState<Btn[]>([]);
 
   function openCreate() {
     setEditing(null);
@@ -70,6 +88,9 @@ function TemplatesPage() {
     setLanguage("pt_BR");
     setBody("");
     setProviderTemplateName("");
+    setHeaderText("");
+    setFooterText("");
+    setButtons([]);
     setOpen(true);
   }
 
@@ -80,6 +101,9 @@ function TemplatesPage() {
     setLanguage(t.language ?? "pt_BR");
     setBody(t.body);
     setProviderTemplateName(t.provider_template_name ?? "");
+    setHeaderText(t.header_text ?? "");
+    setFooterText(t.footer_text ?? "");
+    setButtons(Array.isArray(t.buttons) ? (t.buttons as Btn[]) : []);
     setOpen(true);
   }
 
@@ -87,13 +111,35 @@ function TemplatesPage() {
     mutationFn: async () => {
       const variables = extractVars(body);
       const ptn = providerTemplateName.trim() || null;
+      const cleanButtons = buttons.filter((b) => b.text?.trim());
       if (editing) {
         return updateFn({
-          data: { id: editing.id, name, category, language, body, variables, provider_template_name: ptn },
+          data: {
+            id: editing.id,
+            name,
+            category,
+            language,
+            body,
+            variables,
+            provider_template_name: ptn,
+            header_text: headerText.trim() || null,
+            footer_text: footerText.trim() || null,
+            buttons: cleanButtons,
+          },
         });
       }
       return createFn({
-        data: { name, category, language, body, variables, provider_template_name: ptn ?? undefined },
+        data: {
+          name,
+          category,
+          language,
+          body,
+          variables,
+          provider_template_name: ptn ?? undefined,
+          header_text: headerText.trim() || null,
+          footer_text: footerText.trim() || null,
+          buttons: cleanButtons,
+        },
       });
     },
     onSuccess: () => {
@@ -105,6 +151,24 @@ function TemplatesPage() {
   const del = useMutation({
     mutationFn: (id: string) => deleteFn({ data: { id } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["wa-templates"] }),
+  });
+
+  const submit = useMutation({
+    mutationFn: (id: string) => submitFn({ data: { id } }),
+    onSuccess: (r) => {
+      toast.success(`Enviado à Meta como "${r.providerName}" — status: ${r.status}`);
+      qc.invalidateQueries({ queryKey: ["wa-templates"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao enviar para a Meta"),
+  });
+
+  const sync = useMutation({
+    mutationFn: () => syncFn(),
+    onSuccess: (r) => {
+      toast.success(`Sincronizado: ${r.updated} de ${r.remoteCount} templates na Meta`);
+      qc.invalidateQueries({ queryKey: ["wa-templates"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao sincronizar com a Meta"),
   });
 
   const templates = (data?.templates ?? []) as TemplateRow[];
