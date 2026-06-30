@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ExternalLink } from "lucide-react";
+import { LEAD_TYPE_LABEL, LEAD_TYPE_COLOR, type LeadType } from "@/lib/lead-type";
 
 export const Route = createFileRoute("/_app/whatsapp/")({
   component: WhatsappInbox,
@@ -41,6 +42,7 @@ function WhatsappInbox() {
   }, [qc]);
 
   const conversations = data?.conversations ?? [];
+  const profiles = data?.profiles ?? [];
   const selectedConv = conversations.find((c) => c.id === selected) ?? null;
 
   return (
@@ -85,7 +87,16 @@ function WhatsappInbox() {
             </p>
           )}
           {conversations.map((c) => {
-            const lead = c.leads as { id: string; name: string | null; company_name: string | null } | null;
+            const lead = c.leads as {
+              id: string;
+              name: string | null;
+              company_name: string | null;
+              lead_type: string | null;
+              company_size: string | null;
+              assigned_to: string | null;
+            } | null;
+            const owner = lead?.assigned_to ? profiles.find((p) => p.id === lead.assigned_to) : null;
+            const ownerLabel = owner?.full_name ?? owner?.email ?? null;
             const isSel = c.id === selected;
             return (
               <button
@@ -104,6 +115,30 @@ function WhatsappInbox() {
                 {lead?.company_name && (
                   <p className="text-xs text-muted-foreground truncate">{lead.company_name}</p>
                 )}
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {lead?.lead_type && (
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] h-4 px-1.5"
+                      style={{
+                        borderColor: LEAD_TYPE_COLOR[lead.lead_type as LeadType],
+                        color: LEAD_TYPE_COLOR[lead.lead_type as LeadType],
+                      }}
+                    >
+                      {LEAD_TYPE_LABEL[lead.lead_type as LeadType] ?? lead.lead_type}
+                    </Badge>
+                  )}
+                  {lead?.company_size && (
+                    <Badge variant="outline" className="text-[10px] h-4 px-1.5 text-muted-foreground">
+                      {lead.company_size}
+                    </Badge>
+                  )}
+                  {ownerLabel && (
+                    <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                      {ownerLabel}
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground truncate mt-1">{c.last_preview ?? "—"}</p>
                 <div className="flex items-center justify-between mt-1">
                   <span className="text-[10px] text-muted-foreground">
