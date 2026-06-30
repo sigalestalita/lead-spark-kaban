@@ -11,6 +11,7 @@ import {
 import { listTemplates } from "@/lib/whatsapp-templates.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -21,7 +22,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Megaphone, ChevronRight } from "lucide-react";
+import { Plus, Megaphone, ChevronRight, Upload } from "lucide-react";
 
 export const Route = createFileRoute("/_app/whatsapp/campanhas")({
   component: CampaignsPage,
@@ -29,6 +30,47 @@ export const Route = createFileRoute("/_app/whatsapp/campanhas")({
 
 type Priority = "alta" | "media" | "baixa";
 type DemoFreeF = "any" | "yes" | "no";
+type AudienceSource = "filters" | "phones";
+type PhoneEntry = { phone: string; name?: string; company?: string };
+
+function parseCsv(text: string): PhoneEntry[] {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) return [];
+  // detecta header
+  const first = lines[0].toLowerCase();
+  const hasHeader = /phone|telefone|numero|whatsapp/.test(first);
+  const dataLines = hasHeader ? lines.slice(1) : lines;
+  let phoneIdx = 0;
+  let nameIdx = -1;
+  let companyIdx = -1;
+  if (hasHeader) {
+    const cols = lines[0].split(/[,;\t]/).map((c) => c.trim().toLowerCase());
+    phoneIdx = cols.findIndex((c) => /phone|telefone|numero|whatsapp/.test(c));
+    nameIdx = cols.findIndex((c) => /name|nome/.test(c));
+    companyIdx = cols.findIndex((c) => /company|empresa/.test(c));
+    if (phoneIdx < 0) phoneIdx = 0;
+  }
+  const out: PhoneEntry[] = [];
+  for (const line of dataLines) {
+    const cols = line.split(/[,;\t]/).map((c) => c.trim());
+    const phone = (cols[phoneIdx] ?? "").replace(/^["']|["']$/g, "");
+    if (!phone) continue;
+    out.push({
+      phone,
+      name: nameIdx >= 0 ? cols[nameIdx]?.replace(/^["']|["']$/g, "") : undefined,
+      company: companyIdx >= 0 ? cols[companyIdx]?.replace(/^["']|["']$/g, "") : undefined,
+    });
+  }
+  return out;
+}
+
+function parseManualPhones(text: string): PhoneEntry[] {
+  return text
+    .split(/[\s,;\n]+/)
+    .map((p) => p.trim())
+    .filter((p) => p.replace(/\D/g, "").length >= 8)
+    .map((phone) => ({ phone }));
+}
 
 function CampaignsPage() {
   const listFn = useServerFn(listCampaigns);
@@ -48,10 +90,15 @@ function CampaignsPage() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [templateId, setTemplateId] = useState<string>("");
+  const [source, setSource] = useState<AudienceSource>("filters");
   const [stageIds, setStageIds] = useState<string[]>([]);
   const [priorities, setPriorities] = useState<Priority[]>([]);
   const [demoFree, setDemoFree] = useState<DemoFreeF>("any");
   const [leadTypes, setLeadTypes] = useState<string[]>([]);
+  const [companySizes, setCompanySizes] = useState<string[]>([]);
+  const [emailDomainsText, setEmailDomainsText] = useState("");
+  const [csvText, setCsvText] = useState("");
+  const [manualText, setManualText] = useState("");
 
   const { data: tmpls } = useQuery({
     queryKey: ["wa-templates-mini"],
@@ -64,26 +111,51 @@ function CampaignsPage() {
     enabled: open,
   });
 
-  const filters = useMemo(
-    () => ({
-      stageIds: stageIds.length ? stageIds : undefined,
-      priorities: priorities.length ? priorities : undefined,
-      demoFree: demoFree === "any" ? undefined : demoFree,
-      leadType: leadTypes.length ? leadTypes : undefined,
-    }),
-    [stageIds, priorities, demoFree, leadTypes],
+  const emailDomains = useMemo(
+    () => emailDomainsText.split(/[\s,;]+/).map((d) => d.trim()).filter(Boolean),
+    [emailDomainsText],
   );
 
+  const phoneEntries = useMemo<PhoneEntry[]>(() => {
+    if (source !== "phones") return [];
+    const merged = [...parseCsv(csvText), ...parseManualPhones(manualText)];
+    // dedupe por dígitos
+    const seen = new Set<string>();
+    return merged.filter((e) => {
+      const k = e.phone.replace(/\D/g, "");
+      if (!k || seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  }, [source, csvText, manualText]);
+
+  const audience = useMemo(() => {
+    if (source === "phones") {
+      return { source: "phones" as const, phones: phoneEntries };
+    }
+    return {
+      source: "filters" as const,
+      filters: {
+        stageIds: stageIds.length ? stageIds : undefined,
+        priorities: priorities.length ? priorities : undefined,
+        demoFree: demoFree === "any" ? undefined : demoFree,
+        leadType: leadTypes.length ? leadTypes : undefined,
+        companySizes: companySizes.length ? companySizes : undefined,
+        emailDomains: emailDomains.length ? emailDomains : undefined,
+      },
+    };
+  }, [source, phoneEntries, stageIds, priorities, demoFree, leadTypes, companySizes, emailDomains]);
+
   const { data: preview } = useQuery({
-    queryKey: ["wa-camp-preview", filters],
-    queryFn: () => previewFn({ data: { filters } }),
+    queryKey: ["wa-camp-preview", audience],
+    queryFn: () => previewFn({ data: { audience } }),
     enabled: open,
   });
 
   const create = useMutation({
     mutationFn: async () => {
       const r = await createFn({
-        data: { name, templateId, filters: filters },
+        data: { name, templateId, audience },
       });
       return r;
     },
@@ -96,6 +168,12 @@ function CampaignsPage() {
 
   function toggle<T>(arr: T[], v: T): T[] {
     return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
+  }
+
+  function onCsvFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = () => setCsvText(String(reader.result ?? ""));
+    reader.readAsText(file);
   }
 
   const campaigns = list?.campaigns ?? [];
@@ -135,8 +213,28 @@ function CampaignsPage() {
               </div>
 
               <div className="border border-white/5 rounded-lg p-3 space-y-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase">Audiência</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">Audiência</p>
+                  <div className="flex gap-1">
+                    {(["filters", "phones"] as AudienceSource[]).map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setSource(s)}
+                        className={`text-[11px] px-2 py-1 rounded border ${
+                          source === s
+                            ? "bg-primary/15 border-primary/40 text-primary"
+                            : "border-white/10 text-muted-foreground hover:bg-white/5"
+                        }`}
+                      >
+                        {s === "filters" ? "Filtros" : "CSV / Números"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
+                {source === "filters" && (
+                  <>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Estágios</p>
                   <div className="flex flex-wrap gap-1.5">
@@ -214,6 +312,85 @@ function CampaignsPage() {
                     </div>
                   )}
                 </div>
+
+                {(meta?.companySizes ?? []).length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Porte (company size)</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(meta?.companySizes ?? []).map((cs) => {
+                        const active = companySizes.includes(cs);
+                        return (
+                          <button
+                            key={cs}
+                            type="button"
+                            onClick={() => setCompanySizes(toggle(companySizes, cs))}
+                            className={`text-xs px-2 py-1 rounded border ${
+                              active ? "bg-primary/15 border-primary/40 text-primary" : "border-white/10 text-muted-foreground hover:bg-white/5"
+                            }`}
+                          >
+                            {cs}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Domínios de email (separados por vírgula)</p>
+                  <Input
+                    value={emailDomainsText}
+                    onChange={(e) => setEmailDomainsText(e.target.value)}
+                    placeholder="ex: empresa.com, @consultoria.com.br"
+                    className="h-8 text-xs"
+                  />
+                </div>
+                  </>
+                )}
+
+                {source === "phones" && (
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs text-muted-foreground">Upload CSV</p>
+                        <label className="text-[11px] text-primary hover:underline cursor-pointer flex items-center gap-1">
+                          <Upload className="h-3 w-3" />
+                          escolher arquivo
+                          <input
+                            type="file"
+                            accept=".csv,text/csv,text/plain"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) onCsvFile(f);
+                            }}
+                          />
+                        </label>
+                      </div>
+                      <Textarea
+                        value={csvText}
+                        onChange={(e) => setCsvText(e.target.value)}
+                        placeholder={"phone,name,company\n11999998888,Maria,Acme\n5511988887777,João,Beta"}
+                        className="text-xs font-mono min-h-[90px]"
+                      />
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Header opcional. Colunas suportadas: phone/telefone, name/nome, company/empresa. Separadores: vírgula, ponto-e-vírgula ou tab.
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Ou cole números manualmente</p>
+                      <Textarea
+                        value={manualText}
+                        onChange={(e) => setManualText(e.target.value)}
+                        placeholder={"11999998888\n5511988887777"}
+                        className="text-xs font-mono min-h-[70px]"
+                      />
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Um número por linha (ou separado por vírgula/espaço). Números BR sem DDI 55 recebem o prefixo automaticamente.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="text-xs flex items-center justify-between border-t border-white/5 pt-3">
                   <span className="text-muted-foreground">Audiência estimada (com telefone)</span>
