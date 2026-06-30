@@ -72,18 +72,18 @@ export const upsertAccount = createServerFn({ method: "POST" })
 
     const metaPrev = (current?.metadata ?? {}) as Record<string, unknown>;
     const nextMetaObj: Record<string, unknown> = { ...metaPrev };
-    if (data.verify_token) nextMetaObj.verify_token = data.verify_token;
-    if (data.waba_id !== undefined) nextMetaObj.waba_id = data.waba_id || undefined;
+    if (data.verify_token) nextMetaObj.verify_token = data.verify_token.trim();
+    if (data.waba_id !== undefined) nextMetaObj.waba_id = data.waba_id.trim() || undefined;
     const nextMeta = nextMetaObj as unknown as Json;
 
     const payload = {
       label: data.label,
-      phone_number: data.phone_number,
+      phone_number: data.phone_number.trim(),
       provider: data.provider,
-      provider_instance_id: data.provider_instance_id,
-      provider_base_url: data.provider_base_url || null,
-      access_token: data.access_token ? data.access_token : (current?.access_token ?? null),
-      webhook_secret: data.webhook_secret ? data.webhook_secret : (current?.webhook_secret ?? ""),
+      provider_instance_id: data.provider_instance_id.trim(),
+      provider_base_url: data.provider_base_url?.trim() || null,
+      access_token: data.access_token ? data.access_token.trim() : (current?.access_token ?? null),
+      webhook_secret: data.webhook_secret ? data.webhook_secret.trim() : (current?.webhook_secret?.trim() ?? ""),
       metadata: nextMeta,
       is_default: data.is_default,
       status: data.status,

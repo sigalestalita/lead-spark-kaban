@@ -109,9 +109,10 @@ export const metaCloudProvider: WhatsAppProvider = {
 
   verifySignature(rawBody, headers, secret): boolean {
     const sigHeader = headers["x-hub-signature-256"] || headers["X-Hub-Signature-256"];
-    if (!sigHeader || !secret) return false;
+    const appSecret = secret?.trim();
+    if (!sigHeader || !appSecret) return false;
     const provided = sigHeader.startsWith("sha256=") ? sigHeader.slice(7) : sigHeader;
-    const expected = createHmac("sha256", secret).update(rawBody, "utf8").digest("hex");
+    const expected = createHmac("sha256", appSecret).update(rawBody, "utf8").digest("hex");
     try {
       const a = Buffer.from(provided, "hex");
       const b = Buffer.from(expected, "hex");
