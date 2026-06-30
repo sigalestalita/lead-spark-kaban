@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect, useRef } from "react";
 import { listKanbanData, moveLeadStage, createManualLead, updateLead } from "@/lib/leads.functions";
+import { getOrCreateConversationForLead } from "@/lib/whatsapp.functions";
 import { syncRdLeads } from "@/lib/rd-station.functions";
 import { autoEnrichPendingLeads, recalculatePendingScores } from "@/lib/ai.functions";
 import { syncLeadsFromSheet } from "@/lib/sheets.functions";
@@ -14,7 +16,7 @@ import { PRIORITY_LABEL, PRIORITY_COLOR } from "@/lib/lead-types";
 import { LEAD_TYPE_LABEL, LEAD_TYPE_COLOR, normalizeLeadType, type LeadType } from "@/lib/lead-type";
 import { evaluateIcpFit } from "@/lib/icp-fit";
 import { toast } from "sonner";
-import { RefreshCw, Plus, Search, Calendar, Clock, Timer, Flame, Briefcase, Building2, Mail, ChevronLeft, ChevronRight, Pencil, Check, X, LinkedinIcon } from "lucide-react";
+import { RefreshCw, Plus, Search, Calendar, Clock, Timer, Flame, Briefcase, Building2, Mail, ChevronLeft, ChevronRight, Pencil, Check, X, LinkedinIcon, MessageCircle } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
