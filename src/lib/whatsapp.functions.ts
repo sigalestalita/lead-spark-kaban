@@ -29,7 +29,7 @@ export const listConversations = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     let q = supabase
       .from("whatsapp_conversations")
-      .select("*, leads:lead_id(id,name,company_name,email,phone,priority,stage_id,assigned_to)")
+      .select("*, leads:lead_id(id,name,company_name,email,phone,priority,stage_id,assigned_to,lead_type,company_size)")
       .order("last_message_at", { ascending: false, nullsFirst: false })
       .limit(300);
     if (data?.status && data.status !== "all") q = q.eq("status", data.status);
@@ -50,7 +50,10 @@ export const listConversations = createServerFn({ method: "GET" })
         );
       });
     }
-    return { conversations: result };
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name, email");
+    return { conversations: result, profiles: profiles ?? [] };
   });
 
 /** Busca/cria conversa para um lead. */
