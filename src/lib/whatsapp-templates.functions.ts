@@ -87,14 +87,13 @@ export const updateTemplate = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { id, header_text, ...rest } = data;
-    const update: Record<string, unknown> = { ...rest };
-    if (header_text !== undefined) {
-      update.header_text = header_text;
-      update.header_type = header_text ? "TEXT" : null;
-    }
+    const headerPatch =
+      header_text !== undefined
+        ? { header_text, header_type: header_text ? "TEXT" : null }
+        : {};
     const { error } = await context.supabase
       .from("whatsapp_templates")
-      .update(update)
+      .update({ ...rest, ...headerPatch })
       .eq("id", id);
     if (error) throw new Error(error.message);
     return { ok: true };
