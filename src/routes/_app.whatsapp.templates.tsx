@@ -35,6 +35,7 @@ type TemplateRow = {
   body: string;
   variables: unknown;
   status: string | null;
+  provider_template_name: string | null;
 };
 
 function extractVars(body: string): string[] {
@@ -60,6 +61,7 @@ function TemplatesPage() {
   const [category, setCategory] = useState<"marketing" | "utility" | "authentication">("utility");
   const [language, setLanguage] = useState("pt_BR");
   const [body, setBody] = useState("");
+  const [providerTemplateName, setProviderTemplateName] = useState("");
 
   function openCreate() {
     setEditing(null);
@@ -67,6 +69,7 @@ function TemplatesPage() {
     setCategory("utility");
     setLanguage("pt_BR");
     setBody("");
+    setProviderTemplateName("");
     setOpen(true);
   }
 
@@ -76,16 +79,22 @@ function TemplatesPage() {
     setCategory((t.category as "marketing" | "utility" | "authentication") ?? "utility");
     setLanguage(t.language ?? "pt_BR");
     setBody(t.body);
+    setProviderTemplateName(t.provider_template_name ?? "");
     setOpen(true);
   }
 
   const save = useMutation({
     mutationFn: async () => {
       const variables = extractVars(body);
+      const ptn = providerTemplateName.trim() || null;
       if (editing) {
-        return updateFn({ data: { id: editing.id, name, category, language, body, variables } });
+        return updateFn({
+          data: { id: editing.id, name, category, language, body, variables, provider_template_name: ptn },
+        });
       }
-      return createFn({ data: { name, category, language, body, variables } });
+      return createFn({
+        data: { name, category, language, body, variables, provider_template_name: ptn ?? undefined },
+      });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["wa-templates"] });
@@ -157,6 +166,20 @@ function TemplatesPage() {
                   </p>
                 )}
               </div>
+              <div>
+                <label className="text-xs text-muted-foreground">
+                  Nome do template aprovado na Meta (HSM)
+                </label>
+                <Input
+                  value={providerTemplateName}
+                  onChange={(e) => setProviderTemplateName(e.target.value)}
+                  placeholder="ex: boas_vindas_sdr"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Obrigatório para disparar fora da janela de 24h. Use o mesmo nome aprovado no Gerenciador do
+                  WhatsApp Business. As variáveis acima são enviadas em ordem como {"{{1}}, {{2}}, …"}.
+                </p>
+              </div>
               {save.error instanceof Error && (
                 <p className="text-xs text-destructive">{save.error.message}</p>
               )}
@@ -186,6 +209,15 @@ function TemplatesPage() {
                   <p className="text-sm font-medium truncate">{t.name}</p>
                   <Badge variant="outline" className="text-[10px]">{t.category ?? "utility"}</Badge>
                   <Badge variant="outline" className="text-[10px]">{t.language ?? "pt_BR"}</Badge>
+                  {t.provider_template_name ? (
+                    <Badge className="text-[10px] bg-emerald-500/15 text-emerald-300 border-emerald-500/30">
+                      HSM: {t.provider_template_name}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-500/30">
+                      texto livre (24h)
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap line-clamp-3">{t.body}</p>
               </div>
