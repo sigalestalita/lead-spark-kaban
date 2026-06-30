@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { z } from "zod";
+import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listConversations } from "@/lib/whatsapp.functions";
@@ -13,17 +15,25 @@ import { ExternalLink } from "lucide-react";
 import { LEAD_TYPE_LABEL, LEAD_TYPE_COLOR, type LeadType } from "@/lib/lead-type";
 
 export const Route = createFileRoute("/_app/whatsapp/")({
+  validateSearch: z.object({ c: z.string().uuid().optional() }),
   component: WhatsappInbox,
 });
 
 function WhatsappInbox() {
   const fn = useServerFn(listConversations);
   const qc = useQueryClient();
+  const routeSearch = Route.useSearch();
+  const navigate = useNavigate({ from: "/whatsapp/" });
   const [status, setStatus] = useState<"all" | "open" | "pending" | "closed">("all");
   const [assigned, setAssigned] = useState<"all" | "me" | "unassigned">("all");
   const [unread, setUnread] = useState(false);
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(routeSearch.c ?? null);
+
+  useEffect(() => {
+    if (routeSearch.c && routeSearch.c !== selected) setSelected(routeSearch.c);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeSearch.c]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["wa-conversations", status, assigned, unread, search],
@@ -101,7 +111,10 @@ function WhatsappInbox() {
             return (
               <button
                 key={c.id}
-                onClick={() => setSelected(c.id)}
+                onClick={() => {
+                  setSelected(c.id);
+                  navigate({ search: { c: c.id }, replace: true });
+                }}
                 className={`w-full text-left px-3 py-3 border-b border-white/5 hover:bg-white/5 transition-colors ${
                   isSel ? "bg-white/5" : ""
                 }`}

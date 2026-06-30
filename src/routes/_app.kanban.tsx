@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect, useRef } from "react";
 import { listKanbanData, moveLeadStage, createManualLead, updateLead } from "@/lib/leads.functions";
+import { getOrCreateConversationForLead } from "@/lib/whatsapp.functions";
 import { syncRdLeads } from "@/lib/rd-station.functions";
 import { autoEnrichPendingLeads, recalculatePendingScores } from "@/lib/ai.functions";
 import { syncLeadsFromSheet } from "@/lib/sheets.functions";
@@ -14,7 +16,7 @@ import { PRIORITY_LABEL, PRIORITY_COLOR } from "@/lib/lead-types";
 import { LEAD_TYPE_LABEL, LEAD_TYPE_COLOR, normalizeLeadType, type LeadType } from "@/lib/lead-type";
 import { evaluateIcpFit } from "@/lib/icp-fit";
 import { toast } from "sonner";
-import { RefreshCw, Plus, Search, Calendar, Clock, Timer, Flame, Briefcase, Building2, Mail, ChevronLeft, ChevronRight, Pencil, Check, X, LinkedinIcon } from "lucide-react";
+import { RefreshCw, Plus, Search, Calendar, Clock, Timer, Flame, Briefcase, Building2, Mail, ChevronLeft, ChevronRight, Pencil, Check, X, LinkedinIcon, MessageCircle } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -582,6 +584,18 @@ function LeadCard({
   const assignedProfile = lead.assigned_to ? profiles.find((p) => p.id === lead.assigned_to) : null;
   const assignedLabel = assignedProfile?.full_name ?? assignedProfile?.email ?? null;
 
+  const navigate = useNavigate();
+  const openChatFn = useServerFn(getOrCreateConversationForLead);
+  const openChat = useMutation({
+    mutationFn: () => openChatFn({ data: { leadId: lead.id } }),
+    onSuccess: (res) => {
+      const id = res?.conversation?.id;
+      if (!id) return;
+      navigate({ to: "/whatsapp", search: { c: id } });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao abrir chat"),
+  });
+
   const content = (
     <Card
       className={`p-3 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${
@@ -813,6 +827,18 @@ function LeadCard({
         </span>
         <div className="flex items-center gap-1">
           <span className="text-[10px] font-mono text-muted-foreground">{lead.score}pts</span>
+          {lead.phone && (
+            <button
+              type="button"
+              disabled={openChat.isPending}
+              onPointerDown={stopDrag}
+              onClick={(e) => { stopDrag(e); openChat.mutate(); }}
+              title="Abrir chat no WhatsApp"
+              className="h-5 w-5 grid place-items-center rounded hover:bg-muted text-emerald-600 disabled:opacity-40"
+            >
+              <MessageCircle className="h-3 w-3" />
+            </button>
+          )}
           <div className="flex items-center" onPointerDown={stopDrag} onClick={stopDrag}>
             <button
               type="button"
