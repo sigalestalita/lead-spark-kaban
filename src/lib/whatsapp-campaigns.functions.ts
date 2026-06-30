@@ -10,10 +10,48 @@ const AudienceFilters = z
     demoFree: z.enum(["any", "yes", "no"]).optional(),
     assignedToMe: z.boolean().optional(),
     leadType: z.array(z.string()).optional(),
+    companySizes: z.array(z.string()).optional(),
+    emailDomains: z.array(z.string()).optional(),
   })
   .default({});
 type AudienceFiltersT = z.infer<typeof AudienceFilters>;
 export type CampaignAudienceFilters = AudienceFiltersT;
+
+const PhoneEntry = z.object({
+  phone: z.string().min(6).max(40),
+  name: z.string().max(160).optional(),
+  company: z.string().max(160).optional(),
+});
+export type CampaignPhoneEntry = z.infer<typeof PhoneEntry>;
+
+const Audience = z
+  .object({
+    source: z.enum(["filters", "phones"]).default("filters"),
+    filters: AudienceFilters.optional(),
+    phones: z.array(PhoneEntry).max(5000).optional(),
+  })
+  .default({ source: "filters" });
+export type CampaignAudience = z.infer<typeof Audience>;
+
+/** Parser tolerante: aceita o formato antigo (filtros diretos) e o novo (com source). */
+function parseAudience(raw: unknown): CampaignAudience {
+  if (raw && typeof raw === "object" && "source" in (raw as Record<string, unknown>)) {
+    return Audience.parse(raw);
+  }
+  return Audience.parse({ source: "filters", filters: AudienceFilters.parse(raw ?? {}) });
+}
+
+function normPhone(raw: string): string {
+  const digits = raw.replace(/\D+/g, "").replace(/^0+/, "");
+  if ((digits.length === 10 || digits.length === 11) && !digits.startsWith("55")) {
+    return `55${digits}`;
+  }
+  return digits;
+}
+
+function normDomain(raw: string): string {
+  return raw.trim().toLowerCase().replace(/^@+/, "");
+}
 
 /** Lista campanhas com contagem de mensagens. */
 export const listCampaigns = createServerFn({ method: "GET" })
@@ -64,16 +102,48 @@ export const getCampaign = createServerFn({ method: "GET" })
 /** Preview de audiência: conta e amostra de leads. */
 export const previewAudience = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ filters: AudienceFilters }).parse(d))
+  .inputValidator((d) =>
+    z
+      .object({
+        // legado
+        filters: AudienceFilters.optional(),
+        // novo
+        audience: Audience.optional(),
+      })
+      .parse(d),
+  )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const audience = data.audience ?? parseAudience(data.filters ?? {});
+
+    if (audience.source === "phones") {
+      const phones = (audience.phones ?? []).map((p) => ({ ...p, phone: normPhone(p.phone) })).filter((p) => p.phone);
+      return {
+        count: phones.length,
+        sample: phones.slice(0, 20).map((p, i) => ({
+          id: `phone-${i}`,
+          name: p.name ?? null,
+          company_name: p.company ?? null,
+          phone: p.phone,
+          priority: null,
+          stage_id: null,
+        })),
+      };
+    }
+
+    const f = audience.filters ?? {};
     let q = supabase.from("leads").select("id, name, company_name, phone, priority, stage_id", { count: "exact" });
-    if (data.filters.stageIds?.length) q = q.in("stage_id", data.filters.stageIds);
-    if (data.filters.priorities?.length) q = q.in("priority", data.filters.priorities);
-    if (data.filters.demoFree === "yes") q = q.eq("demo_free", true);
-    if (data.filters.demoFree === "no") q = q.eq("demo_free", false);
-    if (data.filters.assignedToMe) q = q.eq("assigned_to", userId);
-    if (data.filters.leadType?.length) q = q.in("lead_type", data.filters.leadType);
+    if (f.stageIds?.length) q = q.in("stage_id", f.stageIds);
+    if (f.priorities?.length) q = q.in("priority", f.priorities);
+    if (f.demoFree === "yes") q = q.eq("demo_free", true);
+    if (f.demoFree === "no") q = q.eq("demo_free", false);
+    if (f.assignedToMe) q = q.eq("assigned_to", userId);
+    if (f.leadType?.length) q = q.in("lead_type", f.leadType);
+    if (f.companySizes?.length) q = q.in("company_size", f.companySizes);
+    if (f.emailDomains?.length) {
+      const ors = f.emailDomains.map((d) => `email.ilike.%@${normDomain(d)}`).join(",");
+      q = q.or(ors);
+    }
     q = q.not("phone", "is", null).limit(20);
 
     const { data: rows, count, error } = await q;
@@ -90,20 +160,22 @@ export const createCampaign = createServerFn({ method: "POST" })
         name: z.string().min(1).max(160),
         templateId: z.string().uuid(),
         accountId: z.string().uuid().nullable().optional(),
-        filters: AudienceFilters,
+        filters: AudienceFilters.optional(),
+        audience: Audience.optional(),
         scheduledAt: z.string().datetime().optional(),
       })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const audience = data.audience ?? parseAudience(data.filters ?? {});
     const { data: row, error } = await supabase
       .from("whatsapp_campaigns")
       .insert({
         name: data.name,
         template_id: data.templateId,
         account_id: data.accountId ?? null,
-        audience_filters: data.filters,
+        audience_filters: audience,
         status: "draft",
         scheduled_at: data.scheduledAt ?? null,
         created_by: userId,
@@ -137,21 +209,63 @@ export const launchCampaign = createServerFn({ method: "POST" })
     const tmpl = (campaign as { whatsapp_templates: { body: string } | null }).whatsapp_templates;
     if (!tmpl?.body) throw new Error("Template inválido");
 
-    const filters = AudienceFilters.parse(campaign.audience_filters ?? {});
+    const audience = parseAudience(campaign.audience_filters ?? {});
 
-    // monta audiência
-    let q = supabase.from("leads").select("id, name, company_name, phone, assigned_to");
-    if (filters.stageIds?.length) q = q.in("stage_id", filters.stageIds);
-    if (filters.priorities?.length) q = q.in("priority", filters.priorities);
-    if (filters.demoFree === "yes") q = q.eq("demo_free", true);
-    if (filters.demoFree === "no") q = q.eq("demo_free", false);
-    if (filters.assignedToMe) q = q.eq("assigned_to", userId);
-    if (filters.leadType?.length) q = q.in("lead_type", filters.leadType);
-    q = q.not("phone", "is", null).limit(data.limit);
+    // imports server-only
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { getProvider } = await import("./whatsapp/provider-registry.server");
 
-    const { data: leads, error: lErr } = await q;
-    if (lErr) throw new Error(lErr.message);
-    const targets = leads ?? [];
+    type Target = { id: string; name: string | null; company_name: string | null; phone: string | null; assigned_to: string | null };
+    let targets: Target[] = [];
+
+    if (audience.source === "phones") {
+      const entries = (audience.phones ?? []).slice(0, data.limit);
+      for (const e of entries) {
+        const phone = normPhone(e.phone);
+        if (!phone) continue;
+        // tenta achar lead existente pelo final do telefone
+        const tail = phone.slice(-8);
+        const { data: match } = await supabaseAdmin
+          .from("leads")
+          .select("id, name, company_name, phone, assigned_to")
+          .filter("phone", "ilike", `%${tail}%`)
+          .limit(1)
+          .maybeSingle();
+        if (match) {
+          targets.push(match as Target);
+          continue;
+        }
+        const ins = await supabaseAdmin
+          .from("leads")
+          .insert({
+            name: e.name?.trim() || `WhatsApp ${phone.slice(-4)}`,
+            phone,
+            company_name: e.company?.trim() || null,
+            source: "campaign_upload",
+          })
+          .select("id, name, company_name, phone, assigned_to")
+          .single();
+        if (ins.data) targets.push(ins.data as Target);
+      }
+    } else {
+      const f = audience.filters ?? {};
+      let q = supabase.from("leads").select("id, name, company_name, phone, assigned_to");
+      if (f.stageIds?.length) q = q.in("stage_id", f.stageIds);
+      if (f.priorities?.length) q = q.in("priority", f.priorities);
+      if (f.demoFree === "yes") q = q.eq("demo_free", true);
+      if (f.demoFree === "no") q = q.eq("demo_free", false);
+      if (f.assignedToMe) q = q.eq("assigned_to", userId);
+      if (f.leadType?.length) q = q.in("lead_type", f.leadType);
+      if (f.companySizes?.length) q = q.in("company_size", f.companySizes);
+      if (f.emailDomains?.length) {
+        const ors = f.emailDomains.map((d) => `email.ilike.%@${normDomain(d)}`).join(",");
+        q = q.or(ors);
+      }
+      q = q.not("phone", "is", null).limit(data.limit);
+      const { data: leads, error: lErr } = await q;
+      if (lErr) throw new Error(lErr.message);
+      targets = (leads ?? []) as Target[];
+    }
 
     if (targets.length === 0) {
       await supabase
@@ -166,10 +280,6 @@ export const launchCampaign = createServerFn({ method: "POST" })
       .update({ status: "sending", started_at: new Date().toISOString() })
       .eq("id", data.id);
 
-    // imports server-only
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { getProvider } = await import("./whatsapp/provider-registry.server");
-
     const accountQuery = campaign.account_id
       ? supabaseAdmin.from("whatsapp_accounts").select("*").eq("id", campaign.account_id).maybeSingle()
       : supabaseAdmin.from("whatsapp_accounts").select("*").eq("is_default", true).maybeSingle();
@@ -181,7 +291,7 @@ export const launchCampaign = createServerFn({ method: "POST" })
     let failed = 0;
 
     for (const lead of targets) {
-      const phone = (lead.phone ?? "").replace(/\D+/g, "");
+      const phone = normPhone(lead.phone ?? "");
       if (!phone) {
         failed++;
         continue;
@@ -313,13 +423,17 @@ export const getCampaignFilterMeta = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
-    const [{ data: stages }, { data: types }] = await Promise.all([
+    const [{ data: stages }, { data: types }, { data: sizes }] = await Promise.all([
       supabase.from("stages").select("id, name, position").order("position"),
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       supabase.from("leads").select("lead_type").not("lead_type", "is", null).limit(2000),
+      supabase.from("leads").select("company_size").not("company_size", "is", null).limit(2000),
     ]);
     const leadTypes = Array.from(
       new Set((types ?? []).map((r) => (r as { lead_type: string | null }).lead_type).filter(Boolean) as string[]),
     );
-    return { stages: stages ?? [], leadTypes };
+    const companySizes = Array.from(
+      new Set((sizes ?? []).map((r) => (r as { company_size: string | null }).company_size).filter(Boolean) as string[]),
+    ).sort();
+    return { stages: stages ?? [], leadTypes, companySizes };
   });
