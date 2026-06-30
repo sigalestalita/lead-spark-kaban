@@ -7,6 +7,7 @@ import {
   createCampaign,
   previewAudience,
   getCampaignFilterMeta,
+  launchCampaign,
 } from "@/lib/whatsapp-campaigns.functions";
 import { listTemplates } from "@/lib/whatsapp-templates.functions";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Megaphone, ChevronRight, Upload } from "lucide-react";
+import { Plus, Megaphone, ChevronRight, Upload, Send } from "lucide-react";
 
 export const Route = createFileRoute("/_app/whatsapp/campanhas")({
   component: CampaignsPage,
@@ -78,6 +79,7 @@ function CampaignsPage() {
   const tmplFn = useServerFn(listTemplates);
   const metaFn = useServerFn(getCampaignFilterMeta);
   const previewFn = useServerFn(previewAudience);
+  const launchFn = useServerFn(launchCampaign);
   const qc = useQueryClient();
   const navigate = useNavigate();
 
@@ -164,6 +166,11 @@ function CampaignsPage() {
       setOpen(false);
       navigate({ to: "/whatsapp/campanhas/$id", params: { id: r.campaign.id } });
     },
+  });
+
+  const launch = useMutation({
+    mutationFn: (id: string) => launchFn({ data: { id, limit: 200 } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["wa-campaigns"] }),
   });
 
   function toggle<T>(arr: T[], v: T): T[] {
@@ -424,29 +431,49 @@ function CampaignsPage() {
       <div className="grid gap-2">
         {campaigns.map((c) => {
           const tmpl = (c as { whatsapp_templates: { name: string } | null }).whatsapp_templates;
+          const canLaunch = c.status === "draft" || c.status === "scheduled";
+          const isLaunching = launch.isPending && launch.variables === c.id;
           return (
-            <Link
+            <div
               key={c.id}
-              to="/whatsapp/campanhas/$id"
-              params={{ id: c.id }}
               className="flex items-center justify-between gap-3 p-3 border border-white/5 rounded-lg bg-card/50 hover:bg-white/5 transition-colors"
             >
-              <div className="flex items-center gap-3 min-w-0">
+              <Link
+                to="/whatsapp/campanhas/$id"
+                params={{ id: c.id }}
+                className="flex items-center gap-3 min-w-0 flex-1"
+              >
                 <Megaphone className="h-4 w-4 text-muted-foreground shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{c.name}</p>
+                  <p className="text-sm font-medium truncate hover:text-primary">{c.name}</p>
                   <p className="text-xs text-muted-foreground truncate">
                     {tmpl?.name ?? "—"} · criada em {new Date(c.created_at).toLocaleString("pt-BR")}
                   </p>
                 </div>
-              </div>
+              </Link>
               <div className="flex items-center gap-2 shrink-0">
                 <Badge variant="outline" className="text-[10px] capitalize">{c.status}</Badge>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                {canLaunch && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => launch.mutate(c.id)}
+                    disabled={isLaunching}
+                  >
+                    <Send className="h-3.5 w-3.5 mr-1" />
+                    {isLaunching ? "Enviando…" : "Disparar"}
+                  </Button>
+                )}
+                <Link to="/whatsapp/campanhas/$id" params={{ id: c.id }}>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </Link>
               </div>
-            </Link>
+            </div>
           );
         })}
+        {launch.error instanceof Error && (
+          <p className="text-xs text-destructive">{launch.error.message}</p>
+        )}
       </div>
     </div>
   );
