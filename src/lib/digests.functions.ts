@@ -144,6 +144,15 @@ Estrutura obrigatória do email:
    - **Filtros poderosos no kanban**: por responsável, tipo de lead, demo free, prioridade e mais. Bate o olho e enxerga só o que importa.
    - **Kanban completo**: limite antigo de 1000 leads acabou — agora aparece TUDO.
 
+MOCKUPS — OBRIGATÓRIO: cada uma das 4 grandes novidades abaixo PRECISA aparecer ilustrada com a imagem correspondente, embutida logo acima ou ao lado do card explicativo. Use exatamente estas URLs em tags <img>, com width="100%" max-width 560px, border-radius:12px, border:1px solid #1f2a4a, display:block, margin: 0 auto 12px. NÃO invente outras URLs. NÃO use placeholders.
+
+- IA de atendimento (SDR virtual) → https://vlfohgirjbgpqhqbnuks.supabase.co/storage/v1/object/public/email-assets/mockups/ai-sdr.jpg (alt="Conversa da IA da Lidi atendendo um lead no WhatsApp")
+- FUPs automatizados no WhatsApp → https://vlfohgirjbgpqhqbnuks.supabase.co/storage/v1/object/public/email-assets/mockups/fups.jpg (alt="Editor de sequência de follow-up automatizado")
+- Disparador de mensagens em massa → https://vlfohgirjbgpqhqbnuks.supabase.co/storage/v1/object/public/email-assets/mockups/disparador.jpg (alt="Tela de criação de campanha de disparo em massa no WhatsApp")
+- WhatsApp integrado / Kanban com responsável, tipo de lead, demo free → https://vlfohgirjbgpqhqbnuks.supabase.co/storage/v1/object/public/email-assets/mockups/kanban.jpg (alt="Kanban da Lidi com badges de responsável, tipo de lead e demo free")
+
+Distribua as 4 imagens ao longo do email, uma para cada bloco principal. Estrutura sugerida: imagem grande → título da feature → descrição.
+
 3. Bloco curto "E ainda tem mais": cite rapidamente que continuam funcionando, agora mais firmes, o enriquecimento automático de leads, a integração com RD Station CRM, o scoring/priorização, esta própria newsletter automática, dashboards do funil em tempo real e a sincronização com Meta Ads / RD Station / Sheets / formulários.
 
 4. Fechamento motivador: convide o time a abrir a Lidi, explorar as novidades e mandar feedback. Frase final no tom "isso aqui é nosso e tá só começando".
