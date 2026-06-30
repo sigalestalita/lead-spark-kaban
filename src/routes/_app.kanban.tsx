@@ -584,6 +584,18 @@ function LeadCard({
   const assignedProfile = lead.assigned_to ? profiles.find((p) => p.id === lead.assigned_to) : null;
   const assignedLabel = assignedProfile?.full_name ?? assignedProfile?.email ?? null;
 
+  const navigate = useNavigate();
+  const openChatFn = useServerFn(getOrCreateConversationForLead);
+  const openChat = useMutation({
+    mutationFn: () => openChatFn({ data: { leadId: lead.id } }),
+    onSuccess: (res) => {
+      const id = res?.conversation?.id;
+      if (!id) return;
+      navigate({ to: "/whatsapp", search: { c: id } });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao abrir chat"),
+  });
+
   const content = (
     <Card
       className={`p-3 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${
