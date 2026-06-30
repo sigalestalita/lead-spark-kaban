@@ -22,18 +22,18 @@ export const Route = createFileRoute("/_app/whatsapp/")({
 function WhatsappInbox() {
   const fn = useServerFn(listConversations);
   const qc = useQueryClient();
-  const search = Route.useSearch();
-  const navigate = useNavigate({ from: "/_app/whatsapp/" });
+  const routeSearch = Route.useSearch();
+  const navigate = useNavigate({ from: "/whatsapp/" });
   const [status, setStatus] = useState<"all" | "open" | "pending" | "closed">("all");
   const [assigned, setAssigned] = useState<"all" | "me" | "unassigned">("all");
   const [unread, setUnread] = useState(false);
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<string | null>(search.c ?? null);
+  const [selected, setSelected] = useState<string | null>(routeSearch.c ?? null);
 
   useEffect(() => {
-    if (search.c && search.c !== selected) setSelected(search.c);
+    if (routeSearch.c && routeSearch.c !== selected) setSelected(routeSearch.c);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search.c]);
+  }, [routeSearch.c]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["wa-conversations", status, assigned, unread, search],
