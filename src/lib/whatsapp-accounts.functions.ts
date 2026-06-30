@@ -156,3 +156,44 @@ export const testSendAccount = createServerFn({ method: "POST" })
     });
     return result;
   });
+
+/** Registra o número na Meta Cloud API (POST /{phone_number_id}/register).
+ *  Necessário uma única vez antes de enviar/receber mensagens. Define também o PIN
+ *  da verificação em duas etapas. */
+export const registerCloudNumber = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({ id: z.string().uuid(), pin: z.string().regex(/^\d{6}$/, "PIN deve ter 6 dígitos") }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: isMgr } = await context.supabase.rpc("is_manager", { _user_id: context.userId });
+    if (!isMgr) throw new Error("Apenas gestores.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: account, error } = await supabaseAdmin
+      .from("whatsapp_accounts")
+      .select("provider, provider_instance_id, provider_base_url, access_token")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error || !account) throw new Error(error?.message || "Conta não encontrada.");
+    if (account.provider !== "meta_cloud") throw new Error("Disponível apenas para Meta Cloud API.");
+    if (!account.access_token) throw new Error("Conta sem Access Token salvo.");
+    if (!account.provider_instance_id) throw new Error("Conta sem Phone Number ID.");
+    const base = (account.provider_base_url || "https://graph.facebook.com/v21.0").replace(/\/+$/, "");
+    const url = `${base}/${account.provider_instance_id}/register`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${account.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ messaging_product: "whatsapp", pin: data.pin }),
+    });
+    const text = await res.text();
+    let json: { success?: boolean; error?: { message?: string; code?: number; error_subcode?: number } } = {};
+    try { json = JSON.parse(text); } catch { /* ignore */ }
+    if (!res.ok || !json.success) {
+      const msg = json.error?.message || `HTTP ${res.status}: ${text.slice(0, 300)}`;
+      throw new Error(msg);
+    }
+    return { ok: true };
+  });
