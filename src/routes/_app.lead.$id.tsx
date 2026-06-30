@@ -228,6 +228,7 @@ function LeadDetailPage() {
       <div className="grid md:grid-cols-2 gap-4">
         <Card className="p-5 space-y-3">
           <h2 className="font-semibold flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" />Dados do lead</h2>
+          <Field label="Nome" value={lead.name} onSave={(v) => update.mutate({ name: v })} />
           <Field label="Email" value={lead.email} onSave={(v) => update.mutate({ email: v })} />
           <Field label="Telefone" value={lead.phone} onSave={(v) => update.mutate({ phone: v })} />
           <Field label="Cargo" value={lead.position} onSave={(v) => update.mutate({ position: v })} />
