@@ -110,6 +110,7 @@ function CampaignDetail() {
             <thead className="bg-white/5 text-muted-foreground">
               <tr>
                 <th className="text-left px-3 py-2">Lead</th>
+                <th className="text-left px-3 py-2">Telefone</th>
                 <th className="text-left px-3 py-2">Empresa</th>
                 <th className="text-left px-3 py-2">Status</th>
                 <th className="text-left px-3 py-2">Enviado em</th>
@@ -117,18 +118,21 @@ function CampaignDetail() {
             </thead>
             <tbody>
               {data.messages.length === 0 && (
-                <tr><td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">Nenhum envio ainda.</td></tr>
+                <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">Nenhum envio ainda.</td></tr>
               )}
               {data.messages.map((m) => {
-                const lead = (m as { leads: { id: string; name: string | null; company_name: string | null } | null }).leads;
+                const lead = (m as { leads: { id: string; name: string | null; company_name: string | null; phone: string | null } | null }).leads;
                 return (
                   <tr key={m.id} className="border-t border-white/5">
                     <td className="px-3 py-2">
                       {lead ? (
                         <Link to="/lead/$id" params={{ id: lead.id }} className="hover:text-primary">
-                          {lead.name ?? "—"}
+                          {lead.name ?? (lead.phone ? `+${lead.phone}` : "—")}
                         </Link>
                       ) : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground font-mono text-[11px]">
+                      {lead?.phone ? `+${lead.phone}` : "—"}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">{lead?.company_name ?? "—"}</td>
                     <td className="px-3 py-2"><Badge variant="outline" className="text-[10px]">{m.status}</Badge></td>

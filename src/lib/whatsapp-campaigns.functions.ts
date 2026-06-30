@@ -238,7 +238,7 @@ export const launchCampaign = createServerFn({ method: "POST" })
         const ins = await supabaseAdmin
           .from("leads")
           .insert({
-            name: e.name?.trim() || `WhatsApp ${phone.slice(-4)}`,
+            name: e.name?.trim() || `+${phone}`,
             phone,
             company_name: e.company?.trim() || null,
             source: "campaign_upload",
