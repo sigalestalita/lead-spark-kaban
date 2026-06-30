@@ -106,13 +106,13 @@ async function fetchTriggerCandidates(seq: Sequence): Promise<LeadLite[]> {
       .limit(500);
     const out: LeadLite[] = [];
     for (const c of convs ?? []) {
-      const lead = (c as { leads: LeadLite | null }).leads;
+      const lead = (c as unknown as { leads: LeadLite | null }).leads;
       if (!lead?.phone) continue;
       // última msg precisa ser nossa (SDR/automação/IA)
       const { data: lastMsg } = await supabaseAdmin
         .from("whatsapp_messages")
         .select("sender_type")
-        .eq("conversation_id", (c as { id: string }).id)
+        .eq("conversation_id", (c as unknown as { id: string }).id)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
