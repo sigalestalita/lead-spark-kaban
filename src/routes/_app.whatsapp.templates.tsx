@@ -205,10 +205,22 @@ function TemplatesPage() {
           <div key={t.id} className="border border-white/5 rounded-lg p-4 bg-card/50">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-medium truncate">{t.name}</p>
                   <Badge variant="outline" className="text-[10px]">{t.category ?? "utility"}</Badge>
                   <Badge variant="outline" className="text-[10px]">{t.language ?? "pt_BR"}</Badge>
+                  {(() => {
+                    const s = (t.status ?? "draft").toLowerCase();
+                    const styles: Record<string, string> = {
+                      approved: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+                      pending: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+                      rejected: "bg-red-500/15 text-red-300 border-red-500/30",
+                      draft: "bg-muted text-muted-foreground border-white/10",
+                      paused: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+                      disabled: "bg-red-500/15 text-red-300 border-red-500/30",
+                    };
+                    return <Badge className={`text-[10px] ${styles[s] ?? styles.draft}`}>{s}</Badge>;
+                  })()}
                   {t.provider_template_name ? (
                     <Badge className="text-[10px] bg-emerald-500/15 text-emerald-300 border-emerald-500/30">
                       HSM: {t.provider_template_name}
@@ -220,8 +232,21 @@ function TemplatesPage() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap line-clamp-3">{t.body}</p>
+                {t.rejection_reason && (
+                  <p className="text-[11px] text-red-400 mt-1">Motivo Meta: {t.rejection_reason}</p>
+                )}
               </div>
               <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={submit.isPending}
+                  onClick={() => {
+                    if (confirm(`Enviar "${t.name}" para aprovação da Meta?`)) submit.mutate(t.id);
+                  }}
+                >
+                  <Send className="h-3.5 w-3.5 mr-1" /> Enviar p/ Meta
+                </Button>
                 <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
                   <Pencil className="h-4 w-4" />
                 </Button>
