@@ -48,12 +48,16 @@ function buildPayload(input: WaSendInput): Record<string, unknown> {
       return { ...base, type: "document", document: { link: input.mediaUrl, caption: input.body } };
     case "template": {
       const components: Array<Record<string, unknown>> = [];
-      const vars = input.templateVariables ?? {};
-      const ordered = Object.keys(vars).sort();
-      if (ordered.length > 0) {
+      const positional: string[] =
+        input.templateParams && input.templateParams.length > 0
+          ? input.templateParams.map((v) => String(v ?? ""))
+          : Object.keys(input.templateVariables ?? {})
+              .sort()
+              .map((k) => String((input.templateVariables ?? {})[k] ?? ""));
+      if (positional.length > 0) {
         components.push({
           type: "body",
-          parameters: ordered.map((k) => ({ type: "text", text: String(vars[k] ?? "") })),
+          parameters: positional.map((text) => ({ type: "text", text: text || " " })),
         });
       }
       return {
@@ -61,7 +65,7 @@ function buildPayload(input: WaSendInput): Record<string, unknown> {
         type: "template",
         template: {
           name: input.templateName,
-          language: { code: "pt_BR" },
+          language: { code: input.templateLanguage || "pt_BR" },
           ...(components.length ? { components } : {}),
         },
       };

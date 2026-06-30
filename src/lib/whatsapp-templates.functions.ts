@@ -62,6 +62,7 @@ export const updateTemplate = createServerFn({ method: "POST" })
         body: z.string().min(1).max(4096).optional(),
         variables: z.array(z.string()).optional(),
         status: z.enum(["draft", "pending", "approved", "rejected"]).optional(),
+        provider_template_name: z.string().nullable().optional(),
       })
       .parse(d),
   )

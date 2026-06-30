@@ -208,6 +208,18 @@ export const launchCampaign = createServerFn({ method: "POST" })
     if (!campaign) throw new Error("Campanha não encontrada");
     const tmpl = (campaign as { whatsapp_templates: { body: string } | null }).whatsapp_templates;
     if (!tmpl?.body) throw new Error("Template inválido");
+    const tmplFull = (campaign as {
+      whatsapp_templates: {
+        body: string;
+        provider_template_name: string | null;
+        language: string | null;
+        variables: unknown;
+      } | null;
+    }).whatsapp_templates!;
+    const useHsm = !!tmplFull.provider_template_name;
+    const tmplVarNames = Array.isArray(tmplFull.variables)
+      ? (tmplFull.variables as unknown[]).map((v) => String(v))
+      : [];
 
     const audience = parseAudience(campaign.audience_filters ?? {});
 
@@ -301,6 +313,12 @@ export const launchCampaign = createServerFn({ method: "POST" })
         primeiro_nome: (lead.name ?? "").split(" ")[0] ?? "",
         empresa: lead.company_name ?? "",
       });
+      const leadCtx: Record<string, string> = {
+        nome: lead.name ?? "",
+        primeiro_nome: (lead.name ?? "").split(" ")[0] ?? "",
+        empresa: lead.company_name ?? "",
+      };
+      const templateParams = tmplVarNames.map((n) => leadCtx[n] ?? "");
 
       // garante conversa
       let convId: string | null = null;
@@ -355,8 +373,16 @@ export const launchCampaign = createServerFn({ method: "POST" })
             webhook_secret: account.webhook_secret,
           },
           to: phone,
-          type: "text",
-          body,
+          ...(useHsm
+            ? {
+                type: "template" as const,
+                templateName: tmplFull.provider_template_name!,
+                templateLanguage: tmplFull.language ?? "pt_BR",
+                templateParams,
+                // o body renderizado é salvo no chat só para histórico
+                body,
+              }
+            : { type: "text" as const, body }),
         });
 
         if (msg?.id) {
