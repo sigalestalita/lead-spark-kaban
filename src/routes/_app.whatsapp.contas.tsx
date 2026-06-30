@@ -7,6 +7,7 @@ import {
   upsertAccount,
   deleteAccount,
   testSendAccount,
+  registerCloudNumber,
 } from "@/lib/whatsapp-accounts.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Copy, Send, CheckCircle2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Copy, Send, CheckCircle2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/whatsapp/contas")({
@@ -68,6 +69,7 @@ function ContasPage() {
   const saveFn = useServerFn(upsertAccount);
   const delFn = useServerFn(deleteAccount);
   const testFn = useServerFn(testSendAccount);
+  const registerFn = useServerFn(registerCloudNumber);
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -82,6 +84,8 @@ function ContasPage() {
   const [testOpen, setTestOpen] = useState<AccountRow | null>(null);
   const [testTo, setTestTo] = useState("");
   const [testBody, setTestBody] = useState("Teste de integração WhatsApp Cloud API ✅");
+  const [regOpen, setRegOpen] = useState<AccountRow | null>(null);
+  const [regPin, setRegPin] = useState("");
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
 
@@ -144,6 +148,16 @@ function ContasPage() {
     onSuccess: (r) => {
       if (r.status === "failed") toast.error(`Falhou: ${r.error ?? "erro"}`);
       else toast.success(`Enviado (id: ${r.providerMessageId || "—"})`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const register = useMutation({
+    mutationFn: () => registerFn({ data: { id: regOpen!.id, pin: regPin } }),
+    onSuccess: () => {
+      toast.success("Número registrado na Cloud API! Guarde o PIN.");
+      setRegOpen(null);
+      setRegPin("");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -228,6 +242,16 @@ function ContasPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
+                  {a.provider === "meta_cloud" && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      title="Registrar número na Cloud API"
+                      onClick={() => { setRegOpen(a); setRegPin(""); }}
+                    >
+                      <ShieldCheck className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Button
                     size="icon"
                     variant="ghost"
@@ -420,6 +444,42 @@ function ContasPage() {
             <Button variant="outline" onClick={() => setTestOpen(null)}>Fechar</Button>
             <Button onClick={() => test.mutate()} disabled={test.isPending || !testTo || !testBody}>
               {test.isPending ? "Enviando…" : "Enviar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog registrar número na Cloud API */}
+      <Dialog open={!!regOpen} onOpenChange={(v) => !v && setRegOpen(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Registrar número na Cloud API</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Executa <code>POST /{regOpen?.provider_instance_id}/register</code> na Meta. Faça isso
+              uma única vez por número, antes de enviar mensagens. Defina um <strong>PIN de 6 dígitos</strong>{" "}
+              (verificação em duas etapas) — guarde-o, pode ser pedido em re-verificações futuras.
+            </p>
+            <div>
+              <label className="text-xs text-muted-foreground">PIN (6 dígitos)</label>
+              <Input
+                value={regPin}
+                onChange={(e) => setRegPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="123456"
+                inputMode="numeric"
+                maxLength={6}
+              />
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Erros comuns: <code>#133006</code> número já registrado em outro app (precisa de recovery
+              token); <code>#100</code> token sem acesso à WABA; <code>#133005</code> PIN antigo divergente.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRegOpen(null)}>Cancelar</Button>
+            <Button onClick={() => register.mutate()} disabled={register.isPending || regPin.length !== 6}>
+              {register.isPending ? "Registrando…" : "Registrar"}
             </Button>
           </DialogFooter>
         </DialogContent>
