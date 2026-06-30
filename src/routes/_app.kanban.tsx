@@ -827,6 +827,18 @@ function LeadCard({
         </span>
         <div className="flex items-center gap-1">
           <span className="text-[10px] font-mono text-muted-foreground">{lead.score}pts</span>
+          {lead.phone && (
+            <button
+              type="button"
+              disabled={openChat.isPending}
+              onPointerDown={stopDrag}
+              onClick={(e) => { stopDrag(e); openChat.mutate(); }}
+              title="Abrir chat no WhatsApp"
+              className="h-5 w-5 grid place-items-center rounded hover:bg-muted text-emerald-600 disabled:opacity-40"
+            >
+              <MessageCircle className="h-3 w-3" />
+            </button>
+          )}
           <div className="flex items-center" onPointerDown={stopDrag} onClick={stopDrag}>
             <button
               type="button"
