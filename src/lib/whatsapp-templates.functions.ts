@@ -324,7 +324,7 @@ export const syncTemplatesFromMeta = createServerFn({ method: "POST" })
         header_text: header,
         header_type: header ? "TEXT" : null,
         footer_text: footer,
-        buttons,
+        buttons: buttons as never,
         meta_last_synced_at: new Date().toISOString(),
       });
       if (!insErr) imported += 1;
