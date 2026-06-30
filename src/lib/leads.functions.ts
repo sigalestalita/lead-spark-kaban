@@ -10,21 +10,36 @@ export const listKanbanData = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
-    const [stagesRes, leadsRes, profilesRes] = await Promise.all([
+    const PAGE = 1000;
+    async function fetchAllLeads() {
+      const all: any[] = [];
+      let from = 0;
+      // paginar para contornar o limite default do PostgREST (1000)
+      while (true) {
+        const { data, error } = await supabase
+          .from("leads")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .range(from, from + PAGE - 1);
+        if (error) throw new Error(error.message);
+        const batch = data ?? [];
+        all.push(...batch);
+        if (batch.length < PAGE) break;
+        from += PAGE;
+        if (from >= 50000) break; // hard safety cap
+      }
+      return all;
+    }
+    const [stagesRes, leads, profilesRes] = await Promise.all([
       supabase.from("stages").select("*").order("position"),
-      supabase
-        .from("leads")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(5000),
+      fetchAllLeads(),
       supabase.from("profiles").select("id, full_name, email"),
     ]);
     if (stagesRes.error) throw new Error(stagesRes.error.message);
-    if (leadsRes.error) throw new Error(leadsRes.error.message);
     if (profilesRes.error) throw new Error(profilesRes.error.message);
     return {
       stages: stagesRes.data ?? [],
-      leads: leadsRes.data ?? [],
+      leads,
       profiles: profilesRes.data ?? [],
     };
   });
