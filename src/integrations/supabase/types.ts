@@ -989,39 +989,60 @@ export type Database = {
       whatsapp_templates: {
         Row: {
           body: string
+          buttons: Json
           category: string | null
           created_at: string
           created_by: string | null
+          footer_text: string | null
+          header_text: string | null
+          header_type: string | null
           id: string
           language: string
+          meta_last_synced_at: string | null
+          meta_template_id: string | null
           name: string
           provider_template_name: string | null
+          rejection_reason: string | null
           status: string
           updated_at: string
           variables: Json
         }
         Insert: {
           body: string
+          buttons?: Json
           category?: string | null
           created_at?: string
           created_by?: string | null
+          footer_text?: string | null
+          header_text?: string | null
+          header_type?: string | null
           id?: string
           language?: string
+          meta_last_synced_at?: string | null
+          meta_template_id?: string | null
           name: string
           provider_template_name?: string | null
+          rejection_reason?: string | null
           status?: string
           updated_at?: string
           variables?: Json
         }
         Update: {
           body?: string
+          buttons?: Json
           category?: string | null
           created_at?: string
           created_by?: string | null
+          footer_text?: string | null
+          header_text?: string | null
+          header_type?: string | null
           id?: string
           language?: string
+          meta_last_synced_at?: string | null
+          meta_template_id?: string | null
           name?: string
           provider_template_name?: string | null
+          rejection_reason?: string | null
           status?: string
           updated_at?: string
           variables?: Json
