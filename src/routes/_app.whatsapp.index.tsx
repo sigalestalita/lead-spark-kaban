@@ -111,7 +111,10 @@ function WhatsappInbox() {
             return (
               <button
                 key={c.id}
-                onClick={() => setSelected(c.id)}
+                onClick={() => {
+                  setSelected(c.id);
+                  navigate({ search: { c: c.id }, replace: true });
+                }}
                 className={`w-full text-left px-3 py-3 border-b border-white/5 hover:bg-white/5 transition-colors ${
                   isSel ? "bg-white/5" : ""
                 }`}
