@@ -7,6 +7,8 @@ import {
   createTemplate,
   updateTemplate,
   deleteTemplate,
+  submitTemplateToMeta,
+  syncTemplatesFromMeta,
 } from "@/lib/whatsapp-templates.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +23,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Send, RefreshCw, X } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/whatsapp/templates")({
   component: TemplatesPage,
@@ -36,7 +39,17 @@ type TemplateRow = {
   variables: unknown;
   status: string | null;
   provider_template_name: string | null;
+  header_text: string | null;
+  footer_text: string | null;
+  buttons: unknown;
+  rejection_reason: string | null;
 };
+
+type BtnType = "QUICK_REPLY" | "URL" | "PHONE_NUMBER";
+type Btn =
+  | { type: "QUICK_REPLY"; text: string }
+  | { type: "URL"; text: string; url: string }
+  | { type: "PHONE_NUMBER"; text: string; phone_number: string };
 
 function extractVars(body: string): string[] {
   const m = body.match(/\{\{\s*([\w.]+)\s*\}\}/g) ?? [];
@@ -48,6 +61,8 @@ function TemplatesPage() {
   const createFn = useServerFn(createTemplate);
   const updateFn = useServerFn(updateTemplate);
   const deleteFn = useServerFn(deleteTemplate);
+  const submitFn = useServerFn(submitTemplateToMeta);
+  const syncFn = useServerFn(syncTemplatesFromMeta);
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -62,6 +77,9 @@ function TemplatesPage() {
   const [language, setLanguage] = useState("pt_BR");
   const [body, setBody] = useState("");
   const [providerTemplateName, setProviderTemplateName] = useState("");
+  const [headerText, setHeaderText] = useState("");
+  const [footerText, setFooterText] = useState("");
+  const [buttons, setButtons] = useState<Btn[]>([]);
 
   function openCreate() {
     setEditing(null);
@@ -70,6 +88,9 @@ function TemplatesPage() {
     setLanguage("pt_BR");
     setBody("");
     setProviderTemplateName("");
+    setHeaderText("");
+    setFooterText("");
+    setButtons([]);
     setOpen(true);
   }
 
@@ -80,6 +101,9 @@ function TemplatesPage() {
     setLanguage(t.language ?? "pt_BR");
     setBody(t.body);
     setProviderTemplateName(t.provider_template_name ?? "");
+    setHeaderText(t.header_text ?? "");
+    setFooterText(t.footer_text ?? "");
+    setButtons(Array.isArray(t.buttons) ? (t.buttons as Btn[]) : []);
     setOpen(true);
   }
 
@@ -87,13 +111,35 @@ function TemplatesPage() {
     mutationFn: async () => {
       const variables = extractVars(body);
       const ptn = providerTemplateName.trim() || null;
+      const cleanButtons = buttons.filter((b) => b.text?.trim());
       if (editing) {
         return updateFn({
-          data: { id: editing.id, name, category, language, body, variables, provider_template_name: ptn },
+          data: {
+            id: editing.id,
+            name,
+            category,
+            language,
+            body,
+            variables,
+            provider_template_name: ptn,
+            header_text: headerText.trim() || null,
+            footer_text: footerText.trim() || null,
+            buttons: cleanButtons,
+          },
         });
       }
       return createFn({
-        data: { name, category, language, body, variables, provider_template_name: ptn ?? undefined },
+        data: {
+          name,
+          category,
+          language,
+          body,
+          variables,
+          provider_template_name: ptn ?? undefined,
+          header_text: headerText.trim() || null,
+          footer_text: footerText.trim() || null,
+          buttons: cleanButtons,
+        },
       });
     },
     onSuccess: () => {
@@ -105,6 +151,24 @@ function TemplatesPage() {
   const del = useMutation({
     mutationFn: (id: string) => deleteFn({ data: { id } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["wa-templates"] }),
+  });
+
+  const submit = useMutation({
+    mutationFn: (id: string) => submitFn({ data: { id } }),
+    onSuccess: (r) => {
+      toast.success(`Enviado à Meta como "${r.providerName}" — status: ${r.status}`);
+      qc.invalidateQueries({ queryKey: ["wa-templates"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao enviar para a Meta"),
+  });
+
+  const sync = useMutation({
+    mutationFn: () => syncFn(),
+    onSuccess: (r) => {
+      toast.success(`Sincronizado: ${r.updated} de ${r.remoteCount} templates na Meta`);
+      qc.invalidateQueries({ queryKey: ["wa-templates"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao sincronizar com a Meta"),
   });
 
   const templates = (data?.templates ?? []) as TemplateRow[];
@@ -120,13 +184,18 @@ function TemplatesPage() {
             <code className="text-primary">{"{{empresa}}"}</code>.
           </p>
         </div>
+        <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" onClick={() => sync.mutate()} disabled={sync.isPending}>
+          <RefreshCw className={`h-4 w-4 mr-1 ${sync.isPending ? "animate-spin" : ""}`} />
+          Sincronizar Meta
+        </Button>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button size="sm" onClick={openCreate}>
               <Plus className="h-4 w-4 mr-1" /> Novo template
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editing ? "Editar template" : "Novo template"}</DialogTitle>
             </DialogHeader>
@@ -166,6 +235,97 @@ function TemplatesPage() {
                   </p>
                 )}
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-muted-foreground">Header (texto, opcional)</label>
+                  <Input maxLength={60} value={headerText} onChange={(e) => setHeaderText(e.target.value)} placeholder="ex: Novidade Grou" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Footer (opcional)</label>
+                  <Input maxLength={60} value={footerText} onChange={(e) => setFooterText(e.target.value)} placeholder="ex: Equipe Grou" />
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-muted-foreground">Botões (máx. 3)</label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={buttons.length >= 3}
+                    onClick={() => setButtons((b) => [...b, { type: "QUICK_REPLY", text: "" }])}
+                  >
+                    <Plus className="h-3 w-3 mr-1" /> Adicionar
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {buttons.map((b, i) => (
+                    <div key={i} className="border border-white/10 rounded-md p-2 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={b.type}
+                          onValueChange={(v) => {
+                            const t = v as BtnType;
+                            setButtons((arr) =>
+                              arr.map((x, j) =>
+                                j !== i
+                                  ? x
+                                  : t === "URL"
+                                    ? { type: "URL", text: x.text, url: "" }
+                                    : t === "PHONE_NUMBER"
+                                      ? { type: "PHONE_NUMBER", text: x.text, phone_number: "" }
+                                      : { type: "QUICK_REPLY", text: x.text },
+                              ),
+                            );
+                          }}
+                        >
+                          <SelectTrigger className="h-8 w-40"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="QUICK_REPLY">Resposta rápida</SelectItem>
+                            <SelectItem value="URL">Abrir URL</SelectItem>
+                            <SelectItem value="PHONE_NUMBER">Ligar</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          maxLength={25}
+                          placeholder="Texto do botão"
+                          value={b.text}
+                          onChange={(e) =>
+                            setButtons((arr) => arr.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))
+                          }
+                        />
+                        <Button size="icon" variant="ghost" onClick={() => setButtons((arr) => arr.filter((_, j) => j !== i))}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {b.type === "URL" && (
+                        <Input
+                          placeholder="https://…"
+                          value={b.url}
+                          onChange={(e) =>
+                            setButtons((arr) =>
+                              arr.map((x, j) => (j === i && x.type === "URL" ? { ...x, url: e.target.value } : x)),
+                            )
+                          }
+                        />
+                      )}
+                      {b.type === "PHONE_NUMBER" && (
+                        <Input
+                          placeholder="+55 51 99999-9999"
+                          value={b.phone_number}
+                          onChange={(e) =>
+                            setButtons((arr) =>
+                              arr.map((x, j) =>
+                                j === i && x.type === "PHONE_NUMBER" ? { ...x, phone_number: e.target.value } : x,
+                              ),
+                            )
+                          }
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
               <div>
                 <label className="text-xs text-muted-foreground">
                   Nome do template aprovado na Meta (HSM)
@@ -176,8 +336,8 @@ function TemplatesPage() {
                   placeholder="ex: boas_vindas_sdr"
                 />
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  Obrigatório para disparar fora da janela de 24h. Use o mesmo nome aprovado no Gerenciador do
-                  WhatsApp Business. As variáveis acima são enviadas em ordem como {"{{1}}, {{2}}, …"}.
+                  Opcional: gerado automaticamente a partir do nome interno ao clicar "Enviar p/ Meta".
+                  As variáveis acima são enviadas em ordem como {"{{1}}, {{2}}, …"}.
                 </p>
               </div>
               {save.error instanceof Error && (
@@ -192,6 +352,7 @@ function TemplatesPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {isLoading && <p className="text-xs text-muted-foreground">Carregando…</p>}
@@ -205,10 +366,22 @@ function TemplatesPage() {
           <div key={t.id} className="border border-white/5 rounded-lg p-4 bg-card/50">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-medium truncate">{t.name}</p>
                   <Badge variant="outline" className="text-[10px]">{t.category ?? "utility"}</Badge>
                   <Badge variant="outline" className="text-[10px]">{t.language ?? "pt_BR"}</Badge>
+                  {(() => {
+                    const s = (t.status ?? "draft").toLowerCase();
+                    const styles: Record<string, string> = {
+                      approved: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+                      pending: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+                      rejected: "bg-red-500/15 text-red-300 border-red-500/30",
+                      draft: "bg-muted text-muted-foreground border-white/10",
+                      paused: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+                      disabled: "bg-red-500/15 text-red-300 border-red-500/30",
+                    };
+                    return <Badge className={`text-[10px] ${styles[s] ?? styles.draft}`}>{s}</Badge>;
+                  })()}
                   {t.provider_template_name ? (
                     <Badge className="text-[10px] bg-emerald-500/15 text-emerald-300 border-emerald-500/30">
                       HSM: {t.provider_template_name}
@@ -220,8 +393,21 @@ function TemplatesPage() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap line-clamp-3">{t.body}</p>
+                {t.rejection_reason && (
+                  <p className="text-[11px] text-red-400 mt-1">Motivo Meta: {t.rejection_reason}</p>
+                )}
               </div>
               <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={submit.isPending}
+                  onClick={() => {
+                    if (confirm(`Enviar "${t.name}" para aprovação da Meta?`)) submit.mutate(t.id);
+                  }}
+                >
+                  <Send className="h-3.5 w-3.5 mr-1" /> Enviar p/ Meta
+                </Button>
                 <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
                   <Pencil className="h-4 w-4" />
                 </Button>
