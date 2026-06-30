@@ -911,6 +911,147 @@ export type Database = {
           },
         ]
       }
+      whatsapp_fup_enrollments: {
+        Row: {
+          completed_at: string | null
+          current_step: number
+          enrolled_at: string
+          id: string
+          last_error: string | null
+          last_step_at: string | null
+          lead_id: string
+          next_run_at: string | null
+          sequence_id: string
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          current_step?: number
+          enrolled_at?: string
+          id?: string
+          last_error?: string | null
+          last_step_at?: string | null
+          lead_id: string
+          next_run_at?: string | null
+          sequence_id: string
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          current_step?: number
+          enrolled_at?: string
+          id?: string
+          last_error?: string | null
+          last_step_at?: string | null
+          lead_id?: string
+          next_run_at?: string | null
+          sequence_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_fup_enrollments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_fup_enrollments_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_fup_sequences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_fup_sequences: {
+        Row: {
+          active: boolean
+          audience_filters: Json
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          stop_on_reply: boolean
+          stop_on_stage_ids: string[]
+          trigger_config: Json
+          trigger_type: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          audience_filters?: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          stop_on_reply?: boolean
+          stop_on_stage_ids?: string[]
+          trigger_config?: Json
+          trigger_type: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          audience_filters?: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          stop_on_reply?: boolean
+          stop_on_stage_ids?: string[]
+          trigger_config?: Json
+          trigger_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      whatsapp_fup_steps: {
+        Row: {
+          created_at: string
+          delay_hours: number
+          id: string
+          sequence_id: string
+          step_order: number
+          template_id: string
+        }
+        Insert: {
+          created_at?: string
+          delay_hours?: number
+          id?: string
+          sequence_id: string
+          step_order: number
+          template_id: string
+        }
+        Update: {
+          created_at?: string
+          delay_hours?: number
+          id?: string
+          sequence_id?: string
+          step_order?: number
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_fup_steps_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_fup_sequences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_fup_steps_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_messages: {
         Row: {
           body: string | null
