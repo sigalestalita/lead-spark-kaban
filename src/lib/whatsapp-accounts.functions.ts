@@ -154,7 +154,59 @@ export const testSendAccount = createServerFn({ method: "POST" })
       type: "text",
       body: data.body,
     });
-    return result;
+
+    // Se o destinatário bate com um lead existente, grava no inbox (cria conversa se preciso)
+    let inboxLinked: { leadId: string; conversationId: string } | null = null;
+    if (result.status !== "failed") {
+      const phone = data.to.replace(/\D+/g, "");
+      const tail = phone.slice(-8);
+      const { data: leadMatch } = await supabaseAdmin
+        .from("leads")
+        .select("id, assigned_to")
+        .filter("phone", "ilike", `%${tail}%`)
+        .limit(1)
+        .maybeSingle();
+      if (leadMatch) {
+        let { data: conv } = await supabaseAdmin
+          .from("whatsapp_conversations")
+          .select("id")
+          .eq("lead_id", leadMatch.id)
+          .maybeSingle();
+        if (!conv) {
+          const ins = await supabaseAdmin
+            .from("whatsapp_conversations")
+            .insert({
+              lead_id: leadMatch.id,
+              account_id: account.id,
+              assigned_user_id: leadMatch.assigned_to ?? context.userId,
+              status: "open",
+            })
+            .select("id")
+            .single();
+          conv = ins.data;
+        }
+        if (conv) {
+          const ts = new Date().toISOString();
+          await supabaseAdmin.from("whatsapp_messages").insert({
+            conversation_id: conv.id,
+            lead_id: leadMatch.id,
+            sender_type: "agent",
+            sender_user_id: context.userId,
+            message_type: "text",
+            body: data.body,
+            provider_message_id: result.providerMessageId || null,
+            status: result.status === "sending" ? "sent" : result.status,
+            sent_at: ts,
+          });
+          await supabaseAdmin
+            .from("whatsapp_conversations")
+            .update({ last_message_at: ts, last_preview: data.body.slice(0, 200), status: "open" })
+            .eq("id", conv.id);
+          inboxLinked = { leadId: leadMatch.id, conversationId: conv.id };
+        }
+      }
+    }
+    return { ...result, inboxLinked };
   });
 
 /** Registra o número na Meta Cloud API (POST /{phone_number_id}/register).
