@@ -125,8 +125,24 @@ async function handleInbound(
   }
 
   if (!leadId) {
-    console.warn("[wa webhook] inbound sem lead associado, phone=", phone);
-    return; // sem lead, ignora (não criamos lead aqui)
+    // cria lead "incoming" automático pra não perder a mensagem
+    const ins = await admin
+      .from("leads")
+      .insert({
+        name: msg.senderName ?? `WhatsApp ${phone.slice(-4)}`,
+        phone,
+        source: "whatsapp_inbound",
+      })
+      .select("id")
+      .single();
+    leadId = ins.data?.id ?? null;
+    if (!leadId) {
+      console.warn("[wa webhook] falha ao criar lead, phone=", phone, ins.error);
+      return;
+    }
+    if (contact) {
+      await admin.from("whatsapp_contacts").update({ lead_id: leadId }).eq("id", contact.id);
+    }
   }
 
   // 2) acha/cria conversa
