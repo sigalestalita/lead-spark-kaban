@@ -23,7 +23,13 @@ import type {
 const DEFAULT_BASE = "https://graph.facebook.com/v21.0";
 
 function normalizePhone(p: string) {
-  return p.replace(/\D+/g, "");
+  const digits = p.replace(/\D+/g, "").replace(/^0+/, "");
+  // Leads brasileiros geralmente chegam da planilha como DDD+número (ex: 51999969371).
+  // A Meta exige E.164 sem "+"; para números BR locais, adicionamos o DDI 55.
+  if ((digits.length === 10 || digits.length === 11) && !digits.startsWith("55")) {
+    return `55${digits}`;
+  }
+  return digits;
 }
 
 function buildPayload(input: WaSendInput): Record<string, unknown> {

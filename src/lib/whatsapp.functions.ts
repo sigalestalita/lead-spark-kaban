@@ -2,9 +2,13 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-/** Normaliza telefone para somente dígitos (E.164 sem '+'). */
+/** Normaliza telefone para E.164 sem '+'. Números BR vindos como DDD+número recebem DDI 55. */
 function normPhone(raw: string): string {
-  return raw.replace(/\D+/g, "");
+  const digits = raw.replace(/\D+/g, "").replace(/^0+/, "");
+  if ((digits.length === 10 || digits.length === 11) && !digits.startsWith("55")) {
+    return `55${digits}`;
+  }
+  return digits;
 }
 
 /** Lista conversas (com filtros) — respeita RLS. */
@@ -213,7 +217,7 @@ export const sendMessage = createServerFn({ method: "POST" })
           access_token: account.access_token,
           webhook_secret: account.webhook_secret,
         },
-        to: lead.phone.replace(/\D+/g, ""),
+        to: normPhone(lead.phone),
         type: data.messageType,
         body: data.body,
         mediaUrl: data.mediaUrl,
@@ -231,6 +235,10 @@ export const sendMessage = createServerFn({ method: "POST" })
           sent_at: new Date().toISOString(),
         })
         .eq("id", msg.id);
+
+      if (result.status === "failed") {
+        throw new Error(result.error ?? "Falha ao enviar mensagem pelo WhatsApp");
+      }
 
       await supabaseAdmin
         .from("whatsapp_conversations")
@@ -330,7 +338,7 @@ export const sendMediaFromStorage = createServerFn({ method: "POST" })
           access_token: account.access_token,
           webhook_secret: account.webhook_secret,
         },
-        to: lead.phone.replace(/\D+/g, ""),
+        to: normPhone(lead.phone),
         type: messageType,
         body: data.caption,
         mediaUrl: signed.signedUrl,
@@ -346,6 +354,10 @@ export const sendMediaFromStorage = createServerFn({ method: "POST" })
           sent_at: new Date().toISOString(),
         })
         .eq("id", msg.id);
+
+      if (result.status === "failed") {
+        throw new Error(result.error ?? "Falha ao enviar anexo pelo WhatsApp");
+      }
 
       await supabaseAdmin
         .from("whatsapp_conversations")
