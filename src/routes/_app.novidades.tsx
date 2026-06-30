@@ -1,13 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { listWeeklyDigests, triggerWeeklyDigestNow, approveAndSendDigest, triggerFirstLidiEdition } from "@/lib/digests.functions";
+import { listWeeklyDigests, triggerWeeklyDigestNow, approveAndSendDigest, triggerFirstLidiEdition, triggerFeaturesEdition } from "@/lib/digests.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Sparkles, Pencil, Send, FileText, Eye } from "lucide-react";
+import { Sparkles, Pencil, Send, FileText, Eye, Rocket } from "lucide-react";
 import { DigestEditor } from "@/components/digest-editor";
 
 export const Route = createFileRoute("/_app/novidades")({
@@ -20,6 +20,7 @@ function NovidadesPage() {
   const triggerFn = useServerFn(triggerWeeklyDigestNow);
   const sendFn = useServerFn(approveAndSendDigest);
   const firstEditionFn = useServerFn(triggerFirstLidiEdition);
+  const featuresEditionFn = useServerFn(triggerFeaturesEdition);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["weekly-digests"],
@@ -40,6 +41,15 @@ function NovidadesPage() {
     mutationFn: () => firstEditionFn(),
     onSuccess: () => {
       toast.success("Edição de estreia da Lidi gerada. Revise antes de enviar.");
+      qc.invalidateQueries({ queryKey: ["weekly-digests"] });
+    },
+    onError: (e: any) => toast.error(`Falha: ${e?.message ?? "erro desconhecido"}`),
+  });
+
+  const featuresEdition = useMutation({
+    mutationFn: () => featuresEditionFn(),
+    onSuccess: () => {
+      toast.success("Edição de novidades gerada. Revise antes de enviar.");
       qc.invalidateQueries({ queryKey: ["weekly-digests"] });
     },
     onError: (e: any) => toast.error(`Falha: ${e?.message ?? "erro desconhecido"}`),
@@ -68,6 +78,15 @@ function NovidadesPage() {
         </div>
         <div className="flex flex-col gap-2 items-end">
           <Button
+            onClick={() => featuresEdition.mutate()}
+            disabled={featuresEdition.isPending}
+            className="gap-2"
+          >
+            <Rocket className="h-4 w-4" />
+            {featuresEdition.isPending ? "Gerando edição de novidades…" : "Gerar edição de novidades da Lidi"}
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => firstEdition.mutate()}
             disabled={firstEdition.isPending}
             className="gap-2"
