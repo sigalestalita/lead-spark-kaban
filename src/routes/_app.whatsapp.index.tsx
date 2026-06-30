@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { z } from "zod";
+import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listConversations } from "@/lib/whatsapp.functions";
@@ -13,17 +15,25 @@ import { ExternalLink } from "lucide-react";
 import { LEAD_TYPE_LABEL, LEAD_TYPE_COLOR, type LeadType } from "@/lib/lead-type";
 
 export const Route = createFileRoute("/_app/whatsapp/")({
+  validateSearch: z.object({ c: z.string().uuid().optional() }),
   component: WhatsappInbox,
 });
 
 function WhatsappInbox() {
   const fn = useServerFn(listConversations);
   const qc = useQueryClient();
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: "/_app/whatsapp/" });
   const [status, setStatus] = useState<"all" | "open" | "pending" | "closed">("all");
   const [assigned, setAssigned] = useState<"all" | "me" | "unassigned">("all");
   const [unread, setUnread] = useState(false);
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(search.c ?? null);
+
+  useEffect(() => {
+    if (search.c && search.c !== selected) setSelected(search.c);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.c]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["wa-conversations", status, assigned, unread, search],
