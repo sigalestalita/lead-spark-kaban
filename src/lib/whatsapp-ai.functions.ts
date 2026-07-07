@@ -90,6 +90,45 @@ function lastInboundLeadMessage(messages: Array<{ sender_type: string; body: str
   return [...messages].reverse().find((m) => m.sender_type === "lead" && (m.body?.trim() ?? ""));
 }
 
+export async function generateAutoReplyInternal(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  conversationId: string,
+  instruction?: string,
+) {
+  const settings = await readAiAgentSettings(supabase);
+  if (!settings.enabled || !settings.autoReplyEnabled) {
+    throw new Error("IA automática de atendimento está desativada");
+  }
+  const { conv, messages, notes, stage, icp } = await loadContext(supabase, conversationId, 40);
+  const lead = (conv.leads ?? {}) as Record<string, unknown>;
+  const currentStageId = (conv.leads as { stage_id?: string | null } | null)?.stage_id ?? null;
+  if (currentStageId && settings.handoffStageIds.includes(currentStageId)) {
+    throw new Error("Conversa já está em etapa de handoff humano");
+  }
+  if (countAgentReplies(messages) >= settings.responseMaxPerConversation) {
+    throw new Error("Limite de respostas automáticas atingido nesta conversa");
+  }
+  const lastLead = lastInboundLeadMessage(messages);
+  if (!lastLead) throw new Error("Nenhuma mensagem recente do lead para responder");
+  const result = await callAI([
+    { role: "system", content: buildAgentSystemPrompt(settings) },
+    {
+      role: "user",
+      content:
+        `${settings.replyPrompt}\n\n` +
+        (instruction ? `Instrução complementar: ${instruction}\n\n` : "") +
+        `${leadBrief(lead, stage, notes, icp)}\n\n` +
+        `Conversa:\n${transcript(messages)}\n\n` +
+        `Última mensagem do lead: ${lastLead.body}\n\n` +
+        `Responda APENAS com a mensagem de WhatsApp pronta, curta, natural, em português brasileiro, sem aspas.`,
+    },
+  ]);
+  const reply = result.choices?.[0]?.message?.content?.trim() ?? "";
+  if (!reply) throw new Error("IA não retornou resposta");
+  return { reply };
+}
+
 async function callAI(messages: Array<{ role: string; content: string }>, tool?: unknown) {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY ausente");
@@ -516,34 +555,5 @@ export const autoReplyToConversation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ conversationId: z.string().uuid(), instruction: z.string().max(1000).optional() }).parse(d))
   .handler(async ({ data, context }) => {
-    const settings = await readAiAgentSettings(context.supabase);
-    if (!settings.enabled || !settings.autoReplyEnabled) {
-      throw new Error("IA automática de atendimento está desativada");
-    }
-    const { conv, messages, notes, stage, icp } = await loadContext(context.supabase, data.conversationId, 40);
-    const lead = (conv.leads ?? {}) as Record<string, unknown>;
-    if (stage?.slug && settings.handoffStageIds.includes((conv.leads as { stage_id?: string | null } | null)?.stage_id ?? "")) {
-      throw new Error("Conversa já está em etapa de handoff humano");
-    }
-    if (countAgentReplies(messages) >= settings.responseMaxPerConversation) {
-      throw new Error("Limite de respostas automáticas atingido nesta conversa");
-    }
-    const lastLead = lastInboundLeadMessage(messages);
-    if (!lastLead) throw new Error("Nenhuma mensagem recente do lead para responder");
-    const result = await callAI([
-      { role: "system", content: buildAgentSystemPrompt(settings) },
-      {
-        role: "user",
-        content:
-          `${settings.replyPrompt}\n\n` +
-          (data.instruction ? `Instrução complementar: ${data.instruction}\n\n` : "") +
-          `${leadBrief(lead, stage, notes, icp)}\n\n` +
-          `Conversa:\n${transcript(messages)}\n\n` +
-          `Última mensagem do lead: ${lastLead.body}\n\n` +
-          `Responda APENAS com a mensagem de WhatsApp pronta, curta, natural, em português brasileiro, sem aspas.`,
-      },
-    ]);
-    const reply = result.choices?.[0]?.message?.content?.trim() ?? "";
-    if (!reply) throw new Error("IA não retornou resposta");
-    return { reply };
+    return generateAutoReplyInternal(context.supabase, data.conversationId, data.instruction);
   });
