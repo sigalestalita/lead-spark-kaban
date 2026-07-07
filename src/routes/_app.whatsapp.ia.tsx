@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Bot, Save } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/_app/whatsapp/ia")({
   component: WhatsAppAiPage,
@@ -33,7 +33,7 @@ function WhatsAppAiPage() {
   const [dirty, setDirty] = useState(false);
   const [form, setForm] = useState<any>(null);
 
-  useMemo(() => {
+  useEffect(() => {
     if (settings && !dirty) setForm(settings);
   }, [settings, dirty]);
 
