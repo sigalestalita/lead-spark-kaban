@@ -4,15 +4,17 @@ import { z } from "zod";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { listConversations } from "@/lib/whatsapp.functions";
+import { listConversations, setConversationStatus } from "@/lib/whatsapp.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { ConversationView } from "@/components/whatsapp/conversation-view";
 import { LeadSidePanel } from "@/components/whatsapp/lead-side-panel";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ExternalLink } from "lucide-react";
 import { LEAD_TYPE_LABEL, LEAD_TYPE_COLOR, type LeadType } from "@/lib/lead-type";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/whatsapp/")({
   validateSearch: z.object({ c: z.string().uuid().optional() }),
@@ -21,6 +23,7 @@ export const Route = createFileRoute("/_app/whatsapp/")({
 
 function WhatsappInbox() {
   const fn = useServerFn(listConversations);
+  const setStatusFn = useServerFn(setConversationStatus);
   const qc = useQueryClient();
   const routeSearch = Route.useSearch();
   const navigate = useNavigate({ from: "/whatsapp/" });
@@ -54,6 +57,18 @@ function WhatsappInbox() {
   const conversations = data?.conversations ?? [];
   const profiles = data?.profiles ?? [];
   const selectedConv = conversations.find((c) => c.id === selected) ?? null;
+
+  const changeConversationStatus = async (nextStatus: "open" | "closed") => {
+    if (!selectedConv) return;
+    try {
+      await setStatusFn({ data: { conversationId: selectedConv.id, status: nextStatus } });
+      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+      qc.invalidateQueries({ queryKey: ["wa-messages", selectedConv.id] });
+      toast.success(nextStatus === "closed" ? "Conversa encerrada." : "Conversa reaberta.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao atualizar status da conversa");
+    }
+  };
 
   return (
     <div className="h-full flex">
@@ -185,15 +200,24 @@ function WhatsappInbox() {
                     {(selectedConv.leads as { company_name?: string | null } | null)?.company_name ?? ""}
                   </p>
                 </div>
-                {(selectedConv.leads as unknown as { id?: string } | null)?.id && (
-                  <Link
-                    to="/lead/$id"
-                    params={{ id: (selectedConv.leads as unknown as { id: string }).id }}
-                    className="text-xs text-primary hover:underline flex items-center gap-1"
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={selectedConv.status === "closed" ? "default" : "outline"}
+                    onClick={() => changeConversationStatus(selectedConv.status === "closed" ? "open" : "closed")}
                   >
-                    Abrir lead <ExternalLink className="h-3 w-3" />
-                  </Link>
-                )}
+                    {selectedConv.status === "closed" ? "Reabrir conversa" : "Encerrar conversa"}
+                  </Button>
+                  {(selectedConv.leads as unknown as { id?: string } | null)?.id && (
+                    <Link
+                      to="/lead/$id"
+                      params={{ id: (selectedConv.leads as unknown as { id: string }).id }}
+                      className="text-xs text-primary hover:underline flex items-center gap-1"
+                    >
+                      Abrir lead <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  )}
+                </div>
               </div>
               <div className="flex-1 min-h-0">
                 <ConversationView conversationId={selectedConv.id} />
