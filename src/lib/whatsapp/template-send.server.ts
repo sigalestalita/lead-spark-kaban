@@ -29,7 +29,7 @@ function extractPlaceholderCount(text?: string | null) {
   return matches.reduce((max, match) => Math.max(max, Number(match[1] ?? 0)), 0);
 }
 
-function leadValueMap(lead?: LeadForTemplateParams | null) {
+function leadValueMap(lead?: LeadForTemplateParams | null): Record<string, string> {
   const fullName = lead?.name?.trim() ?? "";
   const firstName = fullName.split(/\s+/).filter(Boolean)[0] ?? "";
   const company = lead?.company_name?.trim() ?? "";
@@ -38,7 +38,7 @@ function leadValueMap(lead?: LeadForTemplateParams | null) {
     nome: fullName,
     primeiro_nome: firstName,
     empresa: company,
-  } satisfies Record<string, string>;
+  };
 }
 
 function normalizeParamValues(values: string[], expectedCount: number, fallbacks: string[]) {
