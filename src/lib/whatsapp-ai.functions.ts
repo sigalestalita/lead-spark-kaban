@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { GROU_PLAYBOOK } from "./grou-playbook";
+import { getOrCreateConversationForPhone } from "./whatsapp.functions";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const MODEL = "google/gemini-2.5-flash";
@@ -578,4 +579,134 @@ export const autoReplyToConversation = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ conversationId: z.string().uuid(), instruction: z.string().max(1000).optional() }).parse(d))
   .handler(async ({ data, context }) => {
     return generateAutoReplyInternal(context.supabase, data.conversationId, data.instruction);
+  });
+
+export const triggerManualAiTest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({
+      phone: z.string().min(8).max(30),
+      name: z.string().max(200).optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const settings = await readAiAgentSettings(context.supabase);
+    if (!settings.enabled) throw new Error("IA de atendimento desativada");
+    if (!settings.initialOutreachEnabled) throw new Error("Disparo inicial proativo está desativado");
+
+    const created = await getOrCreateConversationForPhone({
+      data: {
+        phone: data.phone,
+        name: data.name,
+      },
+      headers: context.headers,
+    });
+
+    const { conversation } = created;
+    if (!conversation?.id) throw new Error("Não foi possível preparar a conversa de teste");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { getProvider } = await import("./whatsapp/provider-registry.server");
+
+    const { data: conv, error: convErr } = await supabaseAdmin
+      .from("whatsapp_conversations")
+      .select("id, lead_id, account_id, leads:lead_id(id,name,company_name,phone)")
+      .eq("id", conversation.id)
+      .maybeSingle();
+    if (convErr) throw new Error(convErr.message);
+    if (!conv) throw new Error("Conversa de teste não encontrada");
+
+    const lead = conv.leads as { id: string; name: string | null; company_name: string | null; phone: string | null } | null;
+    if (!lead?.phone) throw new Error("Lead de teste sem telefone");
+    if (!settings.initialTemplateId) throw new Error("Nenhum template HSM inicial configurado");
+
+    const { data: tmpl } = await supabaseAdmin
+      .from("whatsapp_templates")
+      .select("provider_template_name, language, variables")
+      .eq("id", settings.initialTemplateId)
+      .maybeSingle();
+    if (!tmpl?.provider_template_name) throw new Error("Template HSM inicial inválido");
+
+    const accountQuery = conv.account_id
+      ? supabaseAdmin.from("whatsapp_accounts").select("*").eq("id", conv.account_id).maybeSingle()
+      : supabaseAdmin.from("whatsapp_accounts").select("*").eq("is_default", true).maybeSingle();
+    const { data: account } = await accountQuery;
+    if (!account) throw new Error("Nenhuma conta de WhatsApp configurada");
+
+    const varNames = Array.isArray(tmpl.variables) ? (tmpl.variables as unknown[]).map(String) : [];
+    const map: Record<string, string> = {
+      nome: lead.name ?? "",
+      primeiro_nome: (lead.name ?? "").split(" ")[0] ?? "",
+      empresa: lead.company_name ?? "",
+    };
+    const templateParams = varNames.map((name) => map[name] ?? " ");
+
+    const { data: msg, error: msgErr } = await supabaseAdmin
+      .from("whatsapp_messages")
+      .insert({
+        conversation_id: conv.id,
+        lead_id: conv.lead_id,
+        sender_type: "bot",
+        message_type: "template",
+        body: null,
+        metadata: {
+          source: "manual_ai_test",
+          template_id: settings.initialTemplateId,
+          template_name: tmpl.provider_template_name,
+          phone: data.phone,
+        },
+        status: "sending",
+      })
+      .select("id")
+      .single();
+    if (msgErr) throw new Error(msgErr.message);
+
+    try {
+      const provider = getProvider(account.provider);
+      const result = await provider.sendMessage({
+        account: {
+          id: account.id,
+          phone_number: account.phone_number,
+          provider: account.provider,
+          provider_instance_id: account.provider_instance_id,
+          provider_base_url: account.provider_base_url,
+          access_token: account.access_token,
+          webhook_secret: account.webhook_secret,
+        },
+        to: String(lead.phone).replace(/\D+/g, ""),
+        type: "template",
+        templateName: tmpl.provider_template_name,
+        templateLanguage: tmpl.language ?? "pt_BR",
+        templateParams,
+      });
+
+      await supabaseAdmin
+        .from("whatsapp_messages")
+        .update({
+          provider_message_id: result.providerMessageId,
+          status: result.status === "failed" ? "failed" : "sent",
+          error: result.error ?? null,
+          sent_at: new Date().toISOString(),
+        })
+        .eq("id", msg.id);
+
+      await supabaseAdmin
+        .from("whatsapp_conversations")
+        .update({
+          last_message_at: new Date().toISOString(),
+          last_preview: `[HSM teste] ${tmpl.provider_template_name}`,
+          status: "open",
+        })
+        .eq("id", conv.id);
+
+      if (result.status === "failed") {
+        throw new Error(result.error ?? "Falha ao enviar template de teste");
+      }
+
+      return { ok: true, conversationId: conv.id, providerMessageId: result.providerMessageId };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Falha no teste manual";
+      await supabaseAdmin.from("whatsapp_messages").update({ status: "failed", error: message }).eq("id", msg.id);
+      throw new Error(message);
+    }
   });
