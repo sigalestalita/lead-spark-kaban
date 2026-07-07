@@ -200,6 +200,84 @@ async function handleInbound(
     .from("whatsapp_contacts")
     .update({ last_message_at: ts })
     .eq("id", contact!.id);
+
+  // 4) resposta automática da IA quando habilitada
+  try {
+    const { data: aiCfg } = await admin
+      .from("app_settings")
+      .select("value")
+      .eq("key", "whatsapp_ai_agent")
+      .maybeSingle();
+    const cfg = (aiCfg?.value ?? {}) as Record<string, unknown>;
+    const autoReplyEnabled = cfg.enabled === true && cfg.autoReplyEnabled === true;
+    const stopOnLeadReply = cfg.stopOnLeadReply !== false;
+    const responseMaxPerConversation = typeof cfg.responseMaxPerConversation === "number" ? cfg.responseMaxPerConversation : 12;
+
+    if (!autoReplyEnabled || !conv?.id || !leadId) return;
+
+    if (stopOnLeadReply) {
+      const { data: msgs } = await admin
+        .from("whatsapp_messages")
+        .select("sender_type")
+        .eq("conversation_id", conv.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      const agentReplies = (msgs ?? []).filter((m) => ["bot", "automation"].includes(m.sender_type)).length;
+      if (agentReplies >= responseMaxPerConversation) return;
+    }
+
+    const { autoReplyToConversation } = await import("@/lib/whatsapp-ai.functions");
+    const aiResult = await autoReplyToConversation({
+      data: { conversationId: conv.id },
+      context: { supabase: admin, userId: null, claims: null } as never,
+    });
+    const reply = aiResult?.reply?.trim();
+    if (!reply) return;
+
+    const { getProvider } = await import("@/lib/whatsapp/provider-registry.server");
+    const provider = getProvider(account.provider);
+    const botMsg = await admin
+      .from("whatsapp_messages")
+      .insert({
+        conversation_id: conv.id,
+        lead_id: leadId,
+        sender_type: "bot",
+        message_type: "text",
+        body: reply,
+        metadata: { source: "ai_auto_reply" },
+        status: "sending",
+      })
+      .select("id")
+      .single();
+
+    const sendResult = await provider.sendMessage({
+      account: accountConfig,
+      to: phone,
+      type: "text",
+      body: reply,
+    });
+
+    await admin
+      .from("whatsapp_messages")
+      .update({
+        provider_message_id: sendResult.providerMessageId || null,
+        status: sendResult.status === "failed" ? "failed" : "sent",
+        error: sendResult.error ?? null,
+        sent_at: new Date().toISOString(),
+      })
+      .eq("id", botMsg.data?.id ?? "00000000-0000-0000-0000-000000000000");
+
+    await admin
+      .from("whatsapp_conversations")
+      .update({
+        last_message_at: new Date().toISOString(),
+        last_preview: reply.slice(0, 200),
+        status: "open",
+      })
+      .eq("id", conv.id);
+  } catch (e) {
+    console.error("[wa webhook] ai auto-reply error", e);
+  }
 }
 
 async function handleStatus(
