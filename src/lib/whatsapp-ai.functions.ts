@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { GROU_PLAYBOOK } from "./grou-playbook";
+import { resolveTemplateSendParams } from "./whatsapp/template-send.server";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const MODEL = "google/gemini-2.5-flash";
@@ -775,7 +776,7 @@ export const triggerManualAiTest = createServerFn({ method: "POST" })
 
     const { data: tmpl } = await supabaseAdmin
       .from("whatsapp_templates")
-      .select("provider_template_name, language, variables")
+      .select("provider_template_name, language, variables, meta_template_id")
       .eq("id", settings.initialTemplateId)
       .maybeSingle();
     if (!tmpl?.provider_template_name) {
@@ -800,13 +801,18 @@ export const triggerManualAiTest = createServerFn({ method: "POST" })
       };
     }
 
-    const varNames = Array.isArray(tmpl.variables) ? (tmpl.variables as unknown[]).map(String) : [];
-    const map: Record<string, string> = {
-      nome: lead.name ?? "",
-      primeiro_nome: (lead.name ?? "").split(" ")[0] ?? "",
-      empresa: lead.company_name ?? "",
-    };
-    const templateParams = varNames.map((name) => map[name] ?? " ");
+    const { headerParams, bodyParams } = await resolveTemplateSendParams({
+      account: {
+        access_token: account.access_token ?? "",
+        provider_base_url: account.provider_base_url,
+      },
+      metaTemplateId: tmpl.meta_template_id,
+      storedVariables: tmpl.variables,
+      lead: {
+        name: lead.name,
+        company_name: lead.company_name,
+      },
+    });
 
     const { data: msg, error: msgErr } = await supabaseAdmin
       .from("whatsapp_messages")
@@ -844,7 +850,8 @@ export const triggerManualAiTest = createServerFn({ method: "POST" })
         type: "template",
         templateName: tmpl.provider_template_name,
         templateLanguage: tmpl.language ?? "pt_BR",
-        templateParams,
+        templateHeaderParams: headerParams,
+        templateParams: bodyParams,
       });
 
       await supabaseAdmin
