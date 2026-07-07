@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { GROU_PLAYBOOK } from "./grou-playbook";
-import { getOrCreateConversationForPhone } from "./whatsapp.functions";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const MODEL = "google/gemini-2.5-flash";
@@ -594,16 +593,104 @@ export const triggerManualAiTest = createServerFn({ method: "POST" })
     if (!settings.enabled) throw new Error("IA de atendimento desativada");
     if (!settings.initialOutreachEnabled) throw new Error("Disparo inicial proativo está desativado");
 
-    const created = await getOrCreateConversationForPhone({
-      data: {
-        phone: data.phone,
-        name: data.name,
-      },
-      headers: context.headers,
-    });
+    const phone = data.phone.replace(/\D+/g, "").replace(/^0+/, "");
+    const normalizedPhone = (phone.length === 10 || phone.length === 11) && !phone.startsWith("55") ? `55${phone}` : phone;
 
-    const { conversation } = created;
-    if (!conversation?.id) throw new Error("Não foi possível preparar a conversa de teste");
+    let contactId: string | null = null;
+    let leadId: string | null = null;
+
+    const { data: existingContact, error: contactErr } = await context.supabase
+      .from("whatsapp_contacts")
+      .select("id, lead_id")
+      .eq("phone", normalizedPhone)
+      .maybeSingle();
+    if (contactErr) throw new Error(contactErr.message);
+
+    if (existingContact) {
+      contactId = existingContact.id;
+      leadId = existingContact.lead_id ?? null;
+    }
+
+    if (!leadId) {
+      const { data: existingLead, error: leadLookupErr } = await context.supabase
+        .from("leads")
+        .select("id")
+        .filter("phone", "ilike", `%${normalizedPhone.slice(-8)}%`)
+        .limit(1)
+        .maybeSingle();
+      if (leadLookupErr) throw new Error(leadLookupErr.message);
+      if (existingLead) leadId = existingLead.id;
+    }
+
+    if (!leadId) {
+      const { data: stage } = await context.supabase
+        .from("stages")
+        .select("id")
+        .eq("slug", "novo")
+        .maybeSingle();
+
+      const { data: createdLead, error: leadCreateErr } = await context.supabase
+        .from("leads")
+        .insert({
+          name: data.name?.trim() || `Teste WhatsApp ${normalizedPhone.slice(-4)}`,
+          phone: normalizedPhone,
+          source: "whatsapp_ai_test",
+          channel: "whatsapp",
+          assigned_to: context.userId,
+          stage_id: stage?.id ?? null,
+        })
+        .select("id")
+        .single();
+      if (leadCreateErr) throw new Error(leadCreateErr.message);
+      leadId = createdLead.id;
+    }
+
+    if (!contactId) {
+      const { data: createdContact, error: contactCreateErr } = await context.supabase
+        .from("whatsapp_contacts")
+        .upsert({
+          phone: normalizedPhone,
+          lead_id: leadId,
+          name: data.name?.trim() || null,
+        }, { onConflict: "phone" })
+        .select("id")
+        .single();
+      if (contactCreateErr) throw new Error(contactCreateErr.message);
+      contactId = createdContact.id;
+    } else if (leadId) {
+      await context.supabase.from("whatsapp_contacts").update({ lead_id: leadId }).eq("id", contactId);
+    }
+
+    const { data: existingConversation, error: existingConvErr } = await context.supabase
+      .from("whatsapp_conversations")
+      .select("id")
+      .eq("lead_id", leadId)
+      .maybeSingle();
+    if (existingConvErr) throw new Error(existingConvErr.message);
+
+    let conversationId = existingConversation?.id ?? null;
+    if (!conversationId) {
+      const { data: account } = await context.supabase
+        .from("whatsapp_accounts")
+        .select("id")
+        .eq("is_default", true)
+        .maybeSingle();
+
+      const { data: createdConversation, error: convCreateErr } = await context.supabase
+        .from("whatsapp_conversations")
+        .insert({
+          lead_id: leadId,
+          contact_id: contactId,
+          account_id: account?.id ?? null,
+          assigned_user_id: context.userId,
+          status: "open",
+        })
+        .select("id")
+        .single();
+      if (convCreateErr) throw new Error(convCreateErr.message);
+      conversationId = createdConversation.id;
+    }
+    if (!conversationId) throw new Error("Não foi possível preparar a conversa de teste");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { getProvider } = await import("./whatsapp/provider-registry.server");
@@ -611,7 +698,7 @@ export const triggerManualAiTest = createServerFn({ method: "POST" })
     const { data: conv, error: convErr } = await supabaseAdmin
       .from("whatsapp_conversations")
       .select("id, lead_id, account_id, leads:lead_id(id,name,company_name,phone)")
-      .eq("id", conversation.id)
+      .eq("id", conversationId)
       .maybeSingle();
     if (convErr) throw new Error(convErr.message);
     if (!conv) throw new Error("Conversa de teste não encontrada");
