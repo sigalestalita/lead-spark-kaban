@@ -71,7 +71,7 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook/$accountId")(
 
         for (const ev of events) {
           if (ev.kind === "message") {
-            await handleInbound(supabaseAdmin, account.id, ev.data);
+            await handleInbound(supabaseAdmin, account.id, accountConfig, ev.data);
           } else if (ev.kind === "status") {
             await handleStatus(supabaseAdmin, ev.data);
           }
@@ -85,6 +85,15 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook/$accountId")(
 async function handleInbound(
   admin: Awaited<ReturnType<typeof getAdmin>>,
   accountId: string,
+  accountConfig: {
+    id: string;
+    phone_number: string;
+    provider: string;
+    provider_instance_id: string | null;
+    provider_base_url: string | null;
+    access_token: string | null;
+    webhook_secret: string;
+  },
   msg: {
     providerMessageId: string;
     from: string;
@@ -226,16 +235,13 @@ async function handleInbound(
       if (agentReplies >= responseMaxPerConversation) return;
     }
 
-    const { autoReplyToConversation } = await import("@/lib/whatsapp-ai.functions");
-    const aiResult = await autoReplyToConversation({
-      data: { conversationId: conv.id },
-      context: { supabase: admin, userId: null, claims: null } as never,
-    });
+    const { generateAutoReplyInternal } = await import("@/lib/whatsapp-ai.functions");
+    const aiResult = await generateAutoReplyInternal(admin, conv.id);
     const reply = aiResult?.reply?.trim();
     if (!reply) return;
 
     const { getProvider } = await import("@/lib/whatsapp/provider-registry.server");
-    const provider = getProvider(account.provider);
+    const provider = getProvider(accountConfig.provider);
     const botMsg = await admin
       .from("whatsapp_messages")
       .insert({
