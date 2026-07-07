@@ -43,7 +43,7 @@ export const createAutomationRule = createServerFn({ method: "POST" })
         name: z.string().min(1).max(160),
         triggerType: z.enum(AUTOMATION_TRIGGERS),
         triggerConfig: TriggerConfig,
-        templateId: z.string().uuid(),
+        templateId: z.string().uuid().optional(),
         delayMinutes: z.number().int().min(0).max(10080).default(0),
         active: z.boolean().default(true),
       })
@@ -57,7 +57,7 @@ export const createAutomationRule = createServerFn({ method: "POST" })
         name: data.name,
         trigger_type: data.triggerType,
         trigger_config: data.triggerConfig,
-        template_id: data.templateId,
+        template_id: data.templateId ?? null,
         delay_minutes: data.delayMinutes,
         active: data.active,
         created_by: userId,
