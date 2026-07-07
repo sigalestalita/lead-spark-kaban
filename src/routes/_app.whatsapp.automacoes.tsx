@@ -34,7 +34,7 @@ export const Route = createFileRoute("/_app/whatsapp/automacoes")({
 });
 
 const TRIGGER_LABELS: Record<AutomationTrigger, string> = {
-  new_lead: "Lead novo",
+  new_lead: "Lead novo (IA + HSM inicial)",
   no_reply: "Sem resposta há X horas",
   stage_change: "Mudou para estágio",
   meeting_reminder: "Lembrete antes da reunião",
@@ -218,6 +218,11 @@ function AutomationsPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {trigger === "new_lead" && (
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        Para lead novo, o disparo real usa a configuração da aba <strong>IA</strong> e o template HSM inicial definido lá.
+                      </p>
+                    )}
                   </div>
                 </div>
 
