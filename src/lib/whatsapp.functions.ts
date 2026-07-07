@@ -417,6 +417,114 @@ export const setConversationStatus = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Busca/cria conversa por telefone para teste manual. */
+export const getOrCreateConversationForPhone = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({
+      phone: z.string().min(8).max(30),
+      name: z.string().max(200).optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const phone = normPhone(data.phone);
+
+    let contactId: string | null = null;
+    let leadId: string | null = null;
+
+    const { data: existingContact, error: contactErr } = await supabase
+      .from("whatsapp_contacts")
+      .select("id, lead_id")
+      .eq("phone", phone)
+      .maybeSingle();
+    if (contactErr) throw new Error(contactErr.message);
+
+    if (existingContact) {
+      contactId = existingContact.id;
+      leadId = existingContact.lead_id ?? null;
+    }
+
+    if (!leadId) {
+      const { data: existingLead, error: leadLookupErr } = await supabase
+        .from("leads")
+        .select("id, assigned_to")
+        .filter("phone", "ilike", `%${phone.slice(-8)}%`)
+        .limit(1)
+        .maybeSingle();
+      if (leadLookupErr) throw new Error(leadLookupErr.message);
+      if (existingLead) leadId = existingLead.id;
+    }
+
+    if (!leadId) {
+      const { data: stage } = await supabase
+        .from("stages")
+        .select("id")
+        .eq("slug", "novo")
+        .maybeSingle();
+
+      const { data: createdLead, error: leadCreateErr } = await supabase
+        .from("leads")
+        .insert({
+          name: data.name?.trim() || `Teste WhatsApp ${phone.slice(-4)}`,
+          phone,
+          source: "whatsapp_ai_test",
+          channel: "whatsapp",
+          assigned_to: userId,
+          stage_id: stage?.id ?? null,
+        })
+        .select("id")
+        .single();
+      if (leadCreateErr) throw new Error(leadCreateErr.message);
+      leadId = createdLead.id;
+    }
+
+    if (!contactId) {
+      const { data: createdContact, error: contactCreateErr } = await supabase
+        .from("whatsapp_contacts")
+        .upsert({
+          phone,
+          lead_id: leadId,
+          name: data.name?.trim() || null,
+        }, { onConflict: "phone" })
+        .select("id")
+        .single();
+      if (contactCreateErr) throw new Error(contactCreateErr.message);
+      contactId = createdContact.id;
+    } else if (leadId) {
+      await supabase.from("whatsapp_contacts").update({ lead_id: leadId }).eq("id", contactId);
+    }
+
+    const { data: existingConversation, error: convLookupErr } = await supabase
+      .from("whatsapp_conversations")
+      .select("*")
+      .eq("lead_id", leadId)
+      .maybeSingle();
+    if (convLookupErr) throw new Error(convLookupErr.message);
+    if (existingConversation) return { conversation: existingConversation, leadId };
+
+    const { data: account } = await supabase
+      .from("whatsapp_accounts")
+      .select("id")
+      .eq("is_default", true)
+      .maybeSingle();
+
+    const { data: createdConversation, error: convCreateErr } = await supabase
+      .from("whatsapp_conversations")
+      .insert({
+        lead_id: leadId,
+        contact_id: contactId,
+        account_id: account?.id ?? null,
+        assigned_user_id: userId,
+        status: "open",
+      })
+      .select("*")
+      .single();
+    if (convCreateErr) throw new Error(convCreateErr.message);
+
+    return { conversation: createdConversation, leadId };
+  });
+
 /** Lista perfis (p/ atribuição). */
 export const listProfilesForAssignment = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
