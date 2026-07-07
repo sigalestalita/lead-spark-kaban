@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getProvider } from "./provider-registry.server";
+import { resolveTemplateSendParams } from "./template-send.server";
 import { renderTemplate } from "../whatsapp-templates.functions";
 
 type AiAgentSettings = {
@@ -202,7 +203,7 @@ async function executeAiInitialOutreachForLead(lead: LeadLite): Promise<{ ok: bo
 
   const { data: tmpl } = await supabaseAdmin
     .from("whatsapp_templates")
-    .select("provider_template_name, language, variables")
+    .select("provider_template_name, language, variables, meta_template_id")
     .eq("id", settings.initialTemplateId)
     .maybeSingle();
   if (!tmpl?.provider_template_name) return { ok: false, error: "Template HSM inicial inválido" };
@@ -233,13 +234,18 @@ async function executeAiInitialOutreachForLead(lead: LeadLite): Promise<{ ok: bo
   }
   if (!convId) return { ok: false, error: "Falha criando conversa" };
 
-  const varNames = Array.isArray(tmpl.variables) ? (tmpl.variables as unknown[]).map(String) : [];
-  const map: Record<string, string> = {
-    nome: lead.name ?? "",
-    primeiro_nome: (lead.name ?? "").split(" ")[0] ?? "",
-    empresa: lead.company_name ?? "",
-  };
-  const templateParams = varNames.map((name) => map[name] ?? " ");
+  const { headerParams, bodyParams } = await resolveTemplateSendParams({
+    account: {
+      access_token: account.access_token ?? "",
+      provider_base_url: account.provider_base_url,
+    },
+    metaTemplateId: tmpl.meta_template_id,
+    storedVariables: tmpl.variables,
+    lead: {
+      name: lead.name,
+      company_name: lead.company_name,
+    },
+  });
 
   const { data: msg } = await supabaseAdmin
     .from("whatsapp_messages")
@@ -275,7 +281,8 @@ async function executeAiInitialOutreachForLead(lead: LeadLite): Promise<{ ok: bo
       type: "template",
       templateName: tmpl.provider_template_name,
       templateLanguage: tmpl.language ?? "pt_BR",
-      templateParams,
+      templateHeaderParams: headerParams,
+      templateParams: bodyParams,
     });
 
     if (msg?.id) {

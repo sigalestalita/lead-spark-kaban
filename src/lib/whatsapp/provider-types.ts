@@ -23,6 +23,8 @@ export interface WaSendInput {
   mediaMime?: string;
   templateName?: string;
   templateLanguage?: string;
+  /** Parâmetros posicionais do cabeçalho do template HSM (HEADER {{1}}, {{2}}, …). */
+  templateHeaderParams?: string[];
   /** Parâmetros posicionais do corpo do template HSM ({{1}}, {{2}}, …). */
   templateParams?: string[];
   /** Compat: chave→valor; convertido em posicional ordenando as chaves. */

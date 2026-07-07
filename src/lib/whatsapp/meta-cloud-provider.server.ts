@@ -48,12 +48,19 @@ function buildPayload(input: WaSendInput): Record<string, unknown> {
       return { ...base, type: "document", document: { link: input.mediaUrl, caption: input.body } };
     case "template": {
       const components: Array<Record<string, unknown>> = [];
+      const header = input.templateHeaderParams?.map((v) => String(v ?? "")) ?? [];
       const positional: string[] =
         input.templateParams && input.templateParams.length > 0
           ? input.templateParams.map((v) => String(v ?? ""))
           : Object.keys(input.templateVariables ?? {})
               .sort()
               .map((k) => String((input.templateVariables ?? {})[k] ?? ""));
+      if (header.length > 0) {
+        components.push({
+          type: "header",
+          parameters: header.map((text) => ({ type: "text", text: text || " " })),
+        });
+      }
       if (positional.length > 0) {
         components.push({
           type: "body",
