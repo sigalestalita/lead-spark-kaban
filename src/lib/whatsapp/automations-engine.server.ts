@@ -424,19 +424,22 @@ export async function runAutomationsTick(): Promise<{
         skipped++;
         continue;
       }
-      const res = r.trigger_type === "new_lead"
+      const usingAiInitial = r.trigger_type === "new_lead";
+      const res = usingAiInitial
         ? await executeAiInitialOutreachForLead(lead)
         : await executeRuleForLead(r, lead);
       if (res.ok) sent++;
       else failed++;
 
-      await supabaseAdmin.from("whatsapp_automation_logs").insert({
-        rule_id: r.id,
-        lead_id: lead.id,
-        status: res.ok ? "sent" : "failed",
-        error: res.error ?? null,
-        executed_at: new Date().toISOString(),
-      });
+      if (usingAiInitial) {
+        await supabaseAdmin.from("whatsapp_automation_logs").insert({
+          rule_id: r.id,
+          lead_id: lead.id,
+          status: res.ok ? "sent" : "failed",
+          error: res.error ?? null,
+          executed_at: new Date().toISOString(),
+        });
+      }
     }
   }
 
