@@ -2,6 +2,12 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getProvider } from "./provider-registry.server";
 import { renderTemplate } from "../whatsapp-templates.functions";
 
+type AiAgentSettings = {
+  enabled: boolean;
+  initialOutreachEnabled: boolean;
+  initialTemplateId: string | null;
+};
+
 type RuleRow = {
   id: string;
   name: string;
@@ -53,6 +59,20 @@ async function getDefaultAccount() {
     .eq("is_default", true)
     .maybeSingle();
   return data;
+}
+
+async function getAiAgentSettings(): Promise<AiAgentSettings> {
+  const { data } = await supabaseAdmin
+    .from("app_settings")
+    .select("value")
+    .eq("key", "whatsapp_ai_agent")
+    .maybeSingle();
+  const value = (data?.value ?? {}) as Record<string, unknown>;
+  return {
+    enabled: value.enabled === true,
+    initialOutreachEnabled: value.initialOutreachEnabled === true,
+    initialTemplateId: typeof value.initialTemplateId === "string" ? value.initialTemplateId : null,
+  };
 }
 
 async function executeRuleForLead(rule: RuleRow, lead: LeadLite): Promise<{ ok: boolean; error?: string }> {
@@ -173,6 +193,122 @@ async function executeRuleForLead(rule: RuleRow, lead: LeadLite): Promise<{ ok: 
   }
 }
 
+async function executeAiInitialOutreachForLead(lead: LeadLite): Promise<{ ok: boolean; error?: string }> {
+  if (!lead.phone) return { ok: false, error: "Lead sem telefone" };
+  const settings = await getAiAgentSettings();
+  if (!settings.enabled || !settings.initialOutreachEnabled || !settings.initialTemplateId) {
+    return { ok: false, error: "IA inicial desativada ou sem template HSM" };
+  }
+
+  const { data: tmpl } = await supabaseAdmin
+    .from("whatsapp_templates")
+    .select("provider_template_name, language, variables")
+    .eq("id", settings.initialTemplateId)
+    .maybeSingle();
+  if (!tmpl?.provider_template_name) return { ok: false, error: "Template HSM inicial inválido" };
+
+  const account = await getDefaultAccount();
+  if (!account) return { ok: false, error: "Sem conta WhatsApp padrão" };
+
+  let convId: string | null = null;
+  const { data: existing } = await supabaseAdmin
+    .from("whatsapp_conversations")
+    .select("id")
+    .eq("lead_id", lead.id)
+    .maybeSingle();
+  if (existing) {
+    convId = existing.id;
+  } else {
+    const { data: created } = await supabaseAdmin
+      .from("whatsapp_conversations")
+      .insert({
+        lead_id: lead.id,
+        account_id: account.id,
+        assigned_user_id: lead.assigned_to,
+        status: "open",
+      })
+      .select("id")
+      .single();
+    convId = created?.id ?? null;
+  }
+  if (!convId) return { ok: false, error: "Falha criando conversa" };
+
+  const varNames = Array.isArray(tmpl.variables) ? (tmpl.variables as unknown[]).map(String) : [];
+  const map: Record<string, string> = {
+    nome: lead.name ?? "",
+    primeiro_nome: (lead.name ?? "").split(" ")[0] ?? "",
+    empresa: lead.company_name ?? "",
+  };
+  const templateParams = varNames.map((name) => map[name] ?? " ");
+
+  const { data: msg } = await supabaseAdmin
+    .from("whatsapp_messages")
+    .insert({
+      conversation_id: convId,
+      lead_id: lead.id,
+      sender_type: "bot",
+      message_type: "template",
+      body: null,
+      metadata: {
+        source: "ai_initial_outreach",
+        template_id: settings.initialTemplateId,
+        template_name: tmpl.provider_template_name,
+      },
+      status: "sending",
+    })
+    .select("id")
+    .single();
+
+  try {
+    const provider = getProvider(account.provider);
+    const result = await provider.sendMessage({
+      account: {
+        id: account.id,
+        phone_number: account.phone_number,
+        provider: account.provider,
+        provider_instance_id: account.provider_instance_id,
+        provider_base_url: account.provider_base_url,
+        access_token: account.access_token,
+        webhook_secret: account.webhook_secret,
+      },
+      to: lead.phone.replace(/\D+/g, ""),
+      type: "template",
+      templateName: tmpl.provider_template_name,
+      templateLanguage: tmpl.language ?? "pt_BR",
+      templateParams,
+    });
+
+    if (msg?.id) {
+      await supabaseAdmin
+        .from("whatsapp_messages")
+        .update({
+          provider_message_id: result.providerMessageId,
+          status: result.status === "failed" ? "failed" : "sent",
+          error: result.error ?? null,
+          sent_at: new Date().toISOString(),
+        })
+        .eq("id", msg.id);
+    }
+
+    await supabaseAdmin
+      .from("whatsapp_conversations")
+      .update({
+        last_message_at: new Date().toISOString(),
+        last_preview: `[HSM] ${tmpl.provider_template_name}`,
+        status: "open",
+      })
+      .eq("id", convId);
+
+    return { ok: result.status !== "failed", error: result.error };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Falha";
+    if (msg?.id) {
+      await supabaseAdmin.from("whatsapp_messages").update({ status: "failed", error: message }).eq("id", msg.id);
+    }
+    return { ok: false, error: message };
+  }
+}
+
 async function evalNewLead(rule: RuleRow): Promise<LeadLite[]> {
   // Leads criados nas últimas 24h ainda não processados; o dedupe via logs cobre o resto.
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
@@ -288,9 +424,19 @@ export async function runAutomationsTick(): Promise<{
         skipped++;
         continue;
       }
-      const res = await executeRuleForLead(r, lead);
+      const res = r.trigger_type === "new_lead"
+        ? await executeAiInitialOutreachForLead(lead)
+        : await executeRuleForLead(r, lead);
       if (res.ok) sent++;
       else failed++;
+
+      await supabaseAdmin.from("whatsapp_automation_logs").insert({
+        rule_id: r.id,
+        lead_id: lead.id,
+        status: res.ok ? "sent" : "failed",
+        error: res.error ?? null,
+        executed_at: new Date().toISOString(),
+      });
     }
   }
 
