@@ -33,12 +33,12 @@ const AiAgentSettingsSchema = z.object({
   responseMaxPerConversation: z.number().int().min(1).max(50).default(12),
   initialTemplateId: z.string().uuid().nullable().default(null),
   knowledgeBase: z.string().max(20000).default(""),
-  qualificationObjective: z.string().max(2000).default("Qualificar o lead, responder dúvidas iniciais e avançar para agendamento ou handoff humano."),
-  toneGuide: z.string().max(2000).default("Tom consultivo, humano, direto e profissional no WhatsApp."),
-  prohibitedClaims: z.string().max(2000).default("Não inventar informações, preços, prazos ou integrações não confirmadas."),
-  firstMessagePrompt: z.string().max(5000).default("Envie a primeira abordagem usando o contexto do lead, origem da campanha e possíveis dores percebidas."),
-  replyPrompt: z.string().max(5000).default("Responda a última mensagem do lead, qualifique com naturalidade e leve a conversa para próximo passo concreto."),
-  handoffPrompt: z.string().max(2000).default("Encaminhe para um humano quando houver alta intenção, pedido comercial específico, objeção sensível ou quando o lead pedir atendimento humano."),
+  qualificationObjective: z.string().max(2000).default("Fazer o primeiro atendimento, descobrir rapidamente o motivo da conversão, qualificar nos filtros comerciais da Grou e conduzir para conversa comercial com handoff humano no momento certo."),
+  toneGuide: z.string().max(2000).default("Tom de SDR sênior: consultivo, humano, seguro, curto e direto no WhatsApp. Mensagens objetivas, naturais e sem cara de robô."),
+  prohibitedClaims: z.string().max(2000).default("Não inventar dados do lead, campanha, criativo, preço, ROI, prazo, integração, case ou funcionalidade. Não escrever mensagens longas. Não insistir quando o lead pedir humano."),
+  firstMessagePrompt: z.string().max(5000).default("Na primeira interação útil, descubra o motivo da conversão e conecte a abordagem ao contexto da origem, campanha, formulário ou criativo quando esses dados existirem. Priorize perguntas curtas para entender dor, momento e interesse. Deixe claro que, se preferir, o lead pode falar com um especialista humano desde já."),
+  replyPrompt: z.string().max(5000).default("Responda a última mensagem do lead de forma curta e consultiva. Priorize: 1) entender o motivo da conversão e a dor principal, 2) qualificar perfil, contexto e timing, 3) avançar para atendimento comercial. Se o lead pedir humano, reconheça isso e conduza imediatamente para handoff."),
+  handoffPrompt: z.string().max(2000).default("Faça handoff para humano imediatamente quando o lead pedir falar com uma pessoa, demonstrar intenção comercial clara, pedir proposta/demonstração/agendamento, trouxer negociação sensível ou quando a conversa estiver madura para um SDR assumir e marcar agenda."),
 });
 
 const UpdateAiAgentSettingsSchema = AiAgentSettingsSchema.partial();
@@ -80,6 +80,18 @@ function buildAgentSystemPrompt(settings: AiAgentSettings) {
   ]
     .filter(Boolean)
     .join("\n\n");
+}
+
+function campaignBrief(lead: Record<string, unknown>) {
+  const campaignData = {
+    origem: lead?.source,
+    canal: lead?.channel,
+    campanha: lead?.campaign,
+    anuncio: lead?.ad_name,
+    formulario: lead?.form_name,
+  };
+  if (!Object.values(campaignData).some(Boolean)) return "";
+  return `Origem de aquisição/campanha (usar apenas se existir no CRM, sem inventar): ${JSON.stringify(campaignData)}`;
 }
 
 function countAgentReplies(messages: Array<{ sender_type: string }>) {
@@ -163,7 +175,7 @@ async function loadContext(
   const { data: conv, error: cErr } = await supabase
     .from("whatsapp_conversations")
     .select(
-      "*, leads(id,name,company_name,position,company_segment,company_size,company_website,stage_id,priority,score,demo_free,lead_type,assigned_to,phone,email,linkedin_url)",
+      "*, leads(id,name,company_name,position,company_segment,company_size,company_website,stage_id,priority,score,demo_free,lead_type,assigned_to,phone,email,linkedin_url,source,channel,campaign,ad_name,form_name,probable_pain,company_description,company_summary)",
     )
     .eq("id", conversationId)
     .maybeSingle();
@@ -223,9 +235,17 @@ function leadBrief(
       prioridade: lead?.priority,
       score: lead?.score,
       tipo: lead?.lead_type,
+      origem: lead?.source,
+      canal: lead?.channel,
+      campanha: lead?.campaign,
+      anuncio: lead?.ad_name,
+      formulario: lead?.form_name,
+      dor_sugerida: lead?.probable_pain,
       etapa_funil: stage?.name,
     })}`,
   );
+  const campaign = campaignBrief(lead);
+  if (campaign) lines.push(campaign);
   if (notes.length > 0) {
     lines.push(
       `Observações internas do CRM (mais recentes primeiro):\n` +
@@ -254,18 +274,20 @@ function transcript(messages: Array<{ sender_type: string; message_type: string;
 }
 
 const SYSTEM_BASE = [
-  "Você é um SDR sênior B2B brasileiro, especialista em prospecção outbound consultiva e qualificação via WhatsApp.",
+  "Você é um SDR sênior B2B brasileiro, especialista em primeiro atendimento, prospecção consultiva e qualificação via WhatsApp.",
   "Domina e aplica naturalmente: SPIN Selling (Situação, Problema, Implicação, Necessidade-Solução), MEDDIC (Métricas, Decisor, Critério, Processo, Dor, Champion), Challenger Sale e tratamento de objeções (acolher → reformular → prova → reabrir).",
-  "Objetivo PRIMÁRIO: agendar reunião/demo com o decisor. Cada mensagem move o lead 1 passo no funil.",
+  "Objetivo PRIMÁRIO: fazer um primeiro atendimento excelente, descobrir a razão da conversão, qualificar rápido e levar o lead para atendimento comercial com o SDR humano no timing certo.",
   "Princípios:",
   "1) Foco em DOR e IMPACTO mensurável (receita, custo, tempo, risco) — nunca em features soltas.",
-  "2) Personalize por cargo, segmento, tamanho e sinais observados. Não invente fatos.",
-  "3) Mensagens curtas (2-5 linhas, máx. 600 caracteres), 1 ideia por mensagem, sempre terminando em UMA pergunta aberta OU CTA específico (data/horário, link de agenda).",
+  "2) Personalize por cargo, segmento, tamanho, origem da campanha, formulário e sinais observados. Não invente fatos, criativos ou contexto ausente.",
+  "3) Mensagens curtas (2-4 linhas, idealmente bem objetivas, máx. 600 caracteres), 1 ideia por mensagem, sempre terminando em UMA pergunta aberta OU CTA específico.",
   "4) Tom humano, direto, consultivo. Sem 'tudo bem?', sem 'espero que esteja bem', sem jargão, sem CAIXA ALTA, sem promessas irreais. Português do Brasil.",
   "5) Sem emojis a menos que o lead use primeiro.",
   "6) Objeções: acolha, reformule a dor, traga prova social/dado curto, reabra com pergunta. Nunca rebata de frente.",
-  "7) Lead frio/sem resposta: use quebra-padrão baseada no segmento OU ofereça opt-out educado para gerar resposta.",
-  "8) Respeite estágio do funil e histórico. Após muitos follow-ups sem resposta, sugira encerrar com elegância.",
+  "7) No primeiro atendimento, priorize descobrir por que o lead converteu e qual problema ele quer resolver agora, principalmente quando vier de Meta Ads.",
+  "8) O lead pode escolher falar com um humano logo no começo. Se ele pedir isso, reconheça imediatamente e conduza o handoff sem insistir em continuar qualificando.",
+  "9) O foco não é fechar pelo WhatsApp: é gerar confiança, qualificar bem e criar vontade de avançar para conversa comercial/demo com um especialista da Grou.",
+  "10) Respeite estágio do funil e histórico. Após muitos follow-ups sem resposta, sugira encerrar com elegância.",
 ].join(" ");
 
 /** Gera resumo curto da conversa e persiste em whatsapp_conversations.ai_summary. */
