@@ -245,7 +245,15 @@ export function ConversationView({ conversationId }: { conversationId: string })
 }
 
 function MessageBubble({ m }: { m: Msg }) {
-  const mine = m.sender_type === "sdr" || m.sender_type === "bot";
+  const mine = m.sender_type === "sdr" || m.sender_type === "bot" || m.sender_type === "automation" || m.sender_type === "agent";
+  const senderLabel =
+    m.sender_type === "bot"
+      ? "IA"
+      : m.sender_type === "automation"
+        ? "Automação"
+        : m.sender_type === "sdr" || m.sender_type === "agent"
+          ? "Time"
+          : "Lead";
   return (
     <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
       <div
@@ -255,6 +263,9 @@ function MessageBubble({ m }: { m: Msg }) {
             : "bg-card border border-white/5 rounded-bl-sm"
         }`}
       >
+        <div className={`mb-1 text-[10px] uppercase tracking-wide ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+          {senderLabel}
+        </div>
         {m.media_url && (
           <a href={m.media_url} target="_blank" rel="noreferrer" className="block mb-1 underline text-xs opacity-80">
             Anexo
