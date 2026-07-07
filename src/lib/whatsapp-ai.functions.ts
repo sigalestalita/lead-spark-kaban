@@ -1,9 +1,94 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { GROU_PLAYBOOK } from "./grou-playbook";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const MODEL = "google/gemini-2.5-flash";
+const AI_CONFIG_KEY = "whatsapp_ai_agent";
+
+type AiAgentSettings = {
+  enabled: boolean;
+  autoReplyEnabled: boolean;
+  initialOutreachEnabled: boolean;
+  handoffStageIds: string[];
+  stopOnLeadReply: boolean;
+  responseMaxPerConversation: number;
+  initialTemplateId: string | null;
+  knowledgeBase: string;
+  qualificationObjective: string;
+  toneGuide: string;
+  prohibitedClaims: string;
+  firstMessagePrompt: string;
+  replyPrompt: string;
+  handoffPrompt: string;
+};
+
+const AiAgentSettingsSchema = z.object({
+  enabled: z.boolean().default(false),
+  autoReplyEnabled: z.boolean().default(false),
+  initialOutreachEnabled: z.boolean().default(false),
+  handoffStageIds: z.array(z.string().uuid()).default([]),
+  stopOnLeadReply: z.boolean().default(true),
+  responseMaxPerConversation: z.number().int().min(1).max(50).default(12),
+  initialTemplateId: z.string().uuid().nullable().default(null),
+  knowledgeBase: z.string().max(20000).default(""),
+  qualificationObjective: z.string().max(2000).default("Qualificar o lead, responder dúvidas iniciais e avançar para agendamento ou handoff humano."),
+  toneGuide: z.string().max(2000).default("Tom consultivo, humano, direto e profissional no WhatsApp."),
+  prohibitedClaims: z.string().max(2000).default("Não inventar informações, preços, prazos ou integrações não confirmadas."),
+  firstMessagePrompt: z.string().max(5000).default("Envie a primeira abordagem usando o contexto do lead, origem da campanha e possíveis dores percebidas."),
+  replyPrompt: z.string().max(5000).default("Responda a última mensagem do lead, qualifique com naturalidade e leve a conversa para próximo passo concreto."),
+  handoffPrompt: z.string().max(2000).default("Encaminhe para um humano quando houver alta intenção, pedido comercial específico, objeção sensível ou quando o lead pedir atendimento humano."),
+});
+
+const UpdateAiAgentSettingsSchema = AiAgentSettingsSchema.partial();
+
+async function readAiAgentSettings(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+): Promise<AiAgentSettings> {
+  const { data, error } = await supabase
+    .from("app_settings")
+    .select("value")
+    .eq("key", AI_CONFIG_KEY)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return AiAgentSettingsSchema.parse(data?.value ?? {});
+}
+
+async function writeAiAgentSettings(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  settings: AiAgentSettings,
+) {
+  const payload = { key: AI_CONFIG_KEY, value: settings, updated_at: new Date().toISOString() };
+  const { error } = await supabase.from("app_settings").upsert(payload);
+  if (error) throw new Error(error.message);
+}
+
+function buildAgentSystemPrompt(settings: AiAgentSettings) {
+  return [
+    SYSTEM_BASE,
+    "Você está operando como a IA de atendimento ativo da Lidi no WhatsApp.",
+    `Objetivo principal: ${settings.qualificationObjective}`,
+    `Guia de tom: ${settings.toneGuide}`,
+    `Restrições obrigatórias: ${settings.prohibitedClaims}`,
+    `Regras de handoff: ${settings.handoffPrompt}`,
+    "Base de conhecimento comercial da operação:",
+    GROU_PLAYBOOK,
+    settings.knowledgeBase?.trim() ? `Conhecimento adicional configurado pelo time:\n${settings.knowledgeBase.trim()}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function countAgentReplies(messages: Array<{ sender_type: string }>) {
+  return messages.filter((m) => ["bot", "automation"].includes(m.sender_type)).length;
+}
+
+function lastInboundLeadMessage(messages: Array<{ sender_type: string; body: string | null }>) {
+  return [...messages].reverse().find((m) => m.sender_type === "lead" && (m.body?.trim() ?? ""));
+}
 
 async function callAI(messages: Array<{ role: string; content: string }>, tool?: unknown) {
   const key = process.env.LOVABLE_API_KEY;
@@ -382,4 +467,83 @@ export const suggestApproachPlan = createServerFn({ method: "POST" })
         expected_conversion: "alta" | "média" | "baixa";
       }>;
     };
+  });
+
+export const getAiAgentSettings = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const settings = await readAiAgentSettings(context.supabase);
+    return { settings };
+  });
+
+export const updateAiAgentSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => UpdateAiAgentSettingsSchema.parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: isMgr } = await context.supabase.rpc("is_manager", { _user_id: context.userId });
+    if (!isMgr) throw new Error("Apenas gestão/admin podem editar a IA de atendimento");
+    const current = await readAiAgentSettings(context.supabase);
+    const next = AiAgentSettingsSchema.parse({ ...current, ...data });
+    await writeAiAgentSettings(context.supabase, next);
+    return { ok: true, settings: next };
+  });
+
+export const generateInitialOutreach = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ conversationId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const settings = await readAiAgentSettings(context.supabase);
+    if (!settings.enabled) throw new Error("IA de atendimento desativada");
+    const { conv, messages, notes, stage, icp } = await loadContext(context.supabase, data.conversationId, 10);
+    const lead = (conv.leads ?? {}) as Record<string, unknown>;
+    const result = await callAI([
+      { role: "system", content: buildAgentSystemPrompt(settings) },
+      {
+        role: "user",
+        content:
+          `${settings.firstMessagePrompt}\n\n` +
+          `${leadBrief(lead, stage, notes, icp)}\n\n` +
+          (messages.length ? `Mensagens já existentes:\n${transcript(messages)}\n\n` : "") +
+          `Considere origem/campanha/formulário/payload quando existir. Responda APENAS com a primeira mensagem pronta para WhatsApp, sem aspas.`,
+      },
+    ]);
+    const reply = result.choices?.[0]?.message?.content?.trim() ?? "";
+    if (!reply) throw new Error("IA não retornou mensagem inicial");
+    return { reply };
+  });
+
+export const autoReplyToConversation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ conversationId: z.string().uuid(), instruction: z.string().max(1000).optional() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const settings = await readAiAgentSettings(context.supabase);
+    if (!settings.enabled || !settings.autoReplyEnabled) {
+      throw new Error("IA automática de atendimento está desativada");
+    }
+    const { conv, messages, notes, stage, icp } = await loadContext(context.supabase, data.conversationId, 40);
+    const lead = (conv.leads ?? {}) as Record<string, unknown>;
+    if (stage?.slug && settings.handoffStageIds.includes((conv.leads as { stage_id?: string | null } | null)?.stage_id ?? "")) {
+      throw new Error("Conversa já está em etapa de handoff humano");
+    }
+    if (countAgentReplies(messages) >= settings.responseMaxPerConversation) {
+      throw new Error("Limite de respostas automáticas atingido nesta conversa");
+    }
+    const lastLead = lastInboundLeadMessage(messages);
+    if (!lastLead) throw new Error("Nenhuma mensagem recente do lead para responder");
+    const result = await callAI([
+      { role: "system", content: buildAgentSystemPrompt(settings) },
+      {
+        role: "user",
+        content:
+          `${settings.replyPrompt}\n\n` +
+          (data.instruction ? `Instrução complementar: ${data.instruction}\n\n` : "") +
+          `${leadBrief(lead, stage, notes, icp)}\n\n` +
+          `Conversa:\n${transcript(messages)}\n\n` +
+          `Última mensagem do lead: ${lastLead.body}\n\n` +
+          `Responda APENAS com a mensagem de WhatsApp pronta, curta, natural, em português brasileiro, sem aspas.`,
+      },
+    ]);
+    const reply = result.choices?.[0]?.message?.content?.trim() ?? "";
+    if (!reply) throw new Error("IA não retornou resposta");
+    return { reply };
   });
