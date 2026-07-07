@@ -24,6 +24,34 @@ type AiAgentSettings = {
   handoffPrompt: string;
 };
 
+type ManualAiTestResult =
+  | {
+      ok: true;
+      conversationId: string;
+      providerMessageId?: string | null;
+    }
+  | {
+      ok: false;
+      code:
+        | "AI_DISABLED"
+        | "INITIAL_OUTREACH_DISABLED"
+        | "INITIAL_TEMPLATE_MISSING"
+        | "LEAD_PHONE_MISSING"
+        | "WHATSAPP_ACCOUNT_MISSING"
+        | "INITIAL_TEMPLATE_INVALID";
+      message: string;
+      missing?: Array<"enabled" | "initialOutreachEnabled" | "initialTemplateId">;
+      conversationId?: string;
+    };
+
+function getManualAiTestPrerequisites(settings: AiAgentSettings) {
+  const missing: Array<"enabled" | "initialOutreachEnabled" | "initialTemplateId"> = [];
+  if (!settings.enabled) missing.push("enabled");
+  if (!settings.initialOutreachEnabled) missing.push("initialOutreachEnabled");
+  if (!settings.initialTemplateId) missing.push("initialTemplateId");
+  return missing;
+}
+
 const AiAgentSettingsSchema = z.object({
   enabled: z.boolean().default(false),
   autoReplyEnabled: z.boolean().default(false),
@@ -588,10 +616,33 @@ export const triggerManualAiTest = createServerFn({ method: "POST" })
       name: z.string().max(200).optional(),
     }).parse(d),
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }): Promise<ManualAiTestResult> => {
     const settings = await readAiAgentSettings(context.supabase);
-    if (!settings.enabled) throw new Error("IA de atendimento desativada");
-    if (!settings.initialOutreachEnabled) throw new Error("Disparo inicial proativo está desativado");
+    const missing = getManualAiTestPrerequisites(settings);
+    if (missing.length > 0) {
+      if (missing.includes("enabled")) {
+        return {
+          ok: false,
+          code: "AI_DISABLED",
+          message: "Ative a IA de atendimento antes de disparar o teste manual.",
+          missing,
+        };
+      }
+      if (missing.includes("initialOutreachEnabled")) {
+        return {
+          ok: false,
+          code: "INITIAL_OUTREACH_DISABLED",
+          message: "Ative o disparo inicial proativo antes de disparar o teste manual.",
+          missing,
+        };
+      }
+      return {
+        ok: false,
+        code: "INITIAL_TEMPLATE_MISSING",
+        message: "Selecione um template HSM inicial antes de disparar o teste manual.",
+        missing,
+      };
+    }
 
     const phone = data.phone.replace(/\D+/g, "").replace(/^0+/, "");
     const normalizedPhone = (phone.length === 10 || phone.length === 11) && !phone.startsWith("55") ? `55${phone}` : phone;
@@ -704,21 +755,50 @@ export const triggerManualAiTest = createServerFn({ method: "POST" })
     if (!conv) throw new Error("Conversa de teste não encontrada");
 
     const lead = conv.leads as { id: string; name: string | null; company_name: string | null; phone: string | null } | null;
-    if (!lead?.phone) throw new Error("Lead de teste sem telefone");
-    if (!settings.initialTemplateId) throw new Error("Nenhum template HSM inicial configurado");
+    if (!lead?.phone) {
+      return {
+        ok: false,
+        code: "LEAD_PHONE_MISSING",
+        message: "O lead de teste ficou sem telefone válido para envio.",
+        conversationId: conv.id,
+      };
+    }
+    if (!settings.initialTemplateId) {
+      return {
+        ok: false,
+        code: "INITIAL_TEMPLATE_MISSING",
+        message: "Selecione um template HSM inicial antes de disparar o teste manual.",
+        missing: ["initialTemplateId"],
+        conversationId: conv.id,
+      };
+    }
 
     const { data: tmpl } = await supabaseAdmin
       .from("whatsapp_templates")
       .select("provider_template_name, language, variables")
       .eq("id", settings.initialTemplateId)
       .maybeSingle();
-    if (!tmpl?.provider_template_name) throw new Error("Template HSM inicial inválido");
+    if (!tmpl?.provider_template_name) {
+      return {
+        ok: false,
+        code: "INITIAL_TEMPLATE_INVALID",
+        message: "O template HSM inicial selecionado está inválido ou indisponível.",
+        conversationId: conv.id,
+      };
+    }
 
     const accountQuery = conv.account_id
       ? supabaseAdmin.from("whatsapp_accounts").select("*").eq("id", conv.account_id).maybeSingle()
       : supabaseAdmin.from("whatsapp_accounts").select("*").eq("is_default", true).maybeSingle();
     const { data: account } = await accountQuery;
-    if (!account) throw new Error("Nenhuma conta de WhatsApp configurada");
+    if (!account) {
+      return {
+        ok: false,
+        code: "WHATSAPP_ACCOUNT_MISSING",
+        message: "Nenhuma conta de WhatsApp conectada foi encontrada para o teste.",
+        conversationId: conv.id,
+      };
+    }
 
     const varNames = Array.isArray(tmpl.variables) ? (tmpl.variables as unknown[]).map(String) : [];
     const map: Record<string, string> = {
