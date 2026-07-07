@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { getAiAgentSettings, triggerManualAiTest, updateAiAgentSettings } from "@/lib/whatsapp-ai.functions";
 import { listTemplates } from "@/lib/whatsapp-templates.functions";
 import { getCampaignFilterMeta } from "@/lib/whatsapp-campaigns.functions";
+import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ export const Route = createFileRoute("/_app/whatsapp/ia")({
 });
 
 function WhatsAppAiPage() {
+  const navigate = useNavigate();
   const getFn = useServerFn(getAiAgentSettings);
   const saveFn = useServerFn(updateAiAgentSettings);
   const testFn = useServerFn(triggerManualAiTest);
@@ -52,9 +54,13 @@ function WhatsAppAiPage() {
   const triggerTest = useMutation({
     mutationFn: () => testFn({ data: { phone: testPhone, name: testName } }),
     onSuccess: (result) => {
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
       toast.success("Teste da IA disparado para o número informado.");
       if (result.conversationId) {
-        window.location.href = `/whatsapp?c=${result.conversationId}`;
+        navigate({ to: "/whatsapp", search: { c: result.conversationId } as never });
       }
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao disparar teste da IA"),
@@ -64,10 +70,28 @@ function WhatsAppAiPage() {
 
   const stages = meta?.stages ?? [];
   const templates = (tmpls?.templates ?? []).filter((t) => !!t.provider_template_name);
+  const missingPrerequisites = [
+    !form.enabled ? "Ative a IA de atendimento" : null,
+    !form.initialOutreachEnabled ? "Ative o disparo inicial proativo" : null,
+    !form.initialTemplateId ? "Selecione um template HSM inicial" : null,
+  ].filter(Boolean) as string[];
+  const canTriggerTest = !dirty && !triggerTest.isPending && !!testPhone.trim() && missingPrerequisites.length === 0;
 
   const patch = (next: Record<string, unknown>) => {
     setForm((prev: any) => ({ ...prev, ...next }));
     setDirty(true);
+  };
+
+  const handleTriggerTest = async () => {
+    if (dirty) {
+      toast.error("Salve as alterações da IA antes de disparar o teste manual.");
+      return;
+    }
+    if (missingPrerequisites.length > 0) {
+      toast.error(`Antes do teste: ${missingPrerequisites.join(" · ")}.`);
+      return;
+    }
+    triggerTest.mutate();
   };
 
   const toggleStage = (id: string) => {
@@ -155,18 +179,30 @@ function WhatsAppAiPage() {
           <CardTitle>Teste manual</CardTitle>
           <CardDescription>Dispara o template inicial da IA para validar o fluxo ponta a ponta no seu número.</CardDescription>
         </CardHeader>
-        <CardContent className="grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
-          <div>
-            <label className="text-xs text-muted-foreground">Telefone</label>
-            <Input value={testPhone} onChange={(e) => setTestPhone(e.target.value)} placeholder="51999969371" />
+        <CardContent className="space-y-3">
+          {dirty ? (
+            <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              Existem alterações não salvas. Salve antes de disparar o teste manual.
+            </div>
+          ) : null}
+          {missingPrerequisites.length > 0 ? (
+            <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              Pré-requisitos pendentes: {missingPrerequisites.join(" · ")}.
+            </div>
+          ) : null}
+          <div className="grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+            <div>
+              <label className="text-xs text-muted-foreground">Telefone</label>
+              <Input value={testPhone} onChange={(e) => setTestPhone(e.target.value)} placeholder="51999969371" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Nome do lead de teste</label>
+              <Input value={testName} onChange={(e) => setTestName(e.target.value)} placeholder="Teste IA WhatsApp" />
+            </div>
+            <Button onClick={handleTriggerTest} disabled={!canTriggerTest}>
+              {triggerTest.isPending ? "Disparando…" : "Disparar teste"}
+            </Button>
           </div>
-          <div>
-            <label className="text-xs text-muted-foreground">Nome do lead de teste</label>
-            <Input value={testName} onChange={(e) => setTestName(e.target.value)} placeholder="Teste IA WhatsApp" />
-          </div>
-          <Button onClick={() => triggerTest.mutate()} disabled={triggerTest.isPending || !testPhone.trim()}>
-            {triggerTest.isPending ? "Disparando…" : "Disparar teste"}
-          </Button>
         </CardContent>
       </Card>
 
