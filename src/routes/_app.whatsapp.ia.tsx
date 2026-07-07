@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { getAiAgentSettings, updateAiAgentSettings } from "@/lib/whatsapp-ai.functions";
+import { getAiAgentSettings, triggerManualAiTest, updateAiAgentSettings } from "@/lib/whatsapp-ai.functions";
 import { listTemplates } from "@/lib/whatsapp-templates.functions";
 import { getCampaignFilterMeta } from "@/lib/whatsapp-campaigns.functions";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Bot, Save } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/whatsapp/ia")({
   component: WhatsAppAiPage,
@@ -21,6 +22,7 @@ export const Route = createFileRoute("/_app/whatsapp/ia")({
 function WhatsAppAiPage() {
   const getFn = useServerFn(getAiAgentSettings);
   const saveFn = useServerFn(updateAiAgentSettings);
+  const testFn = useServerFn(triggerManualAiTest);
   const templatesFn = useServerFn(listTemplates);
   const metaFn = useServerFn(getCampaignFilterMeta);
   const qc = useQueryClient();
@@ -32,6 +34,8 @@ function WhatsAppAiPage() {
   const settings = data?.settings;
   const [dirty, setDirty] = useState(false);
   const [form, setForm] = useState<any>(null);
+  const [testPhone, setTestPhone] = useState("51999969371");
+  const [testName, setTestName] = useState("Teste IA WhatsApp");
 
   useEffect(() => {
     if (settings && !dirty) setForm(settings);
@@ -43,6 +47,17 @@ function WhatsAppAiPage() {
       setDirty(false);
       qc.invalidateQueries({ queryKey: ["wa-ai-settings"] });
     },
+  });
+
+  const triggerTest = useMutation({
+    mutationFn: () => testFn({ data: { phone: testPhone, name: testName } }),
+    onSuccess: (result) => {
+      toast.success("Teste da IA disparado para o número informado.");
+      if (result.conversationId) {
+        window.location.href = `/whatsapp?c=${result.conversationId}`;
+      }
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao disparar teste da IA"),
   });
 
   if (isLoading || !form) return <div className="p-6 text-sm text-muted-foreground">Carregando…</div>;
@@ -132,6 +147,26 @@ function WhatsAppAiPage() {
               <Input type="number" min={1} max={50} value={form.responseMaxPerConversation} onChange={(e) => patch({ responseMaxPerConversation: Number(e.target.value) })} />
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Teste manual</CardTitle>
+          <CardDescription>Dispara o template inicial da IA para validar o fluxo ponta a ponta no seu número.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+          <div>
+            <label className="text-xs text-muted-foreground">Telefone</label>
+            <Input value={testPhone} onChange={(e) => setTestPhone(e.target.value)} placeholder="51999969371" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Nome do lead de teste</label>
+            <Input value={testName} onChange={(e) => setTestName(e.target.value)} placeholder="Teste IA WhatsApp" />
+          </div>
+          <Button onClick={() => triggerTest.mutate()} disabled={triggerTest.isPending || !testPhone.trim()}>
+            {triggerTest.isPending ? "Disparando…" : "Disparar teste"}
+          </Button>
         </CardContent>
       </Card>
 
