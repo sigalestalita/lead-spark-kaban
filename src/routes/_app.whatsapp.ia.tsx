@@ -67,7 +67,7 @@ function WhatsAppAiPage() {
         <div>
           <h2 className="text-lg font-semibold flex items-center gap-2"><Bot className="h-5 w-5" /> IA de atendimento</h2>
           <p className="text-xs text-muted-foreground">
-            Controla a IA proativa que aborda leads novos com HSM e responde automaticamente no inbox.
+            Controla a IA proativa que faz o primeiro atendimento, inicia com HSM e qualifica até o ponto de handoff comercial.
           </p>
         </div>
         <Button onClick={() => save.mutate()} disabled={save.isPending || !dirty}>
@@ -92,21 +92,21 @@ function WhatsAppAiPage() {
             <label className="flex items-center justify-between rounded-lg border border-white/10 p-4 gap-4">
               <div>
                 <p className="text-sm font-medium">Responder automaticamente</p>
-                <p className="text-xs text-muted-foreground">Quando o lead responde no WhatsApp, a IA continua a qualificação.</p>
+                <p className="text-xs text-muted-foreground">Quando o lead responde no WhatsApp, a IA continua a qualificação e respeita pedido de atendimento humano.</p>
               </div>
               <Switch checked={form.autoReplyEnabled} onCheckedChange={(v) => patch({ autoReplyEnabled: v })} />
             </label>
             <label className="flex items-center justify-between rounded-lg border border-white/10 p-4 gap-4">
               <div>
                 <p className="text-sm font-medium">Disparo inicial proativo</p>
-                <p className="text-xs text-muted-foreground">Todo lead novo recebe primeiro contato por template HSM.</p>
+                <p className="text-xs text-muted-foreground">Todo lead novo recebe primeiro contato por template HSM no número conectado.</p>
               </div>
               <Switch checked={form.initialOutreachEnabled} onCheckedChange={(v) => patch({ initialOutreachEnabled: v })} />
             </label>
             <label className="flex items-center justify-between rounded-lg border border-white/10 p-4 gap-4">
               <div>
                 <p className="text-sm font-medium">Parar após resposta do lead</p>
-                <p className="text-xs text-muted-foreground">Evita looping se o time quiser assumir manualmente depois da primeira resposta.</p>
+                <p className="text-xs text-muted-foreground">Evita looping se o time quiser assumir manualmente logo após a primeira resposta do lead.</p>
               </div>
               <Switch checked={form.stopOnLeadReply} onCheckedChange={(v) => patch({ stopOnLeadReply: v })} />
             </label>
@@ -125,6 +125,7 @@ function WhatsAppAiPage() {
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground mt-1">Use um template aprovado na Meta para iniciar a conversa fora da janela de 24h.</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Sugestão: o texto do template já pode abrir espaço para o lead pedir atendimento humano desde o início.</p>
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Máximo de respostas automáticas por conversa</label>
@@ -169,6 +170,7 @@ function WhatsAppAiPage() {
           <div>
             <label className="text-xs text-muted-foreground">Base de conhecimento adicional</label>
             <Textarea value={form.knowledgeBase} onChange={(e) => patch({ knowledgeBase: e.target.value })} rows={10} placeholder="Diferenciais, objeções, segmentos, FAQ, criativos, contexto das campanhas..." />
+            <p className="text-[11px] text-muted-foreground mt-1">Inclua aqui contexto de campanhas Meta Ads, criativos, formulários e objeções por segmento para a IA usar no primeiro atendimento.</p>
           </div>
         </CardContent>
       </Card>
