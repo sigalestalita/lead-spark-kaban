@@ -132,6 +132,10 @@ function lastInboundLeadMessage(messages: Array<{ sender_type: string; body: str
   return [...messages].reverse().find((m) => m.sender_type === "lead" && (m.body?.trim() ?? ""));
 }
 
+function hasHumanTakeover(messages: Array<{ sender_type: string }>) {
+  return messages.some((m) => ["sdr", "agent", "human"].includes(m.sender_type));
+}
+
 export async function generateAutoReplyInternal(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
@@ -147,6 +151,9 @@ export async function generateAutoReplyInternal(
   const currentStageId = (conv.leads as { stage_id?: string | null } | null)?.stage_id ?? null;
   if (currentStageId && settings.handoffStageIds.includes(currentStageId)) {
     throw new Error("Conversa já está em etapa de handoff humano");
+  }
+  if (hasHumanTakeover(messages)) {
+    throw new Error("IA desativada nesta conversa após resposta humana");
   }
   if (countAgentReplies(messages) >= settings.responseMaxPerConversation) {
     throw new Error("Limite de respostas automáticas atingido nesta conversa");

@@ -316,6 +316,7 @@ export const sendMessage = createServerFn({ method: "POST" })
           last_message_at: new Date().toISOString(),
           last_preview: data.body?.slice(0, 200) ?? `[${data.messageType}]`,
           status: "open",
+          unread_count: 0,
         })
         .eq("id", data.conversationId);
 
@@ -439,6 +440,7 @@ export const sendMediaFromStorage = createServerFn({ method: "POST" })
           last_message_at: new Date().toISOString(),
           last_preview: data.caption?.slice(0, 200) ?? `[${messageType}]`,
           status: "open",
+          unread_count: 0,
         })
         .eq("id", data.conversationId);
 

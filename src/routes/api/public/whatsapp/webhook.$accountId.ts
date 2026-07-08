@@ -280,14 +280,18 @@ async function handleInbound(
 
     if (!autoReplyEnabled || !conv?.id || !leadId) return;
 
+    const { data: recentMsgs } = await admin
+      .from("whatsapp_messages")
+      .select("sender_type")
+      .eq("conversation_id", conv.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    const hasHumanTakeover = (recentMsgs ?? []).some((m) => ["sdr", "agent", "human"].includes(m.sender_type));
+    if (hasHumanTakeover) return;
+
     if (stopOnLeadReply) {
-      const { data: msgs } = await admin
-        .from("whatsapp_messages")
-        .select("sender_type")
-        .eq("conversation_id", conv.id)
-        .order("created_at", { ascending: false })
-        .limit(50);
-      const agentReplies = (msgs ?? []).filter((m) => ["bot", "automation"].includes(m.sender_type)).length;
+      const agentReplies = (recentMsgs ?? []).filter((m) => ["bot", "automation"].includes(m.sender_type)).length;
       if (agentReplies >= responseMaxPerConversation) return;
     }
 
