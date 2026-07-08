@@ -285,6 +285,8 @@ async function handleInbound(
 
     if (!autoReplyEnabled || !conv?.id || !leadId) return;
 
+    if (conv.assumed_at && conv.assumed_by_user_id) return;
+
     const { data: recentMsgs } = await admin
       .from("whatsapp_messages")
       .select("sender_type")

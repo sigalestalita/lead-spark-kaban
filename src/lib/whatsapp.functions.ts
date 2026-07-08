@@ -498,6 +498,60 @@ export const assignConversation = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Assume manualmente a conversa e derruba novos handoffs automáticos. */
+export const assumeConversation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({
+      conversationId: z.string().uuid(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const assumedAt = new Date().toISOString();
+
+    const { data: conversation, error: convError } = await supabase
+      .from("whatsapp_conversations")
+      .select("id, lead_id, assigned_user_id, assumed_by_user_id, assumed_at")
+      .eq("id", data.conversationId)
+      .maybeSingle();
+    if (convError) throw new Error(convError.message);
+    if (!conversation) throw new Error("Conversa não encontrada");
+
+    const { error } = await supabase
+      .from("whatsapp_conversations")
+      .update({
+        assigned_user_id: userId,
+        status: "open",
+        assumed_by_user_id: userId,
+        assumed_at: assumedAt,
+      })
+      .eq("id", data.conversationId);
+    if (error) throw new Error(error.message);
+
+    const { error: leadError } = await supabase
+      .from("leads")
+      .update({ assigned_to: userId, last_action_at: assumedAt })
+      .eq("id", conversation.lead_id);
+    if (leadError) throw new Error(leadError.message);
+
+    await supabase.from("lead_interactions").insert({
+      lead_id: conversation.lead_id,
+      author_id: userId,
+      type: "routing",
+      content: "Conversa assumida manualmente por uma SDR.",
+      metadata: {
+        previous_assignee_user_id: conversation.assigned_user_id,
+        assignee_user_id: userId,
+        assumed_by_user_id: userId,
+        assumed_at: assumedAt,
+        source: "whatsapp_manual_assume",
+      },
+    });
+
+    return { ok: true, assumedAt };
+  });
+
 /** Muda status (open/pending/closed). */
 export const setConversationStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

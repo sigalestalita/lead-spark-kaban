@@ -4,7 +4,7 @@ import { z } from "zod";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { assignConversation, listConversations, setConversationStatus } from "@/lib/whatsapp.functions";
+import { assignConversation, assumeConversation, listConversations, setConversationStatus } from "@/lib/whatsapp.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { ConversationView } from "@/components/whatsapp/conversation-view";
 import { LeadSidePanel } from "@/components/whatsapp/lead-side-panel";
@@ -29,6 +29,7 @@ function WhatsappInbox() {
   const fn = useServerFn(listConversations);
   const setStatusFn = useServerFn(setConversationStatus);
   const assignFn = useServerFn(assignConversation);
+  const assumeFn = useServerFn(assumeConversation);
   const qc = useQueryClient();
   const routeSearch = Route.useSearch();
   const navigate = useNavigate({ from: "/whatsapp/" });
@@ -77,6 +78,19 @@ function WhatsappInbox() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao transferir conversa"),
   });
 
+  const assume = useMutation({
+    mutationFn: async () => {
+      if (!selectedConv) return;
+      await assumeFn({ data: { conversationId: selectedConv.id } });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+      qc.invalidateQueries({ queryKey: ["wa-messages", selectedConv?.id] });
+      toast.success("Conversa assumida.");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao assumir conversa"),
+  });
+
   const changeConversationStatus = async (nextStatus: "open" | "closed") => {
     if (!selectedConv) return;
     try {
@@ -88,6 +102,10 @@ function WhatsappInbox() {
       toast.error(e instanceof Error ? e.message : "Falha ao atualizar status da conversa");
     }
   };
+
+  const conversationOwnerId = selectedConv?.assigned_user_id ?? (selectedConv?.leads as { assigned_to?: string | null } | null)?.assigned_to ?? null;
+  const wasAssumed = Boolean(selectedConv?.assumed_at && selectedConv?.assumed_by_user_id);
+  const assumedByMe = selectedConv?.assumed_by_user_id === user?.id;
 
   return (
     <div className="h-full flex">
@@ -240,8 +258,16 @@ function WhatsappInbox() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={assumedByMe ? "default" : "secondary"}
+                    onClick={() => assume.mutate()}
+                    disabled={assume.isPending || !selectedConv || assumedByMe}
+                  >
+                    {assumedByMe ? "Assumida por mim" : wasAssumed ? "Reassumir conversa" : "Assumir conversa"}
+                  </Button>
                   <Select
-                    value={String(selectedConv.assigned_user_id ?? (selectedConv.leads as { assigned_to?: string | null } | null)?.assigned_to ?? "__none")}
+                    value={String(conversationOwnerId ?? "__none")}
                     onValueChange={(v) => transfer.mutate(v === "__none" ? null : v)}
                     disabled={transfer.isPending}
                   >
