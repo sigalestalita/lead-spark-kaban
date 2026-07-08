@@ -8,13 +8,16 @@ import { assignConversation, listConversations, setConversationStatus } from "@/
 import { supabase } from "@/integrations/supabase/client";
 import { ConversationView } from "@/components/whatsapp/conversation-view";
 import { LeadSidePanel } from "@/components/whatsapp/lead-side-panel";
+import { useAuth } from "@/lib/use-auth";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ExternalLink } from "lucide-react";
+import { BellRing, ExternalLink } from "lucide-react";
 import { LEAD_TYPE_LABEL, LEAD_TYPE_COLOR, type LeadType } from "@/lib/lead-type";
 import { toast } from "sonner";
+
+const LISIANE_USER_ID = "96c713e5-af8f-48fd-b536-59c2e1879f73";
 
 export const Route = createFileRoute("/_app/whatsapp/")({
   validateSearch: z.object({ c: z.string().uuid().optional() }),
@@ -22,6 +25,7 @@ export const Route = createFileRoute("/_app/whatsapp/")({
 });
 
 function WhatsappInbox() {
+  const { user } = useAuth();
   const fn = useServerFn(listConversations);
   const setStatusFn = useServerFn(setConversationStatus);
   const assignFn = useServerFn(assignConversation);
@@ -58,6 +62,8 @@ function WhatsappInbox() {
   const conversations = data?.conversations ?? [];
   const profiles = data?.profiles ?? [];
   const selectedConv = conversations.find((c) => c.id === selected) ?? null;
+  const waitingForLisiane = conversations.filter((c) => c.status === "pending" && c.assigned_user_id === LISIANE_USER_ID);
+  const isLisiane = user?.id === LISIANE_USER_ID;
 
   const transfer = useMutation({
     mutationFn: async (nextUserId: string | null) => {
@@ -87,6 +93,15 @@ function WhatsappInbox() {
     <div className="h-full flex">
       <aside className="w-[360px] shrink-0 border-r border-white/5 flex flex-col">
         <div className="p-3 space-y-2 border-b border-white/5">
+          {isLisiane && waitingForLisiane.length > 0 && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+              <BellRing className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <p className="font-medium text-amber-100">Você tem {waitingForLisiane.length} contato(s) aguardando resposta.</p>
+                <p className="text-amber-200/80">Conversas transferidas pela IA para você aparecem como pendentes.</p>
+              </div>
+            </div>
+          )}
           <Input
             placeholder="Buscar lead, empresa, mensagem…"
             value={search}
@@ -137,6 +152,7 @@ function WhatsappInbox() {
             const owner = ownerId ? profiles.find((p) => p.id === ownerId) : null;
             const ownerLabel = owner?.full_name ?? owner?.email ?? null;
             const isSel = c.id === selected;
+            const isWaitingForLisiane = c.status === "pending" && ownerId === LISIANE_USER_ID;
             return (
               <button
                 key={c.id}
@@ -145,14 +161,23 @@ function WhatsappInbox() {
                   navigate({ search: { c: c.id }, replace: true });
                 }}
                 className={`w-full text-left px-3 py-3 border-b border-white/5 hover:bg-white/5 transition-colors ${
+                  isWaitingForLisiane ? "bg-amber-500/5" : ""
+                } ${
                   isSel ? "bg-white/5" : ""
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium truncate">{lead?.name ?? "Sem nome"}</p>
-                  {c.unread_count > 0 && (
-                    <Badge variant="default" className="h-5 px-1.5 text-[10px]">{c.unread_count}</Badge>
-                  )}
+                  <div className="flex items-center gap-1">
+                    {isWaitingForLisiane && (
+                      <Badge variant="outline" className="h-5 px-1.5 text-[10px] border-amber-500/40 text-amber-300">
+                        Aguardando Lisiane
+                      </Badge>
+                    )}
+                    {c.unread_count > 0 && (
+                      <Badge variant="default" className="h-5 px-1.5 text-[10px]">{c.unread_count}</Badge>
+                    )}
+                  </div>
                 </div>
                 {lead?.company_name && (
                   <p className="text-xs text-muted-foreground truncate">{lead.company_name}</p>
