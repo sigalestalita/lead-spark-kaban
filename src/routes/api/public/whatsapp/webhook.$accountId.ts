@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type { Json } from "@/integrations/supabase/types";
+import { LISIANE_USER_ID } from "@/lib/whatsapp-ai.functions";
 
 // Webhook público de WhatsApp. URL estável:
 //   https://<host>/api/public/whatsapp/webhook/<accountId>
@@ -251,20 +252,24 @@ async function handleInbound(
     delivered_at: ts,
   });
 
+  let conversationStatus: "open" | "pending" = "open";
+  let conversationAssignee = conv.assigned_user_id ?? null;
+
+  await admin
+    .from("whatsapp_contacts")
+    .update({ last_message_at: ts })
+    .eq("id", contact!.id);
+
   await admin
     .from("whatsapp_conversations")
     .update({
       last_message_at: ts,
       last_preview: msg.body?.slice(0, 200) ?? `[${msg.type}]`,
       unread_count: (conv.unread_count ?? 0) + 1,
-      status: "open",
+      status: conversationStatus,
+      assigned_user_id: conversationAssignee,
     })
     .eq("id", conv.id);
-
-  await admin
-    .from("whatsapp_contacts")
-    .update({ last_message_at: ts })
-    .eq("id", contact!.id);
 
   // 4) resposta automática da IA quando habilitada
   try {
@@ -295,7 +300,89 @@ async function handleInbound(
       if (agentReplies >= responseMaxPerConversation) return;
     }
 
-    const { generateAutoReplyInternal } = await import("@/lib/whatsapp-ai.functions");
+    const { evaluateAiHandoffInternal, generateAutoReplyInternal } = await import("@/lib/whatsapp-ai.functions");
+    const handoff = await evaluateAiHandoffInternal(admin, conv.id);
+    if (handoff.shouldHandoff) {
+      conversationStatus = "pending";
+      conversationAssignee = LISIANE_USER_ID;
+
+      await admin
+        .from("whatsapp_conversations")
+        .update({
+          assigned_user_id: LISIANE_USER_ID,
+          status: "pending",
+          unread_count: (conv.unread_count ?? 0) + 1,
+          last_message_at: ts,
+          last_preview: msg.body?.slice(0, 200) ?? `[${msg.type}]`,
+        })
+        .eq("id", conv.id);
+
+      await admin
+        .from("leads")
+        .update({ assigned_to: LISIANE_USER_ID, last_action_at: new Date().toISOString() })
+        .eq("id", leadId);
+
+      await admin.from("lead_interactions").insert({
+        lead_id: leadId,
+        author_id: null,
+        type: "routing",
+        content: "Lead transferido automaticamente da IA para a Lisiane por intenção comercial/agendamento.",
+        metadata: {
+          assignee_user_id: LISIANE_USER_ID,
+          source: "ai_handoff",
+          reason: handoff.reason,
+          urgency: handoff.urgency,
+        },
+      });
+
+      if (handoff.suggestedReply) {
+        const { getProvider } = await import("@/lib/whatsapp/provider-registry.server");
+        const provider = getProvider(accountConfig.provider);
+        const botMsg = await admin
+          .from("whatsapp_messages")
+          .insert({
+            conversation_id: conv.id,
+            lead_id: leadId,
+            sender_type: "bot",
+            message_type: "text",
+            body: handoff.suggestedReply,
+            metadata: { source: "ai_handoff", handoff_reason: handoff.reason },
+            status: "sending",
+          })
+          .select("id")
+          .single();
+
+        const sendResult = await provider.sendMessage({
+          account: accountConfig,
+          to: phone,
+          type: "text",
+          body: handoff.suggestedReply,
+        });
+
+        await admin
+          .from("whatsapp_messages")
+          .update({
+            provider_message_id: sendResult.providerMessageId || null,
+            status: sendResult.status === "failed" ? "failed" : "sent",
+            error: sendResult.error ?? null,
+            sent_at: new Date().toISOString(),
+          })
+          .eq("id", botMsg.data?.id ?? "00000000-0000-0000-0000-000000000000");
+
+        await admin
+          .from("whatsapp_conversations")
+          .update({
+            last_message_at: new Date().toISOString(),
+            last_preview: handoff.suggestedReply.slice(0, 200),
+            assigned_user_id: LISIANE_USER_ID,
+            status: "pending",
+          })
+          .eq("id", conv.id);
+      }
+
+      return;
+    }
+
     const aiResult = await generateAutoReplyInternal(admin, conv.id);
     const reply = aiResult?.reply?.trim();
     if (!reply) return;

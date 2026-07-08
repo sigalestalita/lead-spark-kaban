@@ -26,6 +26,15 @@ type AiAgentSettings = {
   handoffPrompt: string;
 };
 
+export type AiHandoffDecision = {
+  shouldHandoff: boolean;
+  reason: string;
+  urgency: "alta" | "media" | "baixa";
+  suggestedReply: string;
+};
+
+export const LISIANE_USER_ID = "96c713e5-af8f-48fd-b536-59c2e1879f73";
+
 type ManualAiTestResult =
   | {
       ok: true;
@@ -134,6 +143,82 @@ function lastInboundLeadMessage(messages: Array<{ sender_type: string; body: str
 
 function hasHumanTakeover(messages: Array<{ sender_type: string }>) {
   return messages.some((m) => ["sdr", "agent", "human"].includes(m.sender_type));
+}
+
+export async function evaluateAiHandoffInternal(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  conversationId: string,
+): Promise<AiHandoffDecision> {
+  const settings = await readAiAgentSettings(supabase);
+  const { conv, messages, notes, stage, icp } = await loadContext(supabase, conversationId, 40);
+  const lead = (conv.leads ?? {}) as Record<string, unknown>;
+  const lastLead = lastInboundLeadMessage(messages);
+  if (!lastLead) {
+    return {
+      shouldHandoff: false,
+      reason: "Sem mensagem recente do lead para avaliar handoff.",
+      urgency: "baixa",
+      suggestedReply: "",
+    };
+  }
+
+  const tool = {
+    type: "function",
+    function: {
+      name: "decide_handoff",
+      description: "Decide se a conversa deve ser transferida para uma SDR humana agora.",
+      parameters: {
+        type: "object",
+        properties: {
+          shouldHandoff: {
+            type: "boolean",
+            description: "true quando houver intenção comercial direta, pedido de valores, proposta, agenda, demo, reunião ou maturidade clara para SDR assumir.",
+          },
+          reason: {
+            type: "string",
+            description: "Motivo curto e objetivo baseado em sinais concretos da conversa.",
+          },
+          urgency: {
+            type: "string",
+            enum: ["alta", "media", "baixa"],
+          },
+          suggestedReply: {
+            type: "string",
+            description: "Mensagem curta pronta para WhatsApp. Se shouldHandoff=true, deve avisar que a Lisiane vai assumir e seguir dali. Se false, deve ser a próxima resposta normal da IA.",
+          },
+        },
+        required: ["shouldHandoff", "reason", "urgency", "suggestedReply"],
+        additionalProperties: false,
+      },
+    },
+  };
+
+  const result = await callAI(
+    [
+      { role: "system", content: buildAgentSystemPrompt(settings) },
+      {
+        role: "user",
+        content:
+          `${settings.replyPrompt}\n\n` +
+          `Antes de responder, decida se já é hora de transferir para o SDR humano. Faça handoff quando o lead pedir valores, preço, proposta, condições, detalhes comerciais mais diretos, agenda, reunião, demonstração, ou quando a conversa estiver madura para a Lisiane assumir.\n\n` +
+          `${leadBrief(lead, stage, notes, icp)}\n\n` +
+          `Conversa:\n${transcript(messages)}\n\n` +
+          `Última mensagem do lead: ${lastLead.body}`,
+      },
+    ],
+    tool,
+  );
+
+  const call = result.choices?.[0]?.message?.tool_calls?.[0];
+  if (!call) throw new Error("IA não retornou decisão de handoff");
+  const args = JSON.parse(call.function.arguments) as AiHandoffDecision;
+  return {
+    shouldHandoff: args.shouldHandoff === true,
+    reason: args.reason?.trim() || "Conversa madura para SDR assumir.",
+    urgency: args.urgency || "media",
+    suggestedReply: args.suggestedReply?.trim() || "",
+  };
 }
 
 export async function generateAutoReplyInternal(
