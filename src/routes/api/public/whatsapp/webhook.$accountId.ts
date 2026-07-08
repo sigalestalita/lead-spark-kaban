@@ -260,6 +260,17 @@ async function handleInbound(
     .update({ last_message_at: ts })
     .eq("id", contact!.id);
 
+  await admin
+    .from("whatsapp_conversations")
+    .update({
+      last_message_at: ts,
+      last_preview: msg.body?.slice(0, 200) ?? `[${msg.type}]`,
+      unread_count: (conv.unread_count ?? 0) + 1,
+      status: conversationStatus,
+      assigned_user_id: conversationAssignee,
+    })
+    .eq("id", conv.id);
+
   // 4) resposta automática da IA quando habilitada
   try {
     const { data: aiCfg } = await admin
@@ -420,17 +431,6 @@ async function handleInbound(
   } catch (e) {
     console.error("[wa webhook] ai auto-reply error", e);
   }
-
-  await admin
-    .from("whatsapp_conversations")
-    .update({
-      last_message_at: ts,
-      last_preview: msg.body?.slice(0, 200) ?? `[${msg.type}]`,
-      unread_count: (conv.unread_count ?? 0) + 1,
-      status: conversationStatus,
-      assigned_user_id: conversationAssignee,
-    })
-    .eq("id", conv.id);
 }
 
 async function handleStatus(
