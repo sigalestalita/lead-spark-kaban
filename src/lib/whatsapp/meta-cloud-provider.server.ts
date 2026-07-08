@@ -146,10 +146,10 @@ export const metaCloudProvider: WhatsAppProvider = {
               timestamp: string;
               type: string;
               text?: { body?: string };
-              image?: { id?: string; mime_type?: string; caption?: string };
-              video?: { id?: string; mime_type?: string; caption?: string };
-              audio?: { id?: string; mime_type?: string };
-              document?: { id?: string; mime_type?: string; filename?: string; caption?: string };
+              image?: { id?: string; mime_type?: string; caption?: string; url?: string };
+              video?: { id?: string; mime_type?: string; caption?: string; url?: string };
+              audio?: { id?: string; mime_type?: string; url?: string };
+              document?: { id?: string; mime_type?: string; filename?: string; caption?: string; url?: string };
             }>;
             statuses?: Array<{
               id: string;
@@ -173,13 +173,15 @@ export const metaCloudProvider: WhatsAppProvider = {
         for (const m of value.messages ?? []) {
           let type: WaMessageType = "text";
           let body: string | undefined;
+          let mediaId: string | undefined;
+          let mediaUrl: string | undefined;
           let mediaMime: string | undefined;
           switch (m.type) {
             case "text": body = m.text?.body; break;
-            case "image": type = "image"; body = m.image?.caption; mediaMime = m.image?.mime_type; break;
-            case "video": type = "video"; body = m.video?.caption; mediaMime = m.video?.mime_type; break;
-            case "audio": type = "audio"; mediaMime = m.audio?.mime_type; break;
-            case "document": type = "file"; body = m.document?.caption ?? m.document?.filename; mediaMime = m.document?.mime_type; break;
+            case "image": type = "image"; body = m.image?.caption; mediaId = m.image?.id; mediaUrl = m.image?.url; mediaMime = m.image?.mime_type; break;
+            case "video": type = "video"; body = m.video?.caption; mediaId = m.video?.id; mediaUrl = m.video?.url; mediaMime = m.video?.mime_type; break;
+            case "audio": type = "audio"; mediaId = m.audio?.id; mediaUrl = m.audio?.url; mediaMime = m.audio?.mime_type; break;
+            case "document": type = "file"; body = m.document?.caption ?? m.document?.filename; mediaId = m.document?.id; mediaUrl = m.document?.url; mediaMime = m.document?.mime_type; break;
             default: body = `[${m.type} não suportado]`;
           }
           const inbound: WaInboundMessage = {
@@ -188,6 +190,8 @@ export const metaCloudProvider: WhatsAppProvider = {
             to: toNumber,
             type,
             body,
+            mediaId,
+            mediaUrl,
             mediaMime,
             timestamp: Number(m.timestamp) * 1000,
             senderName: contactName,

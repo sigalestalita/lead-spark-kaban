@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import type { Json } from "@/integrations/supabase/types";
 
 // Webhook público de WhatsApp. URL estável:
 //   https://<host>/api/public/whatsapp/webhook/<accountId>
@@ -100,6 +101,7 @@ async function handleInbound(
     type: string;
     body?: string;
     mediaUrl?: string;
+    mediaId?: string;
     mediaMime?: string;
     timestamp: number;
     senderName?: string;
@@ -184,16 +186,65 @@ async function handleInbound(
   }
   if (!conv) return;
 
-  // 3) grava mensagem
+  // 3) baixa mídia recebida (áudio/imagem/vídeo/documento) para o storage privado
   const ts = new Date(msg.timestamp).toISOString();
+  let mediaUrl = msg.mediaUrl ?? null;
+  let mediaMime = msg.mediaMime ?? null;
+  let mediaMetadata: Json = {};
+
+  if ((msg.mediaId || msg.mediaUrl) && accountConfig.access_token) {
+    try {
+      const base = (accountConfig.provider_base_url || "https://graph.facebook.com/v21.0").replace(/\/+$/, "");
+      let mediaInfo: { url?: string; mime_type?: string } = { url: msg.mediaUrl, mime_type: msg.mediaMime };
+      if (msg.mediaId) {
+        const metaRes = await fetch(`${base}/${encodeURIComponent(msg.mediaId)}`, {
+          headers: { Authorization: `Bearer ${accountConfig.access_token}` },
+        });
+        if (!metaRes.ok) throw new Error(`media metadata HTTP ${metaRes.status}`);
+        mediaInfo = await metaRes.json() as { url?: string; mime_type?: string };
+      }
+      if (!mediaInfo.url) throw new Error("media URL ausente");
+
+      const fileRes = await fetch(mediaInfo.url, {
+        headers: { Authorization: `Bearer ${accountConfig.access_token}` },
+      });
+      if (!fileRes.ok) throw new Error(`media download HTTP ${fileRes.status}`);
+
+      mediaMime = mediaInfo.mime_type || fileRes.headers.get("content-type") || mediaMime;
+      const ext = extensionFromMime(mediaMime, msg.type);
+      const safeMessageId = msg.providerMessageId.replace(/[^a-zA-Z0-9_-]/g, "_");
+      const storagePath = `inbound/${accountId}/${phone}/${safeMessageId}${ext}`;
+      const bytes = await fileRes.arrayBuffer();
+      const { error: uploadErr } = await admin.storage
+        .from("whatsapp-media")
+        .upload(storagePath, bytes, { contentType: mediaMime ?? "application/octet-stream", upsert: true });
+      if (uploadErr) throw uploadErr;
+
+      const { data: signed } = await admin.storage
+        .from("whatsapp-media")
+        .createSignedUrl(storagePath, 60 * 60 * 24);
+      mediaUrl = signed?.signedUrl ?? null;
+      mediaMetadata = {
+        provider_media_id: msg.mediaId ?? null,
+        storage_bucket: "whatsapp-media",
+        storage_path: storagePath,
+      };
+    } catch (e) {
+      console.error("[wa webhook] media download error", e);
+      mediaMetadata = { provider_media_id: msg.mediaId, media_error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+  // 4) grava mensagem
   await admin.from("whatsapp_messages").insert({
     conversation_id: conv.id,
     lead_id: leadId,
     sender_type: "lead",
     message_type: msg.type,
     body: msg.body ?? null,
-    media_url: msg.mediaUrl ?? null,
-    media_mime: msg.mediaMime ?? null,
+    media_url: mediaUrl,
+    media_mime: mediaMime,
+    metadata: mediaMetadata,
     provider_message_id: msg.providerMessageId,
     status: "delivered",
     sent_at: ts,
@@ -309,6 +360,24 @@ async function handleStatus(
     .from("whatsapp_messages")
     .update(patch)
     .eq("provider_message_id", st.providerMessageId);
+}
+
+function extensionFromMime(mime: string | null, type: string) {
+  const normalized = (mime ?? "").toLowerCase().split(";")[0].trim();
+  if (normalized === "audio/ogg") return ".ogg";
+  if (normalized === "audio/mpeg") return ".mp3";
+  if (normalized === "audio/mp4") return ".m4a";
+  if (normalized === "audio/aac") return ".aac";
+  if (normalized === "audio/amr") return ".amr";
+  if (normalized === "image/jpeg") return ".jpg";
+  if (normalized === "image/png") return ".png";
+  if (normalized === "image/webp") return ".webp";
+  if (normalized === "video/mp4") return ".mp4";
+  if (normalized === "application/pdf") return ".pdf";
+  if (type === "audio") return ".ogg";
+  if (type === "image") return ".jpg";
+  if (type === "video") return ".mp4";
+  return "";
 }
 
 // helper só pro tipo

@@ -196,12 +196,25 @@ export const listMessages = createServerFn({ method: "GET" })
       });
     }
 
+    const rowsWithFreshMediaUrls = await Promise.all(
+      hydratedRows.map(async (row) => {
+        const metadata = (row.metadata ?? {}) as { storage_bucket?: string | null; storage_path?: string | null };
+        if (metadata.storage_bucket !== "whatsapp-media" || !metadata.storage_path) return row;
+
+        const { data: signed } = await supabase.storage
+          .from("whatsapp-media")
+          .createSignedUrl(metadata.storage_path, 60 * 60 * 12);
+
+        return signed?.signedUrl ? { ...row, media_url: signed.signedUrl } : row;
+      }),
+    );
+
     // zera unread_count
     await supabase
       .from("whatsapp_conversations")
       .update({ unread_count: 0 })
       .eq("id", data.conversationId);
-    return { messages: hydratedRows };
+    return { messages: rowsWithFreshMediaUrls };
   });
 
 /** Envia mensagem via provider configurado. */
@@ -371,6 +384,10 @@ export const sendMediaFromStorage = createServerFn({ method: "POST" })
         body: data.caption ?? null,
         media_url: signed.signedUrl,
         media_mime: data.mime,
+        metadata: {
+          storage_bucket: "whatsapp-media",
+          storage_path: data.storagePath,
+        },
         status: "sending",
       })
       .select("*")
