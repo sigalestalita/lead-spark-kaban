@@ -203,10 +203,16 @@ async function executeAiInitialOutreachForLead(lead: LeadLite): Promise<{ ok: bo
 
   const { data: tmpl } = await supabaseAdmin
     .from("whatsapp_templates")
-    .select("provider_template_name, language, variables, meta_template_id")
+    .select("provider_template_name, language, variables, meta_template_id, body")
     .eq("id", settings.initialTemplateId)
     .maybeSingle();
   if (!tmpl?.provider_template_name) return { ok: false, error: "Template HSM inicial inválido" };
+
+  const renderedBody = renderTemplate(tmpl.body ?? "", {
+    nome: lead.name ?? "",
+    primeiro_nome: (lead.name ?? "").split(" ")[0] ?? "",
+    empresa: lead.company_name ?? "",
+  }).trim();
 
   const account = await getDefaultAccount();
   if (!account) return { ok: false, error: "Sem conta WhatsApp padrão" };
@@ -254,11 +260,12 @@ async function executeAiInitialOutreachForLead(lead: LeadLite): Promise<{ ok: bo
       lead_id: lead.id,
       sender_type: "bot",
       message_type: "template",
-      body: null,
+      body: renderedBody || null,
       metadata: {
         source: "ai_initial_outreach",
         template_id: settings.initialTemplateId,
         template_name: tmpl.provider_template_name,
+        rendered_body: renderedBody || null,
       },
       status: "sending",
     })
@@ -301,7 +308,7 @@ async function executeAiInitialOutreachForLead(lead: LeadLite): Promise<{ ok: bo
       .from("whatsapp_conversations")
       .update({
         last_message_at: new Date().toISOString(),
-        last_preview: `[HSM] ${tmpl.provider_template_name}`,
+        last_preview: renderedBody || `[HSM] ${tmpl.provider_template_name}`,
         status: "open",
       })
       .eq("id", convId);

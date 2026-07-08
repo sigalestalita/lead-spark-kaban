@@ -35,6 +35,11 @@ type Msg = {
   delivered_at: string | null;
   read_at: string | null;
   media_url: string | null;
+  metadata?: {
+    source?: string | null;
+    template_name?: string | null;
+    rendered_body?: string | null;
+  } | null;
 };
 
 export function ConversationView({ conversationId }: { conversationId: string }) {
@@ -246,6 +251,11 @@ export function ConversationView({ conversationId }: { conversationId: string })
 
 function MessageBubble({ m }: { m: Msg }) {
   const mine = m.sender_type === "sdr" || m.sender_type === "bot" || m.sender_type === "automation" || m.sender_type === "agent";
+  const templateFallback =
+    m.message_type === "template"
+      ? m.body ?? m.metadata?.rendered_body ?? (m.metadata?.template_name ? `[HSM] ${m.metadata.template_name}` : null)
+      : null;
+  const displayBody = templateFallback ?? m.body;
   const senderLabel =
     m.sender_type === "bot"
       ? "IA"
@@ -271,7 +281,7 @@ function MessageBubble({ m }: { m: Msg }) {
             Anexo
           </a>
         )}
-        {m.body && <p className="whitespace-pre-wrap break-words">{m.body}</p>}
+        {displayBody && <p className="whitespace-pre-wrap break-words">{displayBody}</p>}
         <div className={`flex items-center gap-1 mt-1 text-[10px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
           <span>
             {new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}

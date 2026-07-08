@@ -138,6 +138,7 @@ export const listMessages = createServerFn({ method: "GET" })
   .inputValidator((d) => z.object({ conversationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    const { renderTemplate } = await import("./whatsapp-templates.functions");
     const { data: rows, error } = await supabase
       .from("whatsapp_messages")
       .select("*")
@@ -145,12 +146,62 @@ export const listMessages = createServerFn({ method: "GET" })
       .order("created_at", { ascending: true })
       .limit(500);
     if (error) throw new Error(error.message);
+
+    const messageRows = rows ?? [];
+    const templateRows = messageRows.filter((row) => {
+      const metadata = (row.metadata ?? {}) as { template_id?: string | null };
+      return row.message_type === "template" && !row.body && metadata.template_id;
+    });
+
+    let hydratedRows = messageRows;
+    if (templateRows.length > 0) {
+      const templateIds = [...new Set(templateRows.map((row) => ((row.metadata ?? {}) as { template_id?: string | null }).template_id).filter(Boolean))] as string[];
+      const leadIds = [...new Set(templateRows.map((row) => row.lead_id).filter(Boolean))] as string[];
+
+      const [{ data: templates }, { data: leads }] = await Promise.all([
+        supabase.from("whatsapp_templates").select("id, body").in("id", templateIds),
+        supabase.from("leads").select("id, name, company_name").in("id", leadIds),
+      ]);
+
+      const templateMap = new Map((templates ?? []).map((template) => [template.id, template]));
+      const leadMap = new Map((leads ?? []).map((lead) => [lead.id, lead]));
+
+      hydratedRows = messageRows.map((row) => {
+        const metadata = (row.metadata ?? {}) as {
+          template_id?: string | null;
+          rendered_body?: string | null;
+        };
+        if (row.message_type !== "template" || row.body || !metadata.template_id) return row;
+
+        const template = templateMap.get(metadata.template_id);
+        const lead = row.lead_id ? leadMap.get(row.lead_id) : null;
+        const renderedBody = metadata.rendered_body
+          ?? (template?.body
+            ? renderTemplate(template.body, {
+                nome: lead?.name ?? "",
+                primeiro_nome: (lead?.name ?? "").split(" ")[0] ?? "",
+                empresa: lead?.company_name ?? "",
+              }).trim()
+            : null);
+
+        if (!renderedBody) return row;
+        return {
+          ...row,
+          body: renderedBody,
+          metadata: {
+            ...metadata,
+            rendered_body: renderedBody,
+          },
+        };
+      });
+    }
+
     // zera unread_count
     await supabase
       .from("whatsapp_conversations")
       .update({ unread_count: 0 })
       .eq("id", data.conversationId);
-    return { messages: rows ?? [] };
+    return { messages: hydratedRows };
   });
 
 /** Envia mensagem via provider configurado. */
