@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -12,6 +12,7 @@ import {
   AUTOMATION_TRIGGERS,
   type AutomationTrigger,
 } from "@/lib/whatsapp-automations.functions";
+import { getLeadRoutingSettings, updateLeadRoutingSettings } from "@/lib/settings.functions";
 import { listTemplates } from "@/lib/whatsapp-templates.functions";
 import { getCampaignFilterMeta } from "@/lib/whatsapp-campaigns.functions";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,8 @@ function AutomationsPage() {
   const tickFn = useServerFn(runAutomationsNow);
   const tmplFn = useServerFn(listTemplates);
   const metaFn = useServerFn(getCampaignFilterMeta);
+  const routingFn = useServerFn(getLeadRoutingSettings);
+  const saveRoutingFn = useServerFn(updateLeadRoutingSettings);
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -84,6 +87,10 @@ function AutomationsPage() {
     queryKey: ["wa-camp-meta"],
     queryFn: () => metaFn(),
   });
+  const { data: routing } = useQuery({
+    queryKey: ["wa-lead-routing"],
+    queryFn: () => routingFn(),
+  });
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<RuleRow | null>(null);
@@ -95,6 +102,19 @@ function AutomationsPage() {
   const [stageId, setStageId] = useState<string>("");
   const [minutesBefore, setMinutesBefore] = useState<number>(60);
   const [active, setActive] = useState(true);
+  const [routingEnabled, setRoutingEnabled] = useState(false);
+  const [empresaUserId, setEmpresaUserId] = useState("__none");
+  const [consultoriaUserId, setConsultoriaUserId] = useState("__none");
+  const [pessoaFisicaUserId, setPessoaFisicaUserId] = useState("__none");
+
+  useEffect(() => {
+    const settings = routing?.settings;
+    if (!settings) return;
+    setRoutingEnabled(settings.enabled === true);
+    setEmpresaUserId(settings.rules.find((rule) => rule.leadType === "empresa")?.userId ?? "__none");
+    setConsultoriaUserId(settings.rules.find((rule) => rule.leadType === "consultoria")?.userId ?? "__none");
+    setPessoaFisicaUserId(settings.rules.find((rule) => rule.leadType === "pessoa_fisica")?.userId ?? "__none");
+  }, [routing]);
 
   function reset() {
     setEditing(null);
@@ -167,10 +187,92 @@ function AutomationsPage() {
     },
   });
 
+  const saveRouting = useMutation({
+    mutationFn: () => saveRoutingFn({
+      data: {
+        enabled: routingEnabled,
+        fallbackMode: "general_queue",
+        rules: [
+          empresaUserId !== "__none" ? { leadType: "empresa", userId: empresaUserId } : null,
+          consultoriaUserId !== "__none" ? { leadType: "consultoria", userId: consultoriaUserId } : null,
+          pessoaFisicaUserId !== "__none" ? { leadType: "pessoa_fisica", userId: pessoaFisicaUserId } : null,
+        ].filter((rule): rule is { leadType: "consultoria" | "empresa" | "pessoa_fisica"; userId: string } => !!rule),
+      },
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["wa-lead-routing"] });
+    },
+  });
+
   const rules = (data?.rules ?? []) as RuleRow[];
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
+      <div className="space-y-4 border border-white/5 rounded-lg p-4 bg-card/40">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold">Distribuição de atendimento</h2>
+            <p className="text-xs text-muted-foreground">
+              Atribuição fixa na entrada do lead por tipo. Se não houver regra, cai na fila geral.
+            </p>
+          </div>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <Switch checked={routingEnabled} onCheckedChange={setRoutingEnabled} />
+            Ativar roteamento
+          </label>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <div>
+            <label className="text-xs text-muted-foreground">Empresa</label>
+            <Select value={empresaUserId} onValueChange={setEmpresaUserId}>
+              <SelectTrigger><SelectValue placeholder="Fila geral" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">Fila geral</SelectItem>
+                {(routing?.profiles ?? []).map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email ?? p.id}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Consultoria</label>
+            <Select value={consultoriaUserId} onValueChange={setConsultoriaUserId}>
+              <SelectTrigger><SelectValue placeholder="Fila geral" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">Fila geral</SelectItem>
+                {(routing?.profiles ?? []).map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email ?? p.id}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Pessoa física</label>
+            <Select value={pessoaFisicaUserId} onValueChange={setPessoaFisicaUserId}>
+              <SelectTrigger><SelectValue placeholder="Fila geral" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">Fila geral</SelectItem>
+                {(routing?.profiles ?? []).map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email ?? p.id}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+            <Badge variant="outline">Critério: tipo de lead</Badge>
+            <Badge variant="outline">Posse: na entrada do lead</Badge>
+            <Badge variant="outline">Fallback: fila geral</Badge>
+          </div>
+          <Button onClick={() => saveRouting.mutate()} disabled={saveRouting.isPending}>
+            {saveRouting.isPending ? "Salvando…" : "Salvar distribuição"}
+          </Button>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">Automações</h2>

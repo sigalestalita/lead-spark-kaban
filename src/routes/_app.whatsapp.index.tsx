@@ -2,9 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { useNavigate } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { listConversations, setConversationStatus } from "@/lib/whatsapp.functions";
+import { assignConversation, listConversations, setConversationStatus } from "@/lib/whatsapp.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { ConversationView } from "@/components/whatsapp/conversation-view";
 import { LeadSidePanel } from "@/components/whatsapp/lead-side-panel";
@@ -24,6 +24,7 @@ export const Route = createFileRoute("/_app/whatsapp/")({
 function WhatsappInbox() {
   const fn = useServerFn(listConversations);
   const setStatusFn = useServerFn(setConversationStatus);
+  const assignFn = useServerFn(assignConversation);
   const qc = useQueryClient();
   const routeSearch = Route.useSearch();
   const navigate = useNavigate({ from: "/whatsapp/" });
@@ -57,6 +58,18 @@ function WhatsappInbox() {
   const conversations = data?.conversations ?? [];
   const profiles = data?.profiles ?? [];
   const selectedConv = conversations.find((c) => c.id === selected) ?? null;
+
+  const transfer = useMutation({
+    mutationFn: async (nextUserId: string | null) => {
+      if (!selectedConv) return;
+      await assignFn({ data: { conversationId: selectedConv.id, userId: nextUserId } });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+      toast.success("Atendimento atualizado.");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao transferir conversa"),
+  });
 
   const changeConversationStatus = async (nextStatus: "open" | "closed") => {
     if (!selectedConv) return;
@@ -120,7 +133,8 @@ function WhatsappInbox() {
               company_size: string | null;
               assigned_to: string | null;
             } | null;
-            const owner = lead?.assigned_to ? profiles.find((p) => p.id === lead.assigned_to) : null;
+            const ownerId = c.assigned_user_id ?? lead?.assigned_to ?? null;
+            const owner = ownerId ? profiles.find((p) => p.id === ownerId) : null;
             const ownerLabel = owner?.full_name ?? owner?.email ?? null;
             const isSel = c.id === selected;
             return (
@@ -201,6 +215,21 @@ function WhatsappInbox() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <Select
+                    value={String(selectedConv.assigned_user_id ?? (selectedConv.leads as { assigned_to?: string | null } | null)?.assigned_to ?? "__none")}
+                    onValueChange={(v) => transfer.mutate(v === "__none" ? null : v)}
+                    disabled={transfer.isPending}
+                  >
+                    <SelectTrigger className="h-8 w-[210px] text-xs">
+                      <SelectValue placeholder="Fila geral" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">Fila geral</SelectItem>
+                      {profiles.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email ?? p.id}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Button
                     size="sm"
                     variant={selectedConv.status === "closed" ? "default" : "outline"}

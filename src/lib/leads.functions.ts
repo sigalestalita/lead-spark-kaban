@@ -121,7 +121,7 @@ export const updateLead = createServerFn({ method: "POST" })
       .parse(d)
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
     const allowed: Record<string, unknown> = {};
     const allowedKeys = [
       "name",
@@ -155,6 +155,29 @@ export const updateLead = createServerFn({ method: "POST" })
 
     const { error } = await supabase.from("leads").update(allowed as never).eq("id", data.id);
     if (error) throw new Error(error.message);
+
+    if (Object.prototype.hasOwnProperty.call(allowed, "assigned_to")) {
+      const { error: convError } = await supabase
+        .from("whatsapp_conversations")
+        .update({ assigned_user_id: (allowed.assigned_to as string | null | undefined) ?? null })
+        .eq("lead_id", data.id);
+      if (convError) throw new Error(convError.message);
+
+      await supabase.from("lead_interactions").insert({
+        lead_id: data.id,
+        author_id: userId,
+        type: "routing",
+        content: allowed.assigned_to ? "Responsável do lead alterado manualmente." : "Lead enviado para fila geral.",
+        metadata: {
+          assignee_user_id: allowed.assigned_to ? String(allowed.assigned_to) : null,
+          source: "lead_update",
+        },
+      });
+    } else if (Object.prototype.hasOwnProperty.call(allowed, "lead_type")) {
+      const { ensureLeadRouted } = await import("./lead-routing.server");
+      await ensureLeadRouted({ supabase, leadId: data.id, actorUserId: userId });
+    }
+
     return { ok: true };
   });
 
@@ -233,6 +256,8 @@ export const createManualLead = createServerFn({ method: "POST" })
       .select("id, name, company_name, lead_type, score, priority")
       .single();
     if (error) throw new Error(error.message);
+    const { ensureLeadRouted } = await import("./lead-routing.server");
+    await ensureLeadRouted({ supabase, leadId: inserted.id });
     await notifyNewLead({
       id: inserted.id,
       name: inserted.name,
