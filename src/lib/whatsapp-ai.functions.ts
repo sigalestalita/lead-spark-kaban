@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { renderTemplate } from "./whatsapp-templates.functions";
 import { GROU_PLAYBOOK } from "./grou-playbook";
 import { resolveTemplateSendParams } from "./whatsapp/template-send.server";
 
@@ -776,7 +777,7 @@ export const triggerManualAiTest = createServerFn({ method: "POST" })
 
     const { data: tmpl } = await supabaseAdmin
       .from("whatsapp_templates")
-      .select("provider_template_name, language, variables, meta_template_id")
+      .select("provider_template_name, language, variables, meta_template_id, body")
       .eq("id", settings.initialTemplateId)
       .maybeSingle();
     if (!tmpl?.provider_template_name) {
@@ -814,6 +815,12 @@ export const triggerManualAiTest = createServerFn({ method: "POST" })
       },
     });
 
+    const renderedBody = renderTemplate(tmpl.body ?? "", {
+      nome: lead.name ?? "",
+      primeiro_nome: (lead.name ?? "").split(" ")[0] ?? "",
+      empresa: lead.company_name ?? "",
+    }).trim();
+
     const { data: msg, error: msgErr } = await supabaseAdmin
       .from("whatsapp_messages")
       .insert({
@@ -821,11 +828,12 @@ export const triggerManualAiTest = createServerFn({ method: "POST" })
         lead_id: conv.lead_id,
         sender_type: "bot",
         message_type: "template",
-        body: null,
+        body: renderedBody || null,
         metadata: {
           source: "manual_ai_test",
           template_id: settings.initialTemplateId,
           template_name: tmpl.provider_template_name,
+          rendered_body: renderedBody || null,
           phone: data.phone,
         },
         status: "sending",
@@ -868,7 +876,7 @@ export const triggerManualAiTest = createServerFn({ method: "POST" })
         .from("whatsapp_conversations")
         .update({
           last_message_at: new Date().toISOString(),
-          last_preview: `[HSM teste] ${tmpl.provider_template_name}`,
+          last_preview: renderedBody || `[HSM teste] ${tmpl.provider_template_name}`,
           status: "open",
         })
         .eq("id", conv.id);
