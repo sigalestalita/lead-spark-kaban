@@ -29,6 +29,7 @@ type Msg = {
   body: string | null;
   sender_type: string;
   message_type: string;
+  media_mime?: string | null;
   status: string;
   created_at: string;
   sent_at: string | null;
@@ -256,6 +257,7 @@ function MessageBubble({ m }: { m: Msg }) {
       ? m.body ?? m.metadata?.rendered_body ?? (m.metadata?.template_name ? `[HSM] ${m.metadata.template_name}` : null)
       : null;
   const displayBody = templateFallback ?? m.body;
+  const isAudio = m.message_type === "audio" || m.media_mime?.startsWith("audio/");
   const senderLabel =
     m.sender_type === "bot"
       ? "IA"
@@ -277,9 +279,20 @@ function MessageBubble({ m }: { m: Msg }) {
           {senderLabel}
         </div>
         {m.media_url && (
-          <a href={m.media_url} target="_blank" rel="noreferrer" className="block mb-1 underline text-xs opacity-80">
-            Anexo
-          </a>
+          isAudio ? (
+            <audio
+              controls
+              preload="metadata"
+              className="mb-2 h-10 w-full max-w-[280px]"
+            >
+              <source src={m.media_url} type={m.media_mime ?? undefined} />
+              Seu navegador não suporta reprodução de áudio.
+            </audio>
+          ) : (
+            <a href={m.media_url} target="_blank" rel="noreferrer" className="block mb-1 underline text-xs opacity-80">
+              Anexo
+            </a>
+          )
         )}
         {displayBody && <p className="whitespace-pre-wrap break-words">{displayBody}</p>}
         <div className={`flex items-center gap-1 mt-1 text-[10px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
