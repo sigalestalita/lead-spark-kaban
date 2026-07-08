@@ -278,7 +278,7 @@ function MessageBubble({ m }: { m: Msg }) {
         <div className={`mb-1 text-[10px] uppercase tracking-wide ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
           {senderLabel}
         </div>
-        {m.media_url && (
+        {m.media_url ? (
           isAudio ? (
             <audio
               controls
@@ -293,7 +293,12 @@ function MessageBubble({ m }: { m: Msg }) {
               Anexo
             </a>
           )
-        )}
+        ) : isAudio ? (
+          <div className={`mb-2 flex items-center gap-2 rounded-md border px-2 py-1.5 text-xs ${mine ? "border-primary-foreground/20 text-primary-foreground/80" : "border-white/10 text-muted-foreground"}`}>
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            <span>Áudio recebido sem arquivo disponível</span>
+          </div>
+        ) : null}
         {displayBody && <p className="whitespace-pre-wrap break-words">{displayBody}</p>}
         <div className={`flex items-center gap-1 mt-1 text-[10px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
           <span>

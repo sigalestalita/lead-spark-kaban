@@ -43,6 +43,7 @@ export interface WaInboundMessage {
   to: string;
   type: WaMessageType;
   body?: string;
+  mediaId?: string;
   mediaUrl?: string;
   mediaMime?: string;
   timestamp: number; // ms
