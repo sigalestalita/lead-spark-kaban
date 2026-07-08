@@ -838,6 +838,8 @@ export type Database = {
           ai_summary: string | null
           ai_summary_at: string | null
           assigned_user_id: string | null
+          assumed_at: string | null
+          assumed_by_user_id: string | null
           contact_id: string | null
           created_at: string
           id: string
@@ -856,6 +858,8 @@ export type Database = {
           ai_summary?: string | null
           ai_summary_at?: string | null
           assigned_user_id?: string | null
+          assumed_at?: string | null
+          assumed_by_user_id?: string | null
           contact_id?: string | null
           created_at?: string
           id?: string
@@ -874,6 +878,8 @@ export type Database = {
           ai_summary?: string | null
           ai_summary_at?: string | null
           assigned_user_id?: string | null
+          assumed_at?: string | null
+          assumed_by_user_id?: string | null
           contact_id?: string | null
           created_at?: string
           id?: string
