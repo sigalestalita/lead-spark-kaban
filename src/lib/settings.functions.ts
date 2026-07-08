@@ -2,6 +2,17 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+const LeadRoutingRuleSchema = z.object({
+  leadType: z.enum(["consultoria", "empresa", "pessoa_fisica"]),
+  userId: z.string().uuid(),
+});
+
+const LeadRoutingSettingsSchema = z.object({
+  enabled: z.boolean().default(false),
+  fallbackMode: z.literal("general_queue").default("general_queue"),
+  rules: z.array(LeadRoutingRuleSchema).max(10).default([]),
+});
+
 export const getSettings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -29,6 +40,38 @@ export const updateSetting = createServerFn({ method: "POST" })
     const { error } = await supabase
       .from("app_settings")
       .upsert({ key: data.key, value: data.value as never, updated_at: new Date().toISOString() });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const getLeadRoutingSettings = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { readLeadRoutingSettings } = await import("./lead-routing.server");
+    const [settings, profilesRes] = await Promise.all([
+      readLeadRoutingSettings(context.supabase),
+      context.supabase.from("profiles").select("id, full_name, email").order("full_name"),
+    ]);
+    if (profilesRes.error) throw new Error(profilesRes.error.message);
+    return { settings, profiles: profilesRes.data ?? [] };
+  });
+
+export const updateLeadRoutingSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => LeadRoutingSettingsSchema.parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: isMgr, error: roleError } = await context.supabase.rpc("is_manager", { _user_id: context.userId });
+    if (roleError) throw new Error(roleError.message);
+    if (!isMgr) throw new Error("Apenas gestão/admin pode alterar o roteamento do inbox.");
+
+    const { LEAD_ROUTING_SETTINGS_KEY } = await import("./lead-routing.server");
+    const { error } = await context.supabase
+      .from("app_settings")
+      .upsert({
+        key: LEAD_ROUTING_SETTINGS_KEY,
+        value: data,
+        updated_at: new Date().toISOString(),
+      });
     if (error) throw new Error(error.message);
     return { ok: true };
   });

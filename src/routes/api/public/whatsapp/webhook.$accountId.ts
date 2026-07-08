@@ -154,6 +154,11 @@ async function handleInbound(
     }
   }
 
+  if (leadId) {
+    const { ensureLeadRouted } = await import("@/lib/lead-routing.server");
+    await ensureLeadRouted({ supabase: admin, leadId, actorUserId: null });
+  }
+
   // 2) acha/cria conversa
   let conv = (
     await admin.from("whatsapp_conversations").select("*").eq("lead_id", leadId).maybeSingle()
