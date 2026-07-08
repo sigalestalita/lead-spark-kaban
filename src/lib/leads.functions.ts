@@ -168,7 +168,10 @@ export const updateLead = createServerFn({ method: "POST" })
         author_id: userId,
         type: "routing",
         content: allowed.assigned_to ? "Responsável do lead alterado manualmente." : "Lead enviado para fila geral.",
-        metadata: { assignee_user_id: allowed.assigned_to ?? null, source: "lead_update" },
+        metadata: {
+          assignee_user_id: allowed.assigned_to ? String(allowed.assigned_to) : null,
+          source: "lead_update",
+        },
       });
     } else if (Object.prototype.hasOwnProperty.call(allowed, "lead_type")) {
       const { ensureLeadRouted } = await import("./lead-routing.server");

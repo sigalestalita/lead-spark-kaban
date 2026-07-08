@@ -54,13 +54,7 @@ function parseSettings(value: unknown): LeadRoutingSettings {
   };
 }
 
-export async function readLeadRoutingSettings(supabase: {
-  from: (table: string) => {
-    select: (columns: string) => {
-      eq: (column: string, value: string) => { maybeSingle: () => Promise<{ data: { value: unknown } | null; error: { message: string } | null }> };
-    };
-  };
-}) {
+export async function readLeadRoutingSettings(supabase: any) {
   const { data, error } = await supabase
     .from("app_settings")
     .select("value")
@@ -86,9 +80,7 @@ export async function ensureLeadRouted({
   leadId,
   actorUserId,
 }: {
-  supabase: {
-    from: (table: string) => any;
-  };
+  supabase: any;
   leadId: string;
   actorUserId?: string | null;
 }) {
@@ -101,7 +93,7 @@ export async function ensureLeadRouted({
   if (!lead) return null;
   if (lead.assigned_to) return lead.assigned_to;
 
-  const settings = await readLeadRoutingSettings(supabase as never);
+  const settings = await readLeadRoutingSettings(supabase);
   const assignee = resolveLeadRoutingAssignee(lead, settings);
   if (!assignee) return null;
 
@@ -123,7 +115,7 @@ export async function ensureLeadRouted({
     author_id: actorUserId ?? null,
     type: "routing",
     content: "Lead roteado automaticamente para SDR por tipo de lead.",
-    metadata: { assignee_user_id: assignee, mode: "fixed", criterion: "lead_type" },
+    metadata: { assignee_user_id: String(assignee), mode: "fixed", criterion: "lead_type" },
   });
 
   return assignee;
