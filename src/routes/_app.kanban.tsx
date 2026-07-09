@@ -47,7 +47,7 @@ function isCertificationLead(lead: KanbanLead) {
     ...(formPayload && typeof formPayload === "object"
       ? Object.values(formPayload).filter((value): value is string => typeof value === "string")
       : []),
-  ];
+  ].filter((value): value is string => typeof value === "string");
 
   return values.some((value) => /certifica/i.test(value));
 }

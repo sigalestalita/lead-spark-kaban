@@ -147,6 +147,12 @@
   --lead-type-consultoria: oklch(0.72 0.18 295);
   --lead-type-empresa: oklch(0.7 0.16 165);
   --lead-type-pessoa-fisica: oklch(0.78 0.15 50);
+  --kanban-certification-bg: oklch(0.28 0.05 95 / 0.42);
+  --kanban-certification-border: oklch(0.8 0.16 85 / 0.65);
+  --kanban-certification-fg: oklch(0.9 0.07 95);
+  --kanban-certification-badge-bg: oklch(0.85 0.14 90 / 0.1);
+  --kanban-certification-icon-bg: oklch(0.83 0.17 86 / 0.18);
+  --kanban-certification-icon-fg: oklch(0.9 0.15 88);
 
   --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -8px rgb(0 0 0 / 0.4);
   --shadow-glow: 0 0 40px -10px oklch(0.78 0.13 215 / 0.4);
@@ -260,6 +266,21 @@
     animation: none;
     opacity: 1;
   }
+}
+
+.kanban-certification-card {
+  background: var(--kanban-certification-bg);
+  border-color: var(--kanban-certification-border);
+}
+
+.kanban-certification-accent {
+  position: absolute;
+  top: 8px;
+  right: 0;
+  width: 4px;
+  height: calc(100% - 16px);
+  border-radius: 9999px 0 0 9999px;
+  background: var(--kanban-certification-border);
 }
 
 @keyframes loginIn {
