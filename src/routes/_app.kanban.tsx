@@ -16,7 +16,7 @@ import { PRIORITY_LABEL, PRIORITY_COLOR } from "@/lib/lead-types";
 import { LEAD_TYPE_LABEL, LEAD_TYPE_COLOR, normalizeLeadType, type LeadType } from "@/lib/lead-type";
 import { evaluateIcpFit } from "@/lib/icp-fit";
 import { toast } from "sonner";
-import { RefreshCw, Plus, Search, Calendar, Clock, Timer, Flame, Briefcase, Building2, Mail, ChevronLeft, ChevronRight, Pencil, Check, X, LinkedinIcon, MessageCircle } from "lucide-react";
+import { RefreshCw, Plus, Search, Calendar, Clock, Timer, Flame, Briefcase, Building2, Mail, ChevronLeft, ChevronRight, Pencil, Check, X, LinkedinIcon, MessageCircle, GraduationCap } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -34,6 +34,23 @@ export const Route = createFileRoute("/_app/kanban")({
   head: () => ({ meta: [{ title: "Kanban — SDR GROU" }] }),
   component: KanbanPage,
 });
+
+type KanbanLead = import("@/lib/lead-types").Lead;
+
+function isCertificationLead(lead: KanbanLead) {
+  const formPayload = lead.form_payload;
+  const values = [
+    lead.campaign,
+    lead.source,
+    lead.ad_name,
+    lead.company_segment,
+    ...(formPayload && typeof formPayload === "object"
+      ? Object.values(formPayload).filter((value): value is string => typeof value === "string")
+      : []),
+  ];
+
+  return values.some((value) => /certifica/i.test(value));
+}
 
 function KanbanPage() {
   const fetchData = useServerFn(listKanbanData);
@@ -55,6 +72,7 @@ function KanbanPage() {
   const [assigned, setAssigned] = useState<string>("all");
   const [demoFree, setDemoFree] = useState<string>("all");
   const [leadTypeFilter, setLeadTypeFilter] = useState<string>("all");
+  const [certificationFilter, setCertificationFilter] = useState<string>("all");
 
   const { data, isLoading } = useQuery({
     queryKey: ["kanban"],
@@ -194,6 +212,7 @@ function KanbanPage() {
     if (demoFree === "sim" && l.demo_free !== true) return false;
     if (demoFree === "nao" && l.demo_free !== false) return false;
     if (demoFree === "nd" && l.demo_free != null) return false;
+    if (certificationFilter === "certificacao" && !isCertificationLead(l)) return false;
     if (leadTypeFilter !== "all") {
       const raw = (l.form_payload as { lead_type?: string } | null)?.lead_type ?? null;
       const t = (l.lead_type as LeadType | null) ?? normalizeLeadType(raw);
@@ -343,6 +362,15 @@ function KanbanPage() {
             <option value="consultoria">Consultoria</option>
             <option value="pessoa_fisica">Pessoa física</option>
             <option value="nd">Não informado</option>
+          </select>
+          <select
+            value={certificationFilter}
+            onChange={(e) => setCertificationFilter(e.target.value)}
+            className="h-9 rounded-md border bg-background px-2 text-sm"
+            title="Interesse em Certificação"
+          >
+            <option value="all">Interesse: todos</option>
+            <option value="certificacao">Somente Certificação</option>
           </select>
           <div className="flex items-center gap-1">
             <select
@@ -583,6 +611,7 @@ function LeadCard({
   const isHotIcp = stageSlug === "novo" && icpFit.score >= 2;
   const assignedProfile = lead.assigned_to ? profiles.find((p) => p.id === lead.assigned_to) : null;
   const assignedLabel = assignedProfile?.full_name ?? assignedProfile?.email ?? null;
+  const isCertification = isCertificationLead(lead);
 
   const navigate = useNavigate();
   const openChatFn = useServerFn(getOrCreateConversationForLead);
@@ -598,12 +627,29 @@ function LeadCard({
 
   const content = (
     <Card
-      className={`p-3 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${
+      className={`relative p-3 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${
         isDragging ? "opacity-30" : ""
       } ${overlay ? "shadow-lg" : ""} ${
         isHotIcp ? "ring-2 ring-amber-500/60 bg-amber-500/[0.04]" : ""
+      } ${
+        isCertification ? "kanban-certification-card pr-9" : ""
       }`}
     >
+      {isCertification && (
+        <>
+          <span className="kanban-certification-accent" aria-hidden="true" />
+          <span
+            className="absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full"
+            style={{
+              background: "var(--kanban-certification-icon-bg)",
+              color: "var(--kanban-certification-icon-fg)",
+            }}
+            title="Lead com interesse em Certificação"
+          >
+            <GraduationCap className="h-3.5 w-3.5" />
+          </span>
+        </>
+      )}
       <div className="flex items-start justify-between gap-2 mb-1">
         <Link
           to="/lead/$id"
@@ -644,6 +690,21 @@ function LeadCard({
             className="text-[10px] border-emerald-500 text-emerald-600 dark:text-emerald-400"
           >
             Demo Free
+          </Badge>
+        </div>
+      )}
+      {isCertification && (
+        <div className="mb-1">
+          <Badge
+            variant="outline"
+            className="text-[10px]"
+            style={{
+              borderColor: "var(--kanban-certification-border)",
+              color: "var(--kanban-certification-fg)",
+              background: "var(--kanban-certification-badge-bg)",
+            }}
+          >
+            Certificação
           </Badge>
         </div>
       )}
