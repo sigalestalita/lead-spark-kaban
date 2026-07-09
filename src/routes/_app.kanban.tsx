@@ -639,14 +639,10 @@ function LeadCard({
         <>
           <span className="kanban-certification-accent" aria-hidden="true" />
           <span
-            className="absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full"
-            style={{
-              background: "var(--kanban-certification-icon-bg)",
-              color: "var(--kanban-certification-icon-fg)",
-            }}
+            className="kanban-certification-icon"
             title="Lead com interesse em Certificação"
           >
-            <GraduationCap className="h-3.5 w-3.5" />
+            <GraduationCap className="h-4 w-4" />
           </span>
         </>
       )}
