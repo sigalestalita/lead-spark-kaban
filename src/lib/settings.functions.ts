@@ -173,16 +173,44 @@ export const getDashboardStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
-    const [{ data: leads }, { data: stages }] = await Promise.all([
-      supabase
-        .from("leads")
-        .select(
-          "id, priority, score, source, campaign, stage_id, created_at, first_approach_at, last_action_at"
-        )
-        .limit(2000),
+    const PAGE = 1000;
+    const [stagesRes, leadsPages] = await Promise.all([
       supabase.from("stages").select("id, name, slug, position").order("position"),
+      (async () => {
+        const rows: Array<{
+          id: string;
+          priority: string | null;
+          score: number | null;
+          source: string | null;
+          campaign: string | null;
+          stage_id: string | null;
+          created_at: string | null;
+          first_approach_at: string | null;
+          last_action_at: string | null;
+        }> = [];
+
+        for (let from = 0; ; from += PAGE) {
+          const { data, error } = await supabase
+            .from("leads")
+            .select(
+              "id, priority, score, source, campaign, stage_id, created_at, first_approach_at, last_action_at"
+            )
+            .range(from, from + PAGE - 1);
+
+          if (error) throw new Error(error.message);
+          const batch = data ?? [];
+          rows.push(...batch);
+          if (batch.length < PAGE) break;
+        }
+
+        return rows;
+      })(),
     ]);
-    const all = leads ?? [];
+
+    if (stagesRes.error) throw new Error(stagesRes.error.message);
+
+    const stages = stagesRes.data ?? [];
+    const all = leadsPages;
     const stagesMap = new Map((stages ?? []).map((s) => [s.id, s]));
 
     const bySlug: Record<string, number> = {};
