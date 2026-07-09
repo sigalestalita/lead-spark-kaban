@@ -558,7 +558,7 @@ async function logWhatsappIntegration(
       provider: "whatsapp",
       action,
       status,
-      detail,
+      detail: detail as Json,
     });
   } catch (e) {
     console.warn("[wa webhook] log error", e);
