@@ -64,6 +64,8 @@ const emptyForm = {
   status: "active" as "active" | "disabled",
 };
 
+const STABLE_WEBHOOK_ORIGIN = "https://sdr-grou.lovable.app";
+
 function ContasPage() {
   const listFn = useServerFn(listAccounts);
   const saveFn = useServerFn(upsertAccount);
@@ -87,7 +89,7 @@ function ContasPage() {
   const [regOpen, setRegOpen] = useState<AccountRow | null>(null);
   const [regPin, setRegPin] = useState("");
 
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const origin = STABLE_WEBHOOK_ORIGIN;
 
   function openCreate() {
     setForm(emptyForm);
