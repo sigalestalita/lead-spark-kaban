@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Json } from "@/integrations/supabase/types";
 
 /** Normaliza telefone para E.164 sem '+'. Números BR vindos como DDD+número recebem DDI 55. */
 function normPhone(raw: string): string {
@@ -217,6 +218,47 @@ export const listMessages = createServerFn({ method: "GET" })
     return { messages: rowsWithFreshMediaUrls };
   });
 
+/** Informa se a conversa ainda está dentro da janela de 24h do WhatsApp. */
+export const getConversationWindowState = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        conversationId: z.string().uuid(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+
+    const { data: lastInbound, error } = await supabase
+      .from("whatsapp_messages")
+      .select("id, created_at")
+      .eq("conversation_id", data.conversationId)
+      .eq("sender_type", "contact")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+
+    const lastInboundAt = lastInbound?.created_at ?? null;
+    if (!lastInboundAt) {
+      return {
+        isOpen: false,
+        lastInboundAt: null,
+        expiresAt: null,
+      };
+    }
+
+    const expiresAt = new Date(new Date(lastInboundAt).getTime() + 24 * 60 * 60 * 1000).toISOString();
+    return {
+      isOpen: new Date(expiresAt).getTime() > Date.now(),
+      lastInboundAt,
+      expiresAt,
+    };
+  });
+
 /** Envia mensagem via provider configurado. */
 export const sendMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -228,6 +270,7 @@ export const sendMessage = createServerFn({ method: "POST" })
         mediaUrl: z.string().url().optional(),
         mediaMime: z.string().optional(),
         messageType: z.enum(["text", "image", "file", "audio", "video", "template"]).default("text"),
+        templateId: z.string().uuid().optional(),
         templateName: z.string().optional(),
         templateVariables: z.record(z.string(), z.string()).optional(),
       })
@@ -235,6 +278,8 @@ export const sendMessage = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { renderTemplate } = await import("./whatsapp-templates.functions");
+    const { resolveTemplateSendParams } = await import("./whatsapp/template-send.server");
 
     const { data: conv, error: convErr } = await supabase
       .from("whatsapp_conversations")
@@ -247,6 +292,64 @@ export const sendMessage = createServerFn({ method: "POST" })
     const lead = conv.leads as { id: string; phone: string | null; name: string | null } | null;
     if (!lead?.phone) throw new Error("Lead sem telefone — não dá pra enviar via WhatsApp");
 
+    let body = data.body ?? null;
+    let mediaUrl = data.mediaUrl ?? null;
+    let mediaMime = data.mediaMime ?? null;
+    let templateName = data.templateName;
+    let templateLanguage = "pt_BR";
+    let templateHeaderParams: string[] | undefined;
+    let templateParams: string[] | undefined;
+    let messageMetadata: Json | null = null;
+
+    if (data.messageType === "template") {
+      if (!data.templateId) throw new Error("Selecione um template HSM para disparar.");
+
+      const { data: tmpl, error: tmplErr } = await supabase
+        .from("whatsapp_templates")
+        .select("id, provider_template_name, language, variables, meta_template_id, body")
+        .eq("id", data.templateId)
+        .maybeSingle();
+      if (tmplErr) throw new Error(tmplErr.message);
+      if (!tmpl?.provider_template_name) throw new Error("O template HSM selecionado está inválido ou indisponível.");
+
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const accountQuery = conv.account_id
+        ? supabaseAdmin.from("whatsapp_accounts").select("*").eq("id", conv.account_id).maybeSingle()
+        : supabaseAdmin.from("whatsapp_accounts").select("*").eq("is_default", true).maybeSingle();
+      const { data: account } = await accountQuery;
+      if (!account) throw new Error("Nenhuma conta de WhatsApp configurada");
+
+      const params = await resolveTemplateSendParams({
+        account: {
+          access_token: account.access_token ?? "",
+          provider_base_url: account.provider_base_url,
+        },
+        metaTemplateId: tmpl.meta_template_id,
+        storedVariables: tmpl.variables,
+        lead: {
+          name: lead.name,
+          company_name: null,
+        },
+      });
+
+      const renderedBody = renderTemplate(tmpl.body ?? "", {
+        nome: lead.name ?? "",
+        primeiro_nome: (lead.name ?? "").split(" ")[0] ?? "",
+        empresa: "",
+      }).trim();
+
+      body = renderedBody || null;
+      templateName = tmpl.provider_template_name;
+      templateLanguage = tmpl.language ?? "pt_BR";
+      templateHeaderParams = params.headerParams;
+      templateParams = params.bodyParams;
+      messageMetadata = {
+        template_id: tmpl.id,
+        template_name: tmpl.provider_template_name,
+        rendered_body: renderedBody || null,
+      };
+    }
+
     // 1) cria registro local em "sending"
     const { data: msg, error: msgErr } = await supabase
       .from("whatsapp_messages")
@@ -256,9 +359,10 @@ export const sendMessage = createServerFn({ method: "POST" })
         sender_type: "sdr",
         sender_user_id: userId,
         message_type: data.messageType,
-        body: data.body ?? null,
-        media_url: data.mediaUrl ?? null,
-        media_mime: data.mediaMime ?? null,
+        body,
+        media_url: mediaUrl,
+        media_mime: mediaMime,
+        metadata: messageMetadata,
         status: "sending",
       })
       .select("*")
@@ -289,10 +393,13 @@ export const sendMessage = createServerFn({ method: "POST" })
         },
         to: normPhone(lead.phone),
         type: data.messageType,
-        body: data.body,
-        mediaUrl: data.mediaUrl,
-        mediaMime: data.mediaMime,
-        templateName: data.templateName,
+        body: body ?? undefined,
+        mediaUrl: mediaUrl ?? undefined,
+        mediaMime: mediaMime ?? undefined,
+        templateName,
+        templateLanguage,
+        templateHeaderParams,
+        templateParams,
         templateVariables: data.templateVariables,
       });
 
@@ -314,7 +421,7 @@ export const sendMessage = createServerFn({ method: "POST" })
         .from("whatsapp_conversations")
         .update({
           last_message_at: new Date().toISOString(),
-          last_preview: data.body?.slice(0, 200) ?? `[${data.messageType}]`,
+          last_preview: body?.slice(0, 200) ?? `[${data.messageType}]`,
           status: "open",
           unread_count: 0,
         })
