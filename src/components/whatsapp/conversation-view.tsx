@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { listMessages, sendMessage, sendMediaFromStorage } from "@/lib/whatsapp.functions";
+import { getConversationWindowState, listMessages, sendMessage, sendMediaFromStorage } from "@/lib/whatsapp.functions";
 import {
   summarizeConversation,
   suggestReply,
@@ -18,6 +18,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { HsmTemplatePicker } from "./hsm-template-picker";
 import { toast } from "sonner";
 import {
   Send, Check, CheckCheck, AlertCircle, Clock,
@@ -47,6 +48,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const listFn = useServerFn(listMessages);
   const sendFn = useServerFn(sendMessage);
   const sendMediaFn = useServerFn(sendMediaFromStorage);
+  const windowFn = useServerFn(getConversationWindowState);
   const aiGet = useServerFn(getConversationAi);
   const aiSummarize = useServerFn(summarizeConversation);
   const aiSuggest = useServerFn(suggestReply);
@@ -68,6 +70,11 @@ export function ConversationView({ conversationId }: { conversationId: string })
     queryFn: () => aiGet({ data: { conversationId } }),
   });
 
+  const { data: windowState } = useQuery({
+    queryKey: ["wa-window", conversationId],
+    queryFn: () => windowFn({ data: { conversationId } }),
+  });
+
   // Realtime
   useEffect(() => {
     const channel = supabase
@@ -78,6 +85,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
         () => {
           qc.invalidateQueries({ queryKey: ["wa-messages", conversationId] });
           qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+          qc.invalidateQueries({ queryKey: ["wa-window", conversationId] });
         },
       )
       .subscribe();
@@ -128,6 +136,19 @@ export function ConversationView({ conversationId }: { conversationId: string })
     mutationFn: () => aiPlan({ data: { conversationId } }),
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao gerar plano"),
   });
+
+  const sendTemplate = useMutation({
+    mutationFn: (templateId: string) => sendFn({ data: { conversationId, messageType: "template", templateId } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["wa-messages", conversationId] });
+      qc.invalidateQueries({ queryKey: ["wa-conversations"] });
+      qc.invalidateQueries({ queryKey: ["wa-window", conversationId] });
+      toast.success("HSM disparada.");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao disparar HSM"),
+  });
+
+  const outside24hWindow = windowState ? !windowState.isOpen : false;
 
   async function handleFile(file: File) {
     if (!file) return;
@@ -183,6 +204,19 @@ export function ConversationView({ conversationId }: { conversationId: string })
         onPlan={() => plan.mutate()}
         onUsePlanMessage={(m) => setText(m)}
       />
+      {outside24hWindow && (
+        <div className="border-b border-white/5 p-3">
+          <HsmTemplatePicker
+            onSend={(templateId) => sendTemplate.mutate(templateId)}
+            sending={sendTemplate.isPending}
+            description={
+              windowState?.lastInboundAt
+                ? `A última resposta do lead foi em ${new Date(windowState.lastInboundAt).toLocaleString("pt-BR")}. Use um template aprovado para retomar o contato.`
+                : "Ainda não há resposta do lead dentro da janela de 24h. Use um template aprovado para iniciar o contato."
+            }
+          />
+        </div>
+      )}
       <div
         ref={scrollRef}
         className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-2 bg-muted/20"
@@ -240,12 +274,17 @@ export function ConversationView({ conversationId }: { conversationId: string })
           }}
           placeholder="Digite uma mensagem ou anexe um arquivo (Enter envia, Shift+Enter quebra linha)"
           className="min-h-[44px] max-h-[160px] resize-none"
-          disabled={send.isPending || uploading}
+          disabled={send.isPending || uploading || outside24hWindow}
         />
-        <Button type="submit" disabled={send.isPending || uploading || !text.trim()} size="sm">
+        <Button type="submit" disabled={send.isPending || uploading || outside24hWindow || !text.trim()} size="sm">
           <Send className="h-4 w-4" />
         </Button>
       </form>
+      {outside24hWindow && (
+        <div className="px-3 pb-3 text-[11px] text-muted-foreground">
+          Mensagens livres ficam bloqueadas fora da janela de 24h. Dispare uma HSM e aguarde a resposta do lead para reabrir o chat.
+        </div>
+      )}
     </div>
   );
 }
