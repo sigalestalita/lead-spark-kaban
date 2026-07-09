@@ -250,7 +250,9 @@ export const getDashboardStats = createServerFn({ method: "GET" })
     const stalled = all.filter((l) => {
       const s = stagesMap.get(l.stage_id ?? "");
       if (!s || terminalSlugs.has(s.slug)) return false;
-      const last = new Date(l.last_action_at ?? l.created_at).getTime();
+      const referenceDate = l.last_action_at ?? l.created_at;
+      if (!referenceDate) return false;
+      const last = new Date(referenceDate).getTime();
       return last < threshold;
     }).length;
 
