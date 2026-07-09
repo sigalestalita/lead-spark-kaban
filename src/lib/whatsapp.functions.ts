@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Json } from "@/integrations/supabase/types";
 
 /** Normaliza telefone para E.164 sem '+'. Números BR vindos como DDD+número recebem DDI 55. */
 function normPhone(raw: string): string {
@@ -298,7 +299,7 @@ export const sendMessage = createServerFn({ method: "POST" })
     let templateLanguage = "pt_BR";
     let templateHeaderParams: string[] | undefined;
     let templateParams: string[] | undefined;
-    let messageMetadata: Record<string, unknown> | null = null;
+    let messageMetadata: Json | null = null;
 
     if (data.messageType === "template") {
       if (!data.templateId) throw new Error("Selecione um template HSM para disparar.");
