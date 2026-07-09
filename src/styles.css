@@ -151,8 +151,10 @@
   --kanban-certification-border: oklch(0.8 0.16 85 / 0.65);
   --kanban-certification-fg: oklch(0.9 0.07 95);
   --kanban-certification-badge-bg: oklch(0.85 0.14 90 / 0.1);
-  --kanban-certification-icon-bg: oklch(0.83 0.17 86 / 0.18);
-  --kanban-certification-icon-fg: oklch(0.9 0.15 88);
+  --kanban-certification-icon-bg: oklch(0.84 0.18 87 / 0.28);
+  --kanban-certification-icon-fg: oklch(0.96 0.1 90);
+  --kanban-certification-icon-ring: oklch(0.87 0.16 88 / 0.75);
+  --kanban-certification-icon-shadow: 0 8px 18px -8px oklch(0.85 0.16 88 / 0.6);
 
   --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -8px rgb(0 0 0 / 0.4);
   --shadow-glow: 0 0 40px -10px oklch(0.78 0.13 215 / 0.4);
@@ -281,6 +283,23 @@
   height: calc(100% - 16px);
   border-radius: 9999px 0 0 9999px;
   background: var(--kanban-certification-border);
+}
+
+.kanban-certification-icon {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  height: 30px;
+  width: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: var(--kanban-certification-icon-bg);
+  color: var(--kanban-certification-icon-fg);
+  border: 1px solid var(--kanban-certification-icon-ring);
+  box-shadow: var(--kanban-certification-icon-shadow);
+  backdrop-filter: blur(8px);
 }
 
 @keyframes loginIn {
