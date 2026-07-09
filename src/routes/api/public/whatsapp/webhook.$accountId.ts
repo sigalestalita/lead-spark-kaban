@@ -50,6 +50,10 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook/$accountId")(
 
         const provider = getProvider(account.provider);
         if (provider.verifySignature && !provider.verifySignature(rawBody, headers, account.webhook_secret)) {
+          await logWhatsappIntegration(supabaseAdmin, "error", "webhook_invalid_signature", {
+            account_id: account.id,
+            has_signature: Boolean(headers["x-hub-signature-256"] || headers["X-Hub-Signature-256"]),
+          });
           return new Response("invalid signature", { status: 401 });
         }
 
@@ -68,8 +72,19 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook/$accountId")(
           events = provider.parseWebhook(rawBody, headers, accountConfig);
         } catch (e) {
           console.error("[wa webhook] parse error", e);
+          await logWhatsappIntegration(supabaseAdmin, "error", "webhook_parse_error", {
+            account_id: account.id,
+            error: e instanceof Error ? e.message : String(e),
+          });
           return new Response("parse error", { status: 400 });
         }
+
+        await logWhatsappIntegration(supabaseAdmin, "success", "webhook_received", {
+          account_id: account.id,
+          events: events.length,
+          message_events: events.filter((ev) => ev.kind === "message").length,
+          status_events: events.filter((ev) => ev.kind === "status").length,
+        });
 
         for (const ev of events) {
           if (ev.kind === "message") {
@@ -108,12 +123,43 @@ async function handleInbound(
     senderName?: string;
   },
 ) {
-  const phone = msg.from.replace(/\D+/g, "");
+  const phone = normalizeWhatsappPhone(msg.from);
+  const phoneMatches = phoneVariants(phone);
+
+  await logWhatsappIntegration(admin, "success", "inbound_received", {
+    account_id: accountId,
+    provider_message_id: msg.providerMessageId,
+    from_tail: phone.slice(-4),
+    type: msg.type,
+  });
+
+  const { data: existingMessage, error: existingMessageErr } = await admin
+    .from("whatsapp_messages")
+    .select("id, conversation_id, lead_id")
+    .eq("provider_message_id", msg.providerMessageId)
+    .maybeSingle();
+  if (existingMessageErr) throw new Error(existingMessageErr.message);
+  if (existingMessage) {
+    await logWhatsappIntegration(admin, "success", "inbound_duplicate_ignored", {
+      account_id: accountId,
+      provider_message_id: msg.providerMessageId,
+      conversation_id: existingMessage.conversation_id,
+      lead_id: existingMessage.lead_id,
+    });
+    return;
+  }
 
   // 1) acha contato → lead
-  let contact = (
-    await admin.from("whatsapp_contacts").select("*").eq("phone", phone).maybeSingle()
-  ).data;
+  const { data: contactRows, error: contactLookupError } = await admin
+    .from("whatsapp_contacts")
+    .select("*")
+    .in("phone", phoneMatches)
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .order("updated_at", { ascending: false, nullsFirst: false })
+    .limit(10);
+  if (contactLookupError) throw new Error(contactLookupError.message);
+
+  let contact = (contactRows ?? []).find((row) => row.phone === phone) ?? contactRows?.[0] ?? null;
 
   let leadId = contact?.lead_id ?? null;
   if (!leadId) {
@@ -130,10 +176,20 @@ async function handleInbound(
   if (!contact) {
     const ins = await admin
       .from("whatsapp_contacts")
-      .insert({ phone, name: msg.senderName ?? null, lead_id: leadId })
+      .upsert({ phone, name: msg.senderName ?? null, lead_id: leadId }, { onConflict: "phone" })
       .select("*")
       .single();
+    if (ins.error) throw new Error(ins.error.message);
     contact = ins.data;
+  } else if (leadId && contact.lead_id !== leadId) {
+    const { data: updatedContact, error: updateContactError } = await admin
+      .from("whatsapp_contacts")
+      .update({ lead_id: leadId, name: contact.name ?? msg.senderName ?? null })
+      .eq("id", contact.id)
+      .select("*")
+      .single();
+    if (updateContactError) throw new Error(updateContactError.message);
+    contact = updatedContact;
   }
 
   if (!leadId) {
@@ -144,9 +200,11 @@ async function handleInbound(
         name: msg.senderName ?? `WhatsApp ${phone.slice(-4)}`,
         phone,
         source: "whatsapp_inbound",
+        channel: "whatsapp",
       })
       .select("id")
       .single();
+    if (ins.error) throw new Error(ins.error.message);
     leadId = ins.data?.id ?? null;
     if (!leadId) {
       console.warn("[wa webhook] falha ao criar lead, phone=", phone, ins.error);
@@ -183,9 +241,21 @@ async function handleInbound(
       })
       .select("*")
       .single();
+    if (ins.error) throw new Error(ins.error.message);
     conv = ins.data;
   }
   if (!conv) return;
+
+  if (contact?.id && conv.contact_id !== contact.id) {
+    const { data: updatedConv, error: convContactError } = await admin
+      .from("whatsapp_conversations")
+      .update({ contact_id: contact.id, account_id: accountId })
+      .eq("id", conv.id)
+      .select("*")
+      .single();
+    if (convContactError) throw new Error(convContactError.message);
+    conv = updatedConv;
+  }
 
   // 3) baixa mídia recebida (áudio/imagem/vídeo/documento) para o storage privado
   const ts = new Date(msg.timestamp).toISOString();
@@ -237,7 +307,7 @@ async function handleInbound(
   }
 
   // 4) grava mensagem
-  await admin.from("whatsapp_messages").insert({
+  const inserted = await admin.from("whatsapp_messages").insert({
     conversation_id: conv.id,
     lead_id: leadId,
     sender_type: "lead",
@@ -250,17 +320,19 @@ async function handleInbound(
     status: "delivered",
     sent_at: ts,
     delivered_at: ts,
-  });
+  }).select("id").single();
+  if (inserted.error) throw new Error(inserted.error.message);
 
   let conversationStatus: "open" | "pending" = "open";
   let conversationAssignee = conv.assigned_user_id ?? null;
 
-  await admin
+  const contactUpdate = await admin
     .from("whatsapp_contacts")
     .update({ last_message_at: ts })
     .eq("id", contact!.id);
+  if (contactUpdate.error) throw new Error(contactUpdate.error.message);
 
-  await admin
+  const conversationUpdate = await admin
     .from("whatsapp_conversations")
     .update({
       last_message_at: ts,
@@ -270,6 +342,17 @@ async function handleInbound(
       assigned_user_id: conversationAssignee,
     })
     .eq("id", conv.id);
+  if (conversationUpdate.error) throw new Error(conversationUpdate.error.message);
+
+  await logWhatsappIntegration(admin, "success", "inbound_saved", {
+    account_id: accountId,
+    provider_message_id: msg.providerMessageId,
+    message_id: inserted.data.id,
+    conversation_id: conv.id,
+    lead_id: leadId,
+    contact_id: contact?.id ?? null,
+    from_tail: phone.slice(-4),
+  });
 
   // 4) resposta automática da IA quando habilitada
   try {
@@ -432,6 +515,53 @@ async function handleInbound(
       .eq("id", conv.id);
   } catch (e) {
     console.error("[wa webhook] ai auto-reply error", e);
+  }
+}
+
+function normalizeWhatsappPhone(raw: string): string {
+  const digits = raw.replace(/\D+/g, "").replace(/^0+/, "");
+  if ((digits.length === 10 || digits.length === 11) && !digits.startsWith("55")) return `55${digits}`;
+  return digits;
+}
+
+function phoneVariants(raw: string): string[] {
+  const digits = normalizeWhatsappPhone(raw);
+  const variants = new Set<string>([digits]);
+  if (digits.startsWith("55") && digits.length >= 12) {
+    const local = digits.slice(2);
+    variants.add(local);
+
+    const ddd = digits.slice(2, 4);
+    const subscriber = digits.slice(4);
+    if (subscriber.length === 9 && subscriber.startsWith("9")) {
+      const withoutMobileNine = `55${ddd}${subscriber.slice(1)}`;
+      variants.add(withoutMobileNine);
+      variants.add(withoutMobileNine.slice(2));
+    }
+    if (subscriber.length === 8) {
+      const withMobileNine = `55${ddd}9${subscriber}`;
+      variants.add(withMobileNine);
+      variants.add(withMobileNine.slice(2));
+    }
+  }
+  return [...variants].filter(Boolean);
+}
+
+async function logWhatsappIntegration(
+  admin: Awaited<ReturnType<typeof getAdmin>>,
+  status: "success" | "error",
+  action: string,
+  detail: Record<string, unknown>,
+) {
+  try {
+    await admin.from("integration_logs").insert({
+      provider: "whatsapp",
+      action,
+      status,
+      detail,
+    });
+  } catch (e) {
+    console.warn("[wa webhook] log error", e);
   }
 }
 
