@@ -386,7 +386,7 @@ async function evalNoReply(rule: RuleRow): Promise<LeadLite[]> {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (!lastMsg || lastMsg.sender_type === "contact") continue;
+    if (!lastMsg || lastMsg.sender_type === "lead") continue;
     leads.push(lead);
   }
   return leads;

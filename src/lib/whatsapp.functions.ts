@@ -235,7 +235,7 @@ export const getConversationWindowState = createServerFn({ method: "GET" })
       .from("whatsapp_messages")
       .select("id, created_at")
       .eq("conversation_id", data.conversationId)
-      .eq("sender_type", "contact")
+      .eq("sender_type", "lead")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();

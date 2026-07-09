@@ -116,7 +116,7 @@ async function fetchTriggerCandidates(seq: Sequence): Promise<LeadLite[]> {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (!lastMsg || lastMsg.sender_type === "contact") continue;
+      if (!lastMsg || lastMsg.sender_type === "lead") continue;
       out.push(lead);
     }
     return out;
@@ -309,7 +309,7 @@ async function processEnrollment(
         .from("whatsapp_messages")
         .select("id")
         .eq("conversation_id", (conv as { id: string }).id)
-        .eq("sender_type", "contact")
+        .eq("sender_type", "lead")
         .gt("created_at", since)
         .limit(1)
         .maybeSingle();
