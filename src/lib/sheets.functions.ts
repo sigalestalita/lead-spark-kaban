@@ -5,37 +5,89 @@ import { normalizeLeadType } from "./lead-type";
 import { notifyNewLead } from "./lead-notify.server";
 
 const SPREADSHEET_ID = "1gGib1CJCUaS-1xNKBrexP7OzuY87u_ZDWehsJdz1U5A";
-const SHEETS: Array<{ tab: string; source: string; channel: string }> = [
-  { tab: "entrada_correta", source: "meta_ads", channel: "meta_ads" },
-  { tab: "entrada_organico_e_outbound", source: "organico_outbound", channel: "organico_outbound" },
+type SheetColumns = {
+  data: number;
+  tipo: number;
+  nome: number;
+  telefone: number;
+  email: number;
+  empresa: number;
+  porte: number;
+  cargo: number;
+  area: number;
+  sobrenome?: number;
+  dor?: number;
+  demo_free?: number;
+  campanha?: number;
+  conjunto?: number;
+  ad?: number;
+  campanha_id?: number;
+  adset_id?: number;
+  ad_id?: number;
+  form_id?: number;
+  lead_id?: number;
+  fonte?: number;
+};
+
+type SheetConfig = {
+  tab: string;
+  source: string;
+  channel: string;
+  range: string;
+  columns: SheetColumns;
+};
+
+const SHEETS: SheetConfig[] = [
+  {
+    tab: "entrada_correta",
+    source: "meta_ads",
+    channel: "meta_ads",
+    range: "A2:W",
+    columns: {
+      data: 0,
+      tipo: 1,
+      nome: 2,
+      sobrenome: 3,
+      telefone: 4,
+      email: 5,
+      empresa: 7,
+      area: 8,
+      porte: 9,
+      cargo: 10,
+      dor: 11,
+      demo_free: 12,
+      campanha: 13,
+      conjunto: 14,
+      ad: 15,
+      campanha_id: 17,
+      adset_id: 18,
+      ad_id: 19,
+      form_id: 21,
+      lead_id: 22,
+    },
+  },
+  {
+    tab: "entrada_correta_organico-outbound",
+    source: "organico_outbound",
+    channel: "organico_outbound",
+    range: "A2:J",
+    columns: {
+      data: 0,
+      tipo: 1,
+      nome: 2,
+      telefone: 3,
+      email: 4,
+      empresa: 5,
+      porte: 6,
+      cargo: 7,
+      area: 8,
+      fonte: 9,
+    },
+  },
 ];
-const SHEET_RANGES = SHEETS.map((s) => `${s.tab}!A2:W`);
+const SHEET_RANGES = SHEETS.map((s) => `${s.tab}!${s.range}`);
 const GATEWAY = "https://connector-gateway.lovable.dev/google_sheets/v4";
 const SYNC_MIN_INTERVAL_MS = 90_000;
-
-// Índices das colunas (A=0..W=22)
-const C = {
-  data: 0,
-  tipo: 1,
-  nome: 2,
-  sobrenome: 3,
-  telefone: 4,
-  email: 5,
-  empresa: 7,
-  area: 8,
-  porte: 9,
-  cargo: 10,
-  dor: 11,
-  demo_free: 12,
-  campanha: 13,
-  conjunto: 14,
-  ad: 15,
-  campanha_id: 17,
-  adset_id: 18,
-  ad_id: 19,
-  form_id: 21,
-  lead_id: 22,
-};
 
 function normalizePhone(raw: string | undefined | null): string | null {
   if (!raw) return null;
@@ -105,61 +157,79 @@ function hashRow(parts: Array<string | null>): string {
   return Math.abs(h).toString(36);
 }
 
+function getRowValue(row: string[], index: number | undefined): string | null {
+  if (index === undefined) return null;
+  return cleanStr(row[index]);
+}
+
 function rowToLead(row: string[], sheetIndex: number, rowIndex: number): LeadRow | null {
   const sheet = SHEETS[sheetIndex] ?? SHEETS[0];
-  const nome = cleanStr(row[C.nome]) ?? "";
-  const sobrenome = cleanStr(row[C.sobrenome]) ?? "";
+  const c = sheet.columns;
+  const nome = getRowValue(row, c.nome) ?? "";
+  const sobrenome = getRowValue(row, c.sobrenome) ?? "";
   const name = `${nome} ${sobrenome}`.trim() || "(sem nome)";
-  const email = cleanStr(row[C.email]);
-  const phone = normalizePhone(cleanStr(row[C.telefone]));
-  let leadId = cleanStr(row[C.lead_id]);
+  const email = getRowValue(row, c.email);
+  const phone = normalizePhone(getRowValue(row, c.telefone));
+  const companyName = getRowValue(row, c.empresa);
+  const position = getRowValue(row, c.cargo);
+  const companySegment = getRowValue(row, c.area);
+  const companySize = getRowValue(row, c.porte);
+  const probablePain = getRowValue(row, c.dor);
+  const demoFreeRaw = getRowValue(row, c.demo_free);
+  const campaign = getRowValue(row, c.campanha);
+  const adName = getRowValue(row, c.ad);
+  const formName = getRowValue(row, c.form_id);
+  const submittedAt = parseDate(getRowValue(row, c.data));
+  const sourceLabel = getRowValue(row, c.fonte);
+  let leadId = getRowValue(row, c.lead_id);
   if (!leadId) {
-    // Fallback estável para abas sem Lead_ID (organico/outbound):
+    // Fallback estável para abas sem Lead_ID:
     // usa email/phone se houver, senão hash do conteúdo + posição.
     const base = email ?? phone ?? hashRow([
-      cleanStr(row[C.data]),
+      getRowValue(row, c.data),
       nome,
       sobrenome,
-      cleanStr(row[C.empresa]),
-      cleanStr(row[C.cargo]),
+      companyName,
+      position,
       String(rowIndex),
     ]);
     leadId = `${sheet.tab}:${base}`;
   }
   // Se a linha estiver totalmente vazia (sem nome, email, phone, empresa), ignora.
-  if (!nome && !sobrenome && !email && !phone && !cleanStr(row[C.empresa])) return null;
+  if (!nome && !sobrenome && !email && !phone && !companyName) return null;
   return {
     meta_lead_id: leadId,
-    source: sheet.source,
+    source: sourceLabel ?? sheet.source,
     channel: sheet.channel,
     payload: {
       name,
       email,
       phone,
-      company_name: cleanStr(row[C.empresa]),
-      position: cleanStr(row[C.cargo]),
-      company_segment: cleanStr(row[C.area]),
-      company_size: cleanStr(row[C.porte]),
-      probable_pain: cleanStr(row[C.dor]),
-      demo_free: parseDemoFree(row[C.demo_free]),
-      demo_free_raw: cleanStr(row[C.demo_free]),
-      campaign: cleanStr(row[C.campanha]),
-      ad_name: cleanStr(row[C.ad]),
-      form_name: cleanStr(row[C.form_id]),
-      submitted_at: parseDate(row[C.data]),
+      company_name: companyName,
+      position,
+      company_segment: companySegment,
+      company_size: companySize,
+      probable_pain: probablePain,
+      demo_free: parseDemoFree(demoFreeRaw),
+      demo_free_raw: demoFreeRaw,
+      campaign,
+      ad_name: adName,
+      form_name: formName,
+      submitted_at: submittedAt,
       form_payload: {
         lead_id: leadId,
         sheet_tab: sheet.tab,
-        form_id: cleanStr(row[C.form_id]),
-        lead_type: cleanStr(row[C.tipo]),
-        demo_free_raw: cleanStr(row[C.demo_free]),
-        ad_set: cleanStr(row[C.conjunto]),
+        form_id: formName,
+        lead_type: getRowValue(row, c.tipo),
+        demo_free_raw: demoFreeRaw,
+        ad_set: getRowValue(row, c.conjunto),
+        source_label: sourceLabel,
         meta_ids: {
-          campaign_id: cleanStr(row[C.campanha_id]),
-          adset_id: cleanStr(row[C.adset_id]),
-          ad_id: cleanStr(row[C.ad_id]),
+          campaign_id: getRowValue(row, c.campanha_id),
+          adset_id: getRowValue(row, c.adset_id),
+          ad_id: getRowValue(row, c.ad_id),
         },
-        submitted_at: parseDate(row[C.data]),
+        submitted_at: submittedAt,
       },
     },
   };
