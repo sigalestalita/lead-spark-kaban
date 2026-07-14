@@ -1,6 +1,17 @@
 import { normalizeLeadType } from "./lead-type";
 
 export const LEAD_ROUTING_SETTINGS_KEY = "whatsapp_lead_routing";
+const LEAD_ROUTING_ROTATION_STATE_KEY = "whatsapp_lead_routing_rotation_state";
+
+const MANAGED_ROUND_ROBIN_LEAD_TYPES = new Set(["empresa", "pessoa_fisica"] as const);
+
+const ROUTING_TARGETS = {
+  roundRobin: [
+    { fullName: "Camila Mattie", email: "camila.mattie@grougp.com.br" },
+    { fullName: "Lisiane Baudini", email: "lisiane@grougp.com.br" },
+  ],
+  consultoria: { fullName: "Mariana Borges", email: "mariana.borges@grougp.com.br" },
+} as const;
 
 export type LeadRoutingRule = {
   leadType: "consultoria" | "empresa" | "pessoa_fisica";
@@ -13,10 +24,18 @@ export type LeadRoutingSettings = {
   rules: LeadRoutingRule[];
 };
 
+type LeadRoutingRotationState = {
+  nextRoundRobinIndex: number;
+};
+
 const DEFAULT_SETTINGS: LeadRoutingSettings = {
   enabled: false,
   fallbackMode: "general_queue",
   rules: [],
+};
+
+const DEFAULT_ROTATION_STATE: LeadRoutingRotationState = {
+  nextRoundRobinIndex: 0,
 };
 
 function readRawLeadType(lead: { lead_type?: string | null; form_payload?: unknown }) {
@@ -64,6 +83,82 @@ export async function readLeadRoutingSettings(supabase: any) {
   return parseSettings(data?.value);
 }
 
+function parseRotationState(value: unknown): LeadRoutingRotationState {
+  if (!value || typeof value !== "object") return DEFAULT_ROTATION_STATE;
+  const raw = value as { nextRoundRobinIndex?: unknown };
+  const nextRoundRobinIndex = typeof raw.nextRoundRobinIndex === "number" && Number.isFinite(raw.nextRoundRobinIndex)
+    ? Math.max(0, Math.trunc(raw.nextRoundRobinIndex))
+    : 0;
+  return { nextRoundRobinIndex };
+}
+
+async function readLeadRoutingRotationState(supabase: any) {
+  const { data, error } = await supabase
+    .from("app_settings")
+    .select("value")
+    .eq("key", LEAD_ROUTING_ROTATION_STATE_KEY)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return parseRotationState(data?.value);
+}
+
+async function writeLeadRoutingRotationState(supabase: any, state: LeadRoutingRotationState) {
+  const { error } = await supabase
+    .from("app_settings")
+    .upsert({
+      key: LEAD_ROUTING_ROTATION_STATE_KEY,
+      value: state,
+      updated_at: new Date().toISOString(),
+    });
+  if (error) throw new Error(error.message);
+}
+
+async function resolveManagedRoutingUsers(supabase: any) {
+  const targetEmails = [...ROUTING_TARGETS.roundRobin.map((target) => target.email), ROUTING_TARGETS.consultoria.email];
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, full_name, email")
+    .in("email", targetEmails);
+  if (error) throw new Error(error.message);
+
+  const byEmail = new Map(
+    (data ?? []).map((profile) => [String(profile.email ?? "").toLowerCase(), String(profile.id)]),
+  );
+
+  const roundRobinUserIds = ROUTING_TARGETS.roundRobin
+    .map((target) => byEmail.get(target.email.toLowerCase()) ?? null)
+    .filter((value): value is string => !!value);
+  const consultoriaUserId = byEmail.get(ROUTING_TARGETS.consultoria.email.toLowerCase()) ?? null;
+
+  return { roundRobinUserIds, consultoriaUserId };
+}
+
+async function resolveManagedRoutingAssignee(
+  supabase: any,
+  leadType: "consultoria" | "empresa" | "pessoa_fisica",
+) {
+  const { roundRobinUserIds, consultoriaUserId } = await resolveManagedRoutingUsers(supabase);
+
+  if (leadType === "consultoria") {
+    return consultoriaUserId;
+  }
+
+  if (!MANAGED_ROUND_ROBIN_LEAD_TYPES.has(leadType) || roundRobinUserIds.length === 0) {
+    return null;
+  }
+
+  const state = await readLeadRoutingRotationState(supabase);
+  const nextIndex = state.nextRoundRobinIndex % roundRobinUserIds.length;
+  const assignee = roundRobinUserIds[nextIndex] ?? null;
+  if (!assignee) return null;
+
+  await writeLeadRoutingRotationState(supabase, {
+    nextRoundRobinIndex: (nextIndex + 1) % roundRobinUserIds.length,
+  });
+
+  return assignee;
+}
+
 export function resolveLeadRoutingAssignee(
   lead: { lead_type?: string | null; form_payload?: unknown },
   settings: LeadRoutingSettings,
@@ -92,6 +187,43 @@ export async function ensureLeadRouted({
   if (leadError) throw new Error(leadError.message);
   if (!lead) return null;
   if (lead.assigned_to) return lead.assigned_to;
+
+  const normalizedLeadType = normalizeLeadType(readRawLeadType(lead));
+  if (normalizedLeadType) {
+    const managedAssignee = await resolveManagedRoutingAssignee(supabase, normalizedLeadType);
+    if (managedAssignee) {
+      const now = new Date().toISOString();
+      const { error: updateLeadError } = await supabase
+        .from("leads")
+        .update({ assigned_to: managedAssignee, last_action_at: now })
+        .eq("id", leadId);
+      if (updateLeadError) throw new Error(updateLeadError.message);
+
+      const { error: updateConvError } = await supabase
+        .from("whatsapp_conversations")
+        .update({ assigned_user_id: managedAssignee })
+        .eq("lead_id", leadId);
+      if (updateConvError) throw new Error(updateConvError.message);
+
+      await supabase.from("lead_interactions").insert({
+        lead_id: leadId,
+        author_id: actorUserId ?? null,
+        type: "routing",
+        content:
+          normalizedLeadType === "consultoria"
+            ? "Lead de consultoria roteado automaticamente para Mariana Borges."
+            : "Lead roteado automaticamente na roleta entre Camila Mattie e Lisiane Baudini.",
+        metadata: {
+          assignee_user_id: String(managedAssignee),
+          mode: normalizedLeadType === "consultoria" ? "fixed" : "round_robin",
+          criterion: "lead_type",
+          lead_type: normalizedLeadType,
+        },
+      });
+
+      return managedAssignee;
+    }
+  }
 
   const settings = await readLeadRoutingSettings(supabase);
   const assignee = resolveLeadRoutingAssignee(lead, settings);
