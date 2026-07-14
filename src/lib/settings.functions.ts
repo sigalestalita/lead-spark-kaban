@@ -293,6 +293,9 @@ export const getDashboardStats = createServerFn({ method: "GET" })
       interactionsByLead.set(row.lead_id, existing);
     }
 
+    const isSdrInteraction = (row: { author_id: string | null; type: string }) =>
+      row.type !== "card_opened" || (!!row.author_id && sdrUserIds.has(row.author_id));
+
     const avg = (values: number[]) =>
       values.length ? Math.round(values.reduce((total, value) => total + value, 0) / values.length) : null;
 
@@ -305,7 +308,7 @@ export const getDashboardStats = createServerFn({ method: "GET" })
 
     for (const lead of all) {
       if (!lead.created_at) continue;
-      const rows = interactionsByLead.get(lead.id) ?? [];
+      const rows = (interactionsByLead.get(lead.id) ?? []).filter(isSdrInteraction);
       const firstOpen = rows.find((row) => row.type === "card_opened");
       const firstStageChange = rows.find((row) => row.type === "status_change");
       const firstStageChangeAfterOpen = firstOpen
@@ -352,7 +355,7 @@ export const getDashboardStats = createServerFn({ method: "GET" })
 
         for (const lead of all) {
           if (!lead.created_at) continue;
-          const rows = interactionsByLead.get(lead.id) ?? [];
+          const rows = (interactionsByLead.get(lead.id) ?? []).filter(isSdrInteraction);
           const firstOpen = rows.find((row) => row.type === "card_opened" && row.author_id === sdr.id);
           const firstStageChange = rows.find(
             (row) => row.type === "status_change" && row.author_id === sdr.id

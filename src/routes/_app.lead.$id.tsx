@@ -85,7 +85,11 @@ function LeadDetailPage() {
   const profilesById = new Map(
     data.profiles.map((profile) => [profile.id, profile.full_name ?? profile.email ?? profile.id])
   );
-  const cardOpenEvents = data.interactions.filter((interaction) => interaction.type === "card_opened");
+  const sdrUserIds = new Set(data.sdrUserIds);
+  const visibleInteractions = data.interactions.filter(
+    (interaction) => interaction.type !== "card_opened" || (!!interaction.author_id && sdrUserIds.has(interaction.author_id))
+  );
+  const cardOpenEvents = visibleInteractions.filter((interaction) => interaction.type === "card_opened");
   const stageChangeEvents = data.interactions.filter((interaction) => interaction.type === "status_change");
   const firstCardOpen = cardOpenEvents.at(-1) ?? null;
   const lastCardOpen = cardOpenEvents[0] ?? null;
@@ -505,7 +509,7 @@ function LeadDetailPage() {
         <Card className="p-5 space-y-3">
           <h2 className="font-semibold">Histórico de interações</h2>
           <div className="space-y-2 max-h-72 overflow-auto">
-            {data.interactions.map((i) => (
+            {visibleInteractions.map((i) => (
               <div key={i.id} className="text-sm border-b pb-2 last:border-0">
                 <div className="flex justify-between">
                   <span className="text-xs font-semibold text-primary">{labelForInteraction(i.type)}</span>
@@ -519,7 +523,7 @@ function LeadDetailPage() {
                 {i.content && <p className="text-xs mt-1 whitespace-pre-wrap">{i.content}</p>}
               </div>
             ))}
-            {data.interactions.length === 0 && <p className="text-xs text-muted-foreground">Sem interações.</p>}
+            {visibleInteractions.length === 0 && <p className="text-xs text-muted-foreground">Sem interações.</p>}
           </div>
         </Card>
       </div>

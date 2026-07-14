@@ -49,7 +49,7 @@ export const getLeadDetail = createServerFn({ method: "GET" })
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
-    const [leadRes, notesRes, interactionsRes, stagesRes, profilesRes] = await Promise.all([
+    const [leadRes, notesRes, interactionsRes, stagesRes, profilesRes, rolesRes] = await Promise.all([
       supabase.from("leads").select("*").eq("id", data.id).maybeSingle(),
       supabase
         .from("lead_notes")
@@ -63,15 +63,26 @@ export const getLeadDetail = createServerFn({ method: "GET" })
         .order("created_at", { ascending: false }),
       supabase.from("stages").select("*").order("position"),
       supabase.from("profiles").select("id, full_name, email"),
+      supabase.from("user_roles").select("user_id, role"),
     ]);
     if (leadRes.error) throw new Error(leadRes.error.message);
     if (!leadRes.data) throw new Error("Lead não encontrado");
+    if (rolesRes.error) throw new Error(rolesRes.error.message);
+    const sdrUserIds = Array.from(
+      new Set(
+        (rolesRes.data ?? [])
+          .filter((roleRow) => roleRow.role === "sdr" || roleRow.role === "gestao" || roleRow.role === "super_admin")
+          .map((roleRow) => roleRow.user_id as string)
+      )
+    );
+
     return {
       lead: leadRes.data,
       notes: notesRes.data ?? [],
       interactions: interactionsRes.data ?? [],
       stages: stagesRes.data ?? [],
       profiles: profilesRes.data ?? [],
+      sdrUserIds,
     };
   });
 
