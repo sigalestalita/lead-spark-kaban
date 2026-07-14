@@ -122,7 +122,10 @@ async function resolveManagedRoutingUsers(supabase: any) {
   if (error) throw new Error(error.message);
 
   const byEmail = new Map(
-    (data ?? []).map((profile) => [String(profile.email ?? "").toLowerCase(), String(profile.id)]),
+    ((data ?? []) as Array<{ id: string; email: string | null }>).map((profile) => [
+      String(profile.email ?? "").toLowerCase(),
+      String(profile.id),
+    ]),
   );
 
   const roundRobinUserIds = ROUTING_TARGETS.roundRobin
