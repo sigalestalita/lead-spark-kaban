@@ -15,6 +15,7 @@ export const Route = createFileRoute("/_app/dashboard")({
 function DashboardPage() {
   const fetchFn = useServerFn(getDashboardStats);
   const [range, setRange] = useState<"7d" | "30d" | "90d" | "180d">("30d");
+  const [assignedTo, setAssignedTo] = useState<string>("all");
 
   const { from, to } = useMemo(() => {
     const now = new Date();
@@ -26,8 +27,8 @@ function DashboardPage() {
   }, [range]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["dashboard", range],
-    queryFn: () => fetchFn({ data: { from, to } }),
+    queryKey: ["dashboard", range, assignedTo],
+    queryFn: () => fetchFn({ data: { from, to, assignedTo: assignedTo === "all" ? undefined : assignedTo } }),
   });
   if (isLoading || !data) return <div className="p-8 text-sm text-muted-foreground">Carregando…</div>;
 
@@ -61,17 +62,33 @@ function DashboardPage() {
     <div className="p-6 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Dashboard</h1>
-        <Select value={range} onValueChange={(v) => setRange(v as typeof range)}>
-          <SelectTrigger className="w-32 h-9 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="7d">Últimos 7d</SelectItem>
-            <SelectItem value="30d">Últimos 30d</SelectItem>
-            <SelectItem value="90d">Últimos 90d</SelectItem>
-            <SelectItem value="180d">Últimos 180d</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={assignedTo} onValueChange={setAssignedTo}>
+            <SelectTrigger className="w-44 h-9 text-xs">
+              <SelectValue placeholder="Filtrar por SDR" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os SDRs</SelectItem>
+              {data.sdrOptions.map((sdr) => (
+                <SelectItem key={sdr.id} value={sdr.id}>
+                  {sdr.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={range} onValueChange={(v) => setRange(v as typeof range)}>
+            <SelectTrigger className="w-32 h-9 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7d">Últimos 7d</SelectItem>
+              <SelectItem value="30d">Últimos 30d</SelectItem>
+              <SelectItem value="90d">Últimos 90d</SelectItem>
+              <SelectItem value="180d">Últimos 180d</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Kpi label="Total de leads" value={data.total} />
