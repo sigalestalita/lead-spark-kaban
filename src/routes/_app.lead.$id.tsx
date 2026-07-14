@@ -87,10 +87,12 @@ function LeadDetailPage() {
   );
   const sdrUserIds = new Set(data.sdrUserIds);
   const visibleInteractions = data.interactions.filter(
-    (interaction) => interaction.type !== "card_opened" || (!!interaction.author_id && sdrUserIds.has(interaction.author_id))
+    (interaction) =>
+      (interaction.type !== "card_opened" && interaction.type !== "status_change") ||
+      (!!interaction.author_id && sdrUserIds.has(interaction.author_id))
   );
   const cardOpenEvents = visibleInteractions.filter((interaction) => interaction.type === "card_opened");
-  const stageChangeEvents = data.interactions.filter((interaction) => interaction.type === "status_change");
+  const stageChangeEvents = visibleInteractions.filter((interaction) => interaction.type === "status_change");
   const firstCardOpen = cardOpenEvents.at(-1) ?? null;
   const lastCardOpen = cardOpenEvents[0] ?? null;
   const firstStageChange = stageChangeEvents.at(-1) ?? null;

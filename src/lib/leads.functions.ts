@@ -71,7 +71,7 @@ export const getLeadDetail = createServerFn({ method: "GET" })
     const sdrUserIds = Array.from(
       new Set(
         (rolesRes.data ?? [])
-          .filter((roleRow) => roleRow.role === "sdr" || roleRow.role === "gestao" || roleRow.role === "super_admin")
+          .filter((roleRow) => roleRow.role === "sdr")
           .map((roleRow) => roleRow.user_id as string)
       )
     );
