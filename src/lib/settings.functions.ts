@@ -176,6 +176,7 @@ export const getDashboardStats = createServerFn({ method: "GET" })
       .object({
         from: z.string().datetime().optional(),
         to: z.string().datetime().optional(),
+        assignedTo: z.string().uuid().optional(),
       })
       .optional()
       .parse(d ?? {})
@@ -187,8 +188,9 @@ export const getDashboardStats = createServerFn({ method: "GET" })
     const from = data?.from ? new Date(data.from) : new Date(now.getTime() - 30 * 24 * 3600 * 1000);
     const fromISO = from.toISOString();
     const toISO = to.toISOString();
+    const assignedTo = data?.assignedTo;
     const PAGE = 1000;
-    const [stagesRes, leadsPages] = await Promise.all([
+    const [stagesRes, leadsPages, profilesRes, rolesRes] = await Promise.all([
       supabase.from("stages").select("id, name, slug, position").order("position"),
       (async () => {
         const rows: Array<{
@@ -198,20 +200,25 @@ export const getDashboardStats = createServerFn({ method: "GET" })
           source: string | null;
           campaign: string | null;
           stage_id: string | null;
+          assigned_to: string | null;
           created_at: string | null;
           first_approach_at: string | null;
           last_action_at: string | null;
         }> = [];
 
         for (let from = 0; ; from += PAGE) {
-          const { data, error } = await supabase
+          let query = supabase
             .from("leads")
             .select(
-              "id, priority, score, source, campaign, stage_id, created_at, first_approach_at, last_action_at"
+              "id, priority, score, source, campaign, stage_id, assigned_to, created_at, first_approach_at, last_action_at"
             )
             .gte("created_at", fromISO)
             .lte("created_at", toISO)
             .range(from, from + PAGE - 1);
+
+          if (assignedTo) query = query.eq("assigned_to", assignedTo);
+
+          const { data, error } = await query;
 
           if (error) throw new Error(error.message);
           const batch = data ?? [];
@@ -221,13 +228,28 @@ export const getDashboardStats = createServerFn({ method: "GET" })
 
         return rows;
       })(),
+      supabase.from("profiles").select("id, full_name, email").order("full_name"),
+      supabase.from("user_roles").select("user_id, role"),
     ]);
 
     if (stagesRes.error) throw new Error(stagesRes.error.message);
+    if (profilesRes.error) throw new Error(profilesRes.error.message);
+    if (rolesRes.error) throw new Error(rolesRes.error.message);
 
     const stages = stagesRes.data ?? [];
     const all = leadsPages;
     const stagesMap = new Map((stages ?? []).map((s) => [s.id, s]));
+    const sdrUserIds = new Set(
+      (rolesRes.data ?? [])
+        .filter((roleRow) => roleRow.role === "sdr" || roleRow.role === "gestao" || roleRow.role === "super_admin")
+        .map((roleRow) => roleRow.user_id as string)
+    );
+    const sdrOptions = (profilesRes.data ?? [])
+      .filter((profile) => sdrUserIds.has(profile.id as string))
+      .map((profile) => ({
+        id: profile.id as string,
+        name: (profile.full_name as string | null) || (profile.email as string | null) || "Sem nome",
+      }));
 
     const bySlug: Record<string, number> = {};
     for (const l of all) {
@@ -274,6 +296,8 @@ export const getDashboardStats = createServerFn({ method: "GET" })
 
     return {
       period: { from: fromISO, to: toISO },
+      assignedTo: assignedTo ?? null,
+      sdrOptions,
       total,
       novos: bySlug["novo"] ?? 0,
       em_contato: bySlug["em_contato"] ?? 0,
