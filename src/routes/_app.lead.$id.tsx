@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
-import { getLeadDetail, updateLead, addLeadNote, recalcLeadScore } from "@/lib/leads.functions";
+import { useEffect, useRef, useState } from "react";
+import { getLeadDetail, updateLead, addLeadNote, recalcLeadScore, registerLeadCardOpen } from "@/lib/leads.functions";
 import { enrichLead, suggestApproach } from "@/lib/ai.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,7 @@ function LeadDetailPage() {
   const recalcFn = useServerFn(recalcLeadScore);
   const enrichFn = useServerFn(enrichLead);
   const suggestFn = useServerFn(suggestApproach);
+  const registerCardOpenFn = useServerFn(registerLeadCardOpen);
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -38,6 +39,16 @@ function LeadDetailPage() {
   const [note, setNote] = useState("");
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [lostFor, setLostFor] = useState<string | null>(null);
+  const openedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!data?.lead?.id) return;
+    if (openedRef.current === data.lead.id) return;
+    openedRef.current = data.lead.id;
+    registerCardOpenFn({ data: { leadId: data.lead.id } })
+      .then(() => qc.invalidateQueries({ queryKey: ["lead", id] }))
+      .catch(() => undefined);
+  }, [data?.lead?.id, id, qc, registerCardOpenFn]);
 
   const update = useMutation({
     mutationFn: (patch: Record<string, unknown>) => updateFn({ data: { id, patch } }),
@@ -71,6 +82,12 @@ function LeadDetailPage() {
   if (!data) return null;
   const lead = data.lead;
   const currentStage = data.stages.find((s) => s.id === lead.stage_id) ?? null;
+  const cardOpenEvents = data.interactions.filter((interaction) => interaction.type === "card_opened");
+  const stageChangeEvents = data.interactions.filter((interaction) => interaction.type === "status_change");
+  const firstCardOpen = cardOpenEvents.at(-1) ?? null;
+  const lastCardOpen = cardOpenEvents[0] ?? null;
+  const firstStageChange = stageChangeEvents.at(-1) ?? null;
+  const lastStageChange = stageChangeEvents[0] ?? null;
 
   const moveToStage = (stageId: string, slug: string) => {
     if (stageId === lead.stage_id) return;
@@ -396,6 +413,19 @@ function LeadDetailPage() {
 
       <Card className="p-5 space-y-3">
         <div className="flex items-center justify-between">
+          <h2 className="font-semibold">Linha do tempo do atendimento</h2>
+          <span className="text-xs text-muted-foreground">Horários exatos do card</span>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-3 text-sm">
+          <Info label="Primeira abertura do card" value={formatDateTime(firstCardOpen?.created_at ?? null)} />
+          <Info label="Última abertura do card" value={formatDateTime(lastCardOpen?.created_at ?? null)} />
+          <Info label="Primeira mudança de etapa" value={formatDateTime(firstStageChange?.created_at ?? null)} />
+          <Info label="Última mudança de etapa" value={formatDateTime(lastStageChange?.created_at ?? null)} />
+        </div>
+      </Card>
+
+      <Card className="p-5 space-y-3">
+        <div className="flex items-center justify-between">
           <h2 className="font-semibold">Abordagem</h2>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={() => enrich.mutate()} disabled={enrich.isPending}>
@@ -537,6 +567,11 @@ function Info({ label, value }: { label: string; value: string | null }) {
 
 function labelForInteraction(type: string) {
   switch (type) {
+    case "card_opened": return "Card aberto";
+    case "status_change": return "Mudança de etapa";
+    case "routing": return "Alteração de responsável";
+    case "enrichment": return "Enriquecimento";
+    case "ai_suggestion": return "Sugestão de IA";
     case "rd_activity": return "Atividade RD";
     case "rd_note": return "Nota RD";
     case "whatsapp": return "WhatsApp";
@@ -544,6 +579,10 @@ function labelForInteraction(type: string) {
     case "call": return "Ligação";
     default: return type;
   }
+}
+
+function formatDateTime(value: string | null) {
+  return value ? new Date(value).toLocaleString("pt-BR") : "—";
 }
 
 function LostReasonDialog({
