@@ -82,12 +82,20 @@ function LeadDetailPage() {
   if (!data) return null;
   const lead = data.lead;
   const currentStage = data.stages.find((s) => s.id === lead.stage_id) ?? null;
+  const profilesById = new Map(
+    data.profiles.map((profile) => [profile.id, profile.full_name ?? profile.email ?? profile.id])
+  );
   const cardOpenEvents = data.interactions.filter((interaction) => interaction.type === "card_opened");
   const stageChangeEvents = data.interactions.filter((interaction) => interaction.type === "status_change");
   const firstCardOpen = cardOpenEvents.at(-1) ?? null;
   const lastCardOpen = cardOpenEvents[0] ?? null;
   const firstStageChange = stageChangeEvents.at(-1) ?? null;
   const lastStageChange = stageChangeEvents[0] ?? null;
+  const firstCardOpenAuthor = firstCardOpen?.author_id ? profilesById.get(firstCardOpen.author_id) ?? null : null;
+  const lastCardOpenAuthor = lastCardOpen?.author_id ? profilesById.get(lastCardOpen.author_id) ?? null : null;
+  const timeToFirstCardOpen = lead.created_at && firstCardOpen?.created_at
+    ? formatDurationBetween(lead.created_at, firstCardOpen.created_at)
+    : null;
 
   const moveToStage = (stageId: string, slug: string) => {
     if (stageId === lead.stage_id) return;
@@ -418,9 +426,15 @@ function LeadDetailPage() {
         </div>
         <div className="grid sm:grid-cols-2 gap-3 text-sm">
           <Info label="Primeira abertura do card" value={formatDateTime(firstCardOpen?.created_at ?? null)} />
+          <Info label="Usuário da primeira abertura" value={firstCardOpenAuthor} />
           <Info label="Última abertura do card" value={formatDateTime(lastCardOpen?.created_at ?? null)} />
+          <Info label="Usuário da última abertura" value={lastCardOpenAuthor} />
           <Info label="Primeira mudança de etapa" value={formatDateTime(firstStageChange?.created_at ?? null)} />
           <Info label="Última mudança de etapa" value={formatDateTime(lastStageChange?.created_at ?? null)} />
+          <Info
+            label="Tempo entre entrada no Kanban e primeira abertura"
+            value={timeToFirstCardOpen}
+          />
         </div>
       </Card>
 
@@ -497,6 +511,11 @@ function LeadDetailPage() {
                   <span className="text-xs font-semibold text-primary">{labelForInteraction(i.type)}</span>
                   <span className="text-[10px] text-muted-foreground">{new Date(i.created_at).toLocaleString("pt-BR")}</span>
                 </div>
+                {i.author_id && (
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Usuário: {profilesById.get(i.author_id) ?? i.author_id}
+                  </p>
+                )}
                 {i.content && <p className="text-xs mt-1 whitespace-pre-wrap">{i.content}</p>}
               </div>
             ))}
@@ -583,6 +602,23 @@ function labelForInteraction(type: string) {
 
 function formatDateTime(value: string | null) {
   return value ? new Date(value).toLocaleString("pt-BR") : "—";
+}
+
+function formatDurationBetween(from: string, to: string) {
+  const fromDate = new Date(from);
+  const toDate = new Date(to);
+  const diffMs = toDate.getTime() - fromDate.getTime();
+
+  if (!Number.isFinite(diffMs) || diffMs < 0) return "—";
+
+  const totalMinutes = Math.round(diffMs / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) return `${days}d ${hours}h ${minutes}min`;
+  if (hours > 0) return `${hours}h ${minutes}min`;
+  return `${minutes}min`;
 }
 
 function LostReasonDialog({
