@@ -75,6 +75,21 @@ export const getLeadDetail = createServerFn({ method: "GET" })
     };
   });
 
+export const registerLeadCardOpen = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ leadId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { error } = await supabase.from("lead_interactions").insert({
+      lead_id: data.leadId,
+      author_id: userId,
+      type: "card_opened",
+      content: "Card do lead aberto",
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 export const moveLeadStage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>
@@ -82,30 +97,53 @@ export const moveLeadStage = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { data: stage } = await supabase
-      .from("stages")
-      .select("slug, name")
-      .eq("id", data.stageId)
+    const nowIso = new Date().toISOString();
+    const { data: lead, error: leadError } = await supabase
+      .from("leads")
+      .select("stage_id, first_approach_at")
+      .eq("id", data.leadId)
       .maybeSingle();
+    if (leadError) throw new Error(leadError.message);
+    if (lead?.stage_id === data.stageId) return { ok: true };
+
+    const stageIds = [lead?.stage_id, data.stageId].filter((value): value is string => !!value);
+    const { data: stagesData, error: stagesError } = stageIds.length
+      ? await supabase.from("stages").select("id, slug, name").in("id", stageIds)
+      : { data: [], error: null };
+    if (stagesError) throw new Error(stagesError.message);
+
+    const stagesById = new Map((stagesData ?? []).map((stage) => [stage.id, stage]));
+    const previousStage = lead?.stage_id ? stagesById.get(lead.stage_id) : null;
+    const nextStage = stagesById.get(data.stageId) ?? null;
 
     const patch: Record<string, unknown> = {
       stage_id: data.stageId,
-      last_action_at: new Date().toISOString(),
-      stage_entered_at: new Date().toISOString(),
+      last_action_at: nowIso,
+      stage_entered_at: nowIso,
     };
-    if (stage?.slug === "em_contato") {
-      patch.first_approach_at = new Date().toISOString();
+    if (nextStage?.slug === "em_contato" && !lead?.first_approach_at) {
+      patch.first_approach_at = nowIso;
     }
 
     const { error } = await supabase.from("leads").update(patch as never).eq("id", data.leadId);
     if (error) throw new Error(error.message);
 
-    await supabase.from("lead_interactions").insert({
+    const { error: interactionError } = await supabase.from("lead_interactions").insert({
       lead_id: data.leadId,
       author_id: userId,
       type: "status_change",
-      content: `Movido para "${stage?.name ?? "etapa"}"`,
+      content: previousStage?.name
+        ? `Movido de "${previousStage.name}" para "${nextStage?.name ?? "etapa"}"`
+        : `Movido para "${nextStage?.name ?? "etapa"}"`,
+      metadata: {
+        from_stage_id: previousStage?.id ?? null,
+        from_stage_name: previousStage?.name ?? null,
+        to_stage_id: nextStage?.id ?? data.stageId,
+        to_stage_name: nextStage?.name ?? null,
+        to_stage_slug: nextStage?.slug ?? null,
+      },
     });
+    if (interactionError) throw new Error(interactionError.message);
 
     return { ok: true };
   });
@@ -151,12 +189,92 @@ export const updateLead = createServerFn({ method: "POST" })
     for (const k of allowedKeys) {
       if (k in data.patch) allowed[k] = data.patch[k];
     }
-    allowed.last_action_at = new Date().toISOString();
+    const nowIso = new Date().toISOString();
+    const hasAssignedToPatch = Object.prototype.hasOwnProperty.call(allowed, "assigned_to");
+    const hasStagePatch = Object.prototype.hasOwnProperty.call(allowed, "stage_id");
+    let currentLead:
+      | {
+          stage_id: string | null;
+          first_approach_at: string | null;
+        }
+      | null = null;
+    if (hasAssignedToPatch || hasStagePatch) {
+      const { data: currentLeadData, error: currentLeadError } = await supabase
+        .from("leads")
+        .select("stage_id, first_approach_at")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (currentLeadError) throw new Error(currentLeadError.message);
+      currentLead = currentLeadData;
+    }
+
+    let stageChange:
+      | {
+          fromStageId: string | null;
+          fromStageName: string | null;
+          toStageId: string | null;
+          toStageName: string | null;
+          toStageSlug: string | null;
+        }
+      | null = null;
+
+    if (hasStagePatch) {
+      const previousStageId = currentLead?.stage_id ?? null;
+      const nextStageId = typeof allowed.stage_id === "string" ? allowed.stage_id : null;
+
+      if (nextStageId !== previousStageId) {
+        const stageIds = [previousStageId, nextStageId].filter((value): value is string => !!value);
+        const { data: stagesData, error: stagesError } = stageIds.length
+          ? await supabase.from("stages").select("id, name, slug").in("id", stageIds)
+          : { data: [], error: null };
+        if (stagesError) throw new Error(stagesError.message);
+
+        const stagesById = new Map((stagesData ?? []).map((stage) => [stage.id, stage]));
+        const previousStage = previousStageId ? stagesById.get(previousStageId) : null;
+        const nextStage = nextStageId ? stagesById.get(nextStageId) : null;
+
+        allowed.stage_entered_at =
+          typeof data.patch.stage_entered_at === "string" ? data.patch.stage_entered_at : nowIso;
+
+        if (nextStage?.slug === "em_contato" && !currentLead?.first_approach_at) {
+          allowed.first_approach_at = nowIso;
+        }
+
+        stageChange = {
+          fromStageId: previousStage?.id ?? previousStageId,
+          fromStageName: previousStage?.name ?? null,
+          toStageId: nextStage?.id ?? nextStageId,
+          toStageName: nextStage?.name ?? null,
+          toStageSlug: nextStage?.slug ?? null,
+        };
+      }
+    }
+
+    allowed.last_action_at = nowIso;
 
     const { error } = await supabase.from("leads").update(allowed as never).eq("id", data.id);
     if (error) throw new Error(error.message);
 
-    if (Object.prototype.hasOwnProperty.call(allowed, "assigned_to")) {
+    if (stageChange) {
+      const { error: stageInteractionError } = await supabase.from("lead_interactions").insert({
+        lead_id: data.id,
+        author_id: userId,
+        type: "status_change",
+        content: stageChange.fromStageName
+          ? `Movido de "${stageChange.fromStageName}" para "${stageChange.toStageName ?? "etapa"}"`
+          : `Movido para "${stageChange.toStageName ?? "etapa"}"`,
+        metadata: {
+          from_stage_id: stageChange.fromStageId,
+          from_stage_name: stageChange.fromStageName,
+          to_stage_id: stageChange.toStageId,
+          to_stage_name: stageChange.toStageName,
+          to_stage_slug: stageChange.toStageSlug,
+        },
+      });
+      if (stageInteractionError) throw new Error(stageInteractionError.message);
+    }
+
+    if (hasAssignedToPatch) {
       const { error: convError } = await supabase
         .from("whatsapp_conversations")
         .update({ assigned_user_id: (allowed.assigned_to as string | null | undefined) ?? null })

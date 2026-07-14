@@ -33,6 +33,7 @@ function DashboardPage() {
   if (isLoading || !data) return <div className="p-8 text-sm text-muted-foreground">Carregando…</div>;
 
   const sourceData = Object.entries(data.bySource).map(([name, count]) => ({ name, count }));
+  const management = data.managementAnalytics;
 
   const funnelOrder = ["novo", "qualificacao", "em_contato", "aguardando", "agendado"];
   const funnelLabels: Record<string, string> = {
@@ -168,6 +169,67 @@ function DashboardPage() {
         </Card>
       </div>
 
+      <section className="space-y-3">
+        <div className="flex items-baseline justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-lg font-semibold">Análise de gestão do atendimento</h2>
+            <p className="text-sm text-muted-foreground">
+              Tempos entre entrada do lead, abertura do card e avanço de etapa por SDR.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <Kpi label="Leads tocados" value={management.summary.touchedLeads} />
+          <Kpi label="Cards abertos" value={management.summary.cardsOpened} />
+          <Kpi label="Mudanças de etapa" value={management.summary.stageMoves} />
+          <Kpi label="Lead → abertura" value={formatDurationMinutes(management.summary.avgLeadToOpenMin)} />
+          <Kpi label="Abertura → etapa" value={formatDurationMinutes(management.summary.avgOpenToStageMin)} />
+        </div>
+
+        <Card className="p-5">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h3 className="font-semibold">Performance individual por SDR</h3>
+            <span className="text-xs text-muted-foreground">
+              Lead → abertura → mudança de etapa
+            </span>
+          </div>
+
+          {management.bySdr.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sem eventos registrados para o filtro atual.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs text-muted-foreground">
+                    <th className="py-2 pr-3 font-medium">SDR</th>
+                    <th className="py-2 pr-3 font-medium">Leads tocados</th>
+                    <th className="py-2 pr-3 font-medium">Cards abertos</th>
+                    <th className="py-2 pr-3 font-medium">Mud. etapa</th>
+                    <th className="py-2 pr-3 font-medium">Lead → abertura</th>
+                    <th className="py-2 pr-3 font-medium">Abertura → etapa</th>
+                    <th className="py-2 font-medium">Lead → etapa</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {management.bySdr.map((row) => (
+                    <tr key={row.sdrId} className="border-b last:border-0">
+                      <td className="py-3 pr-3 font-medium">{row.sdrName}</td>
+                      <td className="py-3 pr-3">{row.touchedLeads}</td>
+                      <td className="py-3 pr-3">{row.cardsOpened}</td>
+                      <td className="py-3 pr-3">{row.stageMoves}</td>
+                      <td className="py-3 pr-3">{formatDurationMinutes(row.avgLeadToOpenMin)}</td>
+                      <td className="py-3 pr-3">{formatDurationMinutes(row.avgOpenToStageMin)}</td>
+                      <td className="py-3">{formatDurationMinutes(row.avgLeadToStageMin)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      </section>
+
       <Card className="p-5">
         <h2 className="font-semibold mb-3">Distribuição por prioridade</h2>
         <div className="grid grid-cols-5 gap-3">
@@ -196,4 +258,17 @@ function Kpi({ label, value, highlight }: { label: string; value: string | numbe
       <p className="text-2xl font-bold mt-1">{value}</p>
     </Card>
   );
+}
+
+function formatDurationMinutes(value: number | null) {
+  if (value === null || Number.isNaN(value)) return "—";
+  if (value < 60) return `${value} min`;
+
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  if (hours < 24) return minutes ? `${hours}h ${minutes}min` : `${hours}h`;
+
+  const days = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+  return remainingHours ? `${days}d ${remainingHours}h` : `${days}d`;
 }

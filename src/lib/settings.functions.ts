@@ -251,6 +251,160 @@ export const getDashboardStats = createServerFn({ method: "GET" })
         name: (profile.full_name as string | null) || (profile.email as string | null) || "Sem nome",
       }));
 
+    const relevantSdrOptions = assignedTo
+      ? sdrOptions.filter((sdr) => sdr.id === assignedTo)
+      : sdrOptions;
+
+    const leadIds = all.map((lead) => lead.id);
+    const interactionRows: Array<{
+      lead_id: string;
+      author_id: string | null;
+      type: string;
+      created_at: string;
+    }> = [];
+
+    if (leadIds.length > 0) {
+      const chunkSize = 100;
+      for (let index = 0; index < leadIds.length; index += chunkSize) {
+        const chunk = leadIds.slice(index, index + chunkSize);
+        const { data: chunkRows, error: interactionsError } = await supabase
+          .from("lead_interactions")
+          .select("lead_id, author_id, type, created_at")
+          .in("lead_id", chunk)
+          .in("type", ["card_opened", "status_change"])
+          .order("created_at", { ascending: true });
+
+        if (interactionsError) throw new Error(interactionsError.message);
+        interactionRows.push(
+          ...((chunkRows ?? []) as Array<{
+            lead_id: string;
+            author_id: string | null;
+            type: string;
+            created_at: string;
+          }>)
+        );
+      }
+    }
+
+    const interactionsByLead = new Map<string, typeof interactionRows>();
+    for (const row of interactionRows) {
+      const existing = interactionsByLead.get(row.lead_id) ?? [];
+      existing.push(row);
+      interactionsByLead.set(row.lead_id, existing);
+    }
+
+    const avg = (values: number[]) =>
+      values.length ? Math.round(values.reduce((total, value) => total + value, 0) / values.length) : null;
+
+    const leadToOpenOverall: number[] = [];
+    const openToStageOverall: number[] = [];
+    const leadToStageOverall: number[] = [];
+    let openedLeads = 0;
+    let advancedLeads = 0;
+    let touchedLeads = 0;
+
+    for (const lead of all) {
+      if (!lead.created_at) continue;
+      const rows = interactionsByLead.get(lead.id) ?? [];
+      const firstOpen = rows.find((row) => row.type === "card_opened");
+      const firstStageChange = rows.find((row) => row.type === "status_change");
+      const firstStageChangeAfterOpen = firstOpen
+        ? rows.find(
+            (row) =>
+              row.type === "status_change" &&
+              new Date(row.created_at).getTime() >= new Date(firstOpen.created_at).getTime()
+          )
+        : undefined;
+
+      if (firstOpen || firstStageChange) touchedLeads += 1;
+
+      if (firstOpen) {
+        openedLeads += 1;
+        leadToOpenOverall.push(
+          (new Date(firstOpen.created_at).getTime() - new Date(lead.created_at).getTime()) / 1000 / 60
+        );
+      }
+
+      if (firstStageChange) {
+        advancedLeads += 1;
+        leadToStageOverall.push(
+          (new Date(firstStageChange.created_at).getTime() - new Date(lead.created_at).getTime()) / 1000 / 60
+        );
+      }
+
+      if (firstOpen && firstStageChangeAfterOpen) {
+        openToStageOverall.push(
+          (new Date(firstStageChangeAfterOpen.created_at).getTime() - new Date(firstOpen.created_at).getTime()) /
+            1000 /
+            60
+        );
+      }
+    }
+
+    const sdrPerformance = relevantSdrOptions
+      .map((sdr) => {
+        const leadToOpen: number[] = [];
+        const openToStage: number[] = [];
+        const leadToStage: number[] = [];
+        const touched = new Set<string>();
+        let cardsOpened = 0;
+        let stageMoves = 0;
+
+        for (const lead of all) {
+          if (!lead.created_at) continue;
+          const rows = interactionsByLead.get(lead.id) ?? [];
+          const firstOpen = rows.find((row) => row.type === "card_opened" && row.author_id === sdr.id);
+          const firstStageChange = rows.find(
+            (row) => row.type === "status_change" && row.author_id === sdr.id
+          );
+          const firstStageChangeAfterOpen = firstOpen
+            ? rows.find(
+                (row) =>
+                  row.type === "status_change" &&
+                  row.author_id === sdr.id &&
+                  new Date(row.created_at).getTime() >= new Date(firstOpen.created_at).getTime()
+              )
+            : undefined;
+
+          if (firstOpen || firstStageChange) touched.add(lead.id);
+
+          if (firstOpen) {
+            cardsOpened += 1;
+            leadToOpen.push(
+              (new Date(firstOpen.created_at).getTime() - new Date(lead.created_at).getTime()) / 1000 / 60
+            );
+          }
+
+          if (firstStageChange) {
+            stageMoves += 1;
+            leadToStage.push(
+              (new Date(firstStageChange.created_at).getTime() - new Date(lead.created_at).getTime()) / 1000 / 60
+            );
+          }
+
+          if (firstOpen && firstStageChangeAfterOpen) {
+            openToStage.push(
+              (new Date(firstStageChangeAfterOpen.created_at).getTime() -
+                new Date(firstOpen.created_at).getTime()) /
+                1000 /
+                60
+            );
+          }
+        }
+
+        return {
+          sdrId: sdr.id,
+          sdrName: sdr.name,
+          touchedLeads: touched.size,
+          cardsOpened,
+          stageMoves,
+          avgLeadToOpenMin: avg(leadToOpen),
+          avgOpenToStageMin: avg(openToStage),
+          avgLeadToStageMin: avg(leadToStage),
+        };
+      })
+      .sort((a, b) => b.stageMoves - a.stageMoves || b.cardsOpened - a.cardsOpened || a.sdrName.localeCompare(b.sdrName));
+
     const bySlug: Record<string, number> = {};
     for (const l of all) {
       const s = stagesMap.get(l.stage_id ?? "");
@@ -310,6 +464,17 @@ export const getDashboardStats = createServerFn({ method: "GET" })
       bySource,
       byStage: (stages ?? []).map((s) => ({ name: s.name, count: bySlug[s.slug] ?? 0 })),
       stalled,
+      managementAnalytics: {
+        summary: {
+          touchedLeads,
+          cardsOpened: openedLeads,
+          stageMoves: advancedLeads,
+          avgLeadToOpenMin: avg(leadToOpenOverall),
+          avgOpenToStageMin: avg(openToStageOverall),
+          avgLeadToStageMin: avg(leadToStageOverall),
+        },
+        bySdr: sdrPerformance,
+      },
       byPriority: {
         alta: all.filter((l) => l.priority === "alta").length,
         media: all.filter((l) => l.priority === "media").length,
