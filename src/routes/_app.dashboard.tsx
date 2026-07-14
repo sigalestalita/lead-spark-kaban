@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getDashboardStats } from "@/lib/settings.functions";
 import { Card } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from "recharts";
 
 export const Route = createFileRoute("/_app/dashboard")({
@@ -12,7 +14,21 @@ export const Route = createFileRoute("/_app/dashboard")({
 
 function DashboardPage() {
   const fetchFn = useServerFn(getDashboardStats);
-  const { data, isLoading } = useQuery({ queryKey: ["dashboard"], queryFn: () => fetchFn() });
+  const [range, setRange] = useState<"7d" | "30d" | "90d" | "180d">("30d");
+
+  const { from, to } = useMemo(() => {
+    const now = new Date();
+    const days = range === "7d" ? 7 : range === "90d" ? 90 : range === "180d" ? 180 : 30;
+    return {
+      from: new Date(now.getTime() - days * 86400000).toISOString(),
+      to: now.toISOString(),
+    };
+  }, [range]);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["dashboard", range],
+    queryFn: () => fetchFn({ data: { from, to } }),
+  });
   if (isLoading || !data) return <div className="p-8 text-sm text-muted-foreground">Carregando…</div>;
 
   const sourceData = Object.entries(data.bySource).map(([name, count]) => ({ name, count }));
@@ -43,7 +59,20 @@ function DashboardPage() {
 
   return (
     <div className="p-6 space-y-4">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <Select value={range} onValueChange={(v) => setRange(v as typeof range)}>
+          <SelectTrigger className="w-32 h-9 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="7d">Últimos 7d</SelectItem>
+            <SelectItem value="30d">Últimos 30d</SelectItem>
+            <SelectItem value="90d">Últimos 90d</SelectItem>
+            <SelectItem value="180d">Últimos 180d</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Kpi label="Total de leads" value={data.total} />
         <Kpi label="Novos" value={data.novos} />
