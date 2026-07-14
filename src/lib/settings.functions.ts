@@ -171,8 +171,22 @@ export const deleteStage = createServerFn({ method: "POST" })
 
 export const getDashboardStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((d) =>
+    z
+      .object({
+        from: z.string().datetime().optional(),
+        to: z.string().datetime().optional(),
+      })
+      .optional()
+      .parse(d ?? {})
+  )
+  .handler(async ({ data, context }) => {
     const { supabase } = context;
+    const now = new Date();
+    const to = data?.to ? new Date(data.to) : now;
+    const from = data?.from ? new Date(data.from) : new Date(now.getTime() - 30 * 24 * 3600 * 1000);
+    const fromISO = from.toISOString();
+    const toISO = to.toISOString();
     const PAGE = 1000;
     const [stagesRes, leadsPages] = await Promise.all([
       supabase.from("stages").select("id, name, slug, position").order("position"),
@@ -195,6 +209,8 @@ export const getDashboardStats = createServerFn({ method: "GET" })
             .select(
               "id, priority, score, source, campaign, stage_id, created_at, first_approach_at, last_action_at"
             )
+            .gte("created_at", fromISO)
+            .lte("created_at", toISO)
             .range(from, from + PAGE - 1);
 
           if (error) throw new Error(error.message);
@@ -257,6 +273,7 @@ export const getDashboardStats = createServerFn({ method: "GET" })
     }).length;
 
     return {
+      period: { from: fromISO, to: toISO },
       total,
       novos: bySlug["novo"] ?? 0,
       em_contato: bySlug["em_contato"] ?? 0,
