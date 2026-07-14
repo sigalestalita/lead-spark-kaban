@@ -241,7 +241,7 @@ export const getDashboardStats = createServerFn({ method: "GET" })
     const stagesMap = new Map((stages ?? []).map((s) => [s.id, s]));
     const sdrUserIds = new Set(
       (rolesRes.data ?? [])
-        .filter((roleRow) => roleRow.role === "sdr" || roleRow.role === "gestao" || roleRow.role === "super_admin")
+        .filter((roleRow) => roleRow.role === "sdr")
         .map((roleRow) => roleRow.user_id as string)
     );
     const sdrOptions = (profilesRes.data ?? [])
@@ -294,7 +294,7 @@ export const getDashboardStats = createServerFn({ method: "GET" })
     }
 
     const isSdrInteraction = (row: { author_id: string | null; type: string }) =>
-      row.type !== "card_opened" || (!!row.author_id && sdrUserIds.has(row.author_id));
+      !!row.author_id && sdrUserIds.has(row.author_id);
 
     const avg = (values: number[]) =>
       values.length ? Math.round(values.reduce((total, value) => total + value, 0) / values.length) : null;
