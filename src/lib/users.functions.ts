@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const TALITA_EMAIL = "talita.sigales@grougp.com.br";
 
-const RoleSchema = z.enum(["super_admin", "gestao", "executivo", "sdr"]);
+const RoleSchema = z.enum(["super_admin", "gestao", "executivo", "sdr", "comercial", "cs", "financeiro"]);
 
 async function getCallerRole(userId: string) {
   const { data, error } = await supabaseAdmin
