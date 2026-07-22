@@ -154,7 +154,7 @@ export const updateSinaleiraClient = createServerFn({ method: "POST" })
     }).parse(i),
   )
   .handler(async ({ context, data }) => {
-    const patch: Record<string, unknown> = {};
+    const patch: { kanban_status?: string; assigned_user_id?: string | null } = {};
     if (data.kanban_status !== undefined) patch.kanban_status = data.kanban_status;
     if (data.assigned_user_id !== undefined) patch.assigned_user_id = data.assigned_user_id;
     const { error } = await context.supabase
