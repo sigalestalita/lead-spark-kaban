@@ -21,11 +21,16 @@ export const Route = createFileRoute("/_app/usuarios")({
   component: UsersPage,
 });
 
+type Role = "super_admin" | "gestao" | "executivo" | "sdr" | "comercial" | "cs" | "financeiro";
+
 const ROLE_LABEL: Record<string, string> = {
   super_admin: "Super Admin",
   gestao: "Gestão",
   executivo: "Executivo",
   sdr: "SDR",
+  comercial: "Comercial",
+  cs: "CS",
+  financeiro: "Financeiro",
 };
 
 function UsersPage() {
@@ -42,7 +47,7 @@ function UsersPage() {
   });
 
   const update = useMutation({
-    mutationFn: (v: { userId: string; role: "super_admin" | "gestao" | "executivo" | "sdr" }) =>
+    mutationFn: (v: { userId: string; role: Role }) =>
       updateFn({ data: v }),
     onSuccess: () => {
       toast.success("Papel atualizado");
@@ -124,7 +129,7 @@ function UsersPage() {
                         value={u.role ?? "sdr"}
                         disabled={disabled}
                         onValueChange={(v) =>
-                          update.mutate({ userId: u.id, role: v as "super_admin" | "gestao" | "executivo" | "sdr" })
+                          update.mutate({ userId: u.id, role: v as Role })
                         }
                       >
                         <SelectTrigger className="w-[160px]">
@@ -132,6 +137,9 @@ function UsersPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="sdr">SDR</SelectItem>
+                          <SelectItem value="comercial">Comercial</SelectItem>
+                          <SelectItem value="cs">CS</SelectItem>
+                          <SelectItem value="financeiro">Financeiro</SelectItem>
                           <SelectItem value="executivo">Executivo</SelectItem>
                           <SelectItem value="gestao">Gestão</SelectItem>
                           <SelectItem value="super_admin">Super Admin</SelectItem>
