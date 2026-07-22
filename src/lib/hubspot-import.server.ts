@@ -93,7 +93,7 @@ async function importOwnersBatch(): Promise<{ done: boolean; count: number }> {
     first_name: (o.firstName as string) ?? null,
     last_name: (o.lastName as string) ?? null,
     active: (o.archived as boolean) === true ? false : true,
-    raw: o,
+    raw: o as unknown as any,
   }));
   if (rows.length) {
     const { error } = await supabaseAdmin.from("hs_owners").upsert(rows, { onConflict: "hubspot_id" });
@@ -162,7 +162,7 @@ async function importObjectBatch(objectType: "contacts" | "companies" | "deals")
       hs_updated_at: toTs(c.properties.lastmodifieddate),
       last_activity_at: toTs(c.properties.notes_last_updated),
       lifecyclestage: c.properties.lifecyclestage ?? null,
-      raw: c.properties,
+      raw: c.properties as unknown as any,
     }));
     const { error } = await supabaseAdmin.from("hs_contacts").upsert(rows, { onConflict: "hubspot_id" });
     if (error) throw error;
@@ -182,7 +182,7 @@ async function importObjectBatch(objectType: "contacts" | "companies" | "deals")
       owner_hubspot_id: c.properties.hubspot_owner_id ?? null,
       hs_created_at: toTs(c.properties.createdate),
       hs_updated_at: toTs(c.properties.hs_lastmodifieddate),
-      raw: c.properties,
+      raw: c.properties as unknown as any,
     }));
     const { error } = await supabaseAdmin.from("hs_companies").upsert(rows, { onConflict: "hubspot_id" });
     if (error) throw error;
@@ -202,7 +202,7 @@ async function importObjectBatch(objectType: "contacts" | "companies" | "deals")
         hs_created_at: toTs(d.properties.createdate),
         hs_closed_at: toTs(d.properties.closedate),
         hs_updated_at: toTs(d.properties.hs_lastmodifieddate),
-        raw: d.properties,
+        raw: d.properties as unknown as any,
       };
     });
     const { error } = await supabaseAdmin.from("hs_deals").upsert(rows, { onConflict: "hubspot_id" });
