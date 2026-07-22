@@ -168,7 +168,7 @@ export const updateInvoiceStatus = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ context, data }) => {
-    const patch: Record<string, unknown> = { status: data.status };
+    const patch: { status: "pendente" | "pago" | "atrasado" | "cancelado"; paid_at?: string } = { status: data.status };
     if (data.status === "pago") patch.paid_at = new Date().toISOString().slice(0, 10);
     const { error } = await context.supabase.from("finance_invoices").update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);
