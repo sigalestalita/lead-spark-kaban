@@ -76,9 +76,12 @@ function AppShell() {
         <div className={`${collapsed ? "px-2" : "px-5"} py-5 border-b border-white/5 flex items-center justify-between gap-2`}>
           <div className="flex items-center gap-2 min-w-0">
             {collapsed ? (
-              <img src={lidiLogo} alt="Lidi" className="h-7 w-auto mx-auto" />
+              <img src={lidiLogo} alt="Grou" className="h-7 w-auto mx-auto" />
             ) : (
-              <img src={lidiLogo} alt="Lidi" className="h-8 w-auto" />
+              <>
+                <img src={lidiLogo} alt="Grou" className="h-7 w-auto shrink-0" />
+                <span className="text-sm font-bold tracking-[0.25em] text-white truncate">COMPASS</span>
+              </>
             )}
           </div>
           <button
