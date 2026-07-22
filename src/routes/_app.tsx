@@ -27,6 +27,7 @@ export const Route = createFileRoute("/_app")({
 function AppShell() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { isComercial, isCs, isFinanceiro } = useCurrentRole();
   const router = useRouter();
   const [redirecting, setRedirecting] = useState(false);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
