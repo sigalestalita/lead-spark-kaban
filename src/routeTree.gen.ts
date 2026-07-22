@@ -37,16 +37,17 @@ import { Route as AppWhatsappCampanhasRouteImport } from './routes/_app.whatsapp
 import { Route as AppWhatsappAutomacoesRouteImport } from './routes/_app.whatsapp.automacoes'
 import { Route as AppLeadIdRouteImport } from './routes/_app.lead.$id'
 import { Route as AppCsSinaleiraPdaRouteImport } from './routes/_app.cs.sinaleira-pda'
-import { Route as AppConfiguracoesHubspotRouteImport } from './routes/_app.configuracoes.hubspot'
 import { Route as AppAnalyticsChatThreadIdRouteImport } from './routes/_app.analytics-chat.$threadId'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
+import { Route as AppConfiguracoesHubspotIndexRouteImport } from './routes/_app.configuracoes.hubspot.index'
 import { Route as ApiPublicRdCallbackRouteImport } from './routes/api/public/rd/callback'
 import { Route as ApiPublicHooksSyncRdRouteImport } from './routes/api/public/hooks/sync-rd'
 import { Route as ApiPublicHooksSendWeeklyDigestRouteImport } from './routes/api/public/hooks/send-weekly-digest'
 import { Route as ApiPublicHooksRunFupsRouteImport } from './routes/api/public/hooks/run-fups'
 import { Route as ApiPublicHooksHubspotImportTickRouteImport } from './routes/api/public/hooks/hubspot-import-tick'
 import { Route as AppWhatsappCampanhasIdRouteImport } from './routes/_app.whatsapp.campanhas.$id'
+import { Route as AppConfiguracoesHubspotExplorarRouteImport } from './routes/_app.configuracoes.hubspot.explorar'
 import { Route as ApiPublicWhatsappWebhookAccountIdRouteImport } from './routes/api/public/whatsapp/webhook.$accountId'
 import { Route as ApiPublicWhatsappAutomationsTickRouteImport } from './routes/api/public/whatsapp/automations.tick'
 
@@ -191,11 +192,6 @@ const AppCsSinaleiraPdaRoute = AppCsSinaleiraPdaRouteImport.update({
   path: '/sinaleira-pda',
   getParentRoute: () => AppCsRoute,
 } as any)
-const AppConfiguracoesHubspotRoute = AppConfiguracoesHubspotRouteImport.update({
-  id: '/configuracoes/hubspot',
-  path: '/configuracoes/hubspot',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppAnalyticsChatThreadIdRoute =
   AppAnalyticsChatThreadIdRouteImport.update({
     id: '/$threadId',
@@ -213,6 +209,12 @@ const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   path: '/.lovable/oauth/consent',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppConfiguracoesHubspotIndexRoute =
+  AppConfiguracoesHubspotIndexRouteImport.update({
+    id: '/configuracoes/hubspot/',
+    path: '/configuracoes/hubspot/',
+    getParentRoute: () => AppRoute,
+  } as any)
 const ApiPublicRdCallbackRoute = ApiPublicRdCallbackRouteImport.update({
   id: '/api/public/rd/callback',
   path: '/api/public/rd/callback',
@@ -245,6 +247,12 @@ const AppWhatsappCampanhasIdRoute = AppWhatsappCampanhasIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AppWhatsappCampanhasRoute,
 } as any)
+const AppConfiguracoesHubspotExplorarRoute =
+  AppConfiguracoesHubspotExplorarRouteImport.update({
+    id: '/configuracoes/hubspot/explorar',
+    path: '/configuracoes/hubspot/explorar',
+    getParentRoute: () => AppRoute,
+  } as any)
 const ApiPublicWhatsappWebhookAccountIdRoute =
   ApiPublicWhatsappWebhookAccountIdRouteImport.update({
     id: '/api/public/whatsapp/webhook/$accountId',
@@ -277,7 +285,6 @@ export interface FileRoutesByFullPath {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/analytics-chat/$threadId': typeof AppAnalyticsChatThreadIdRoute
-  '/configuracoes/hubspot': typeof AppConfiguracoesHubspotRoute
   '/cs/sinaleira-pda': typeof AppCsSinaleiraPdaRoute
   '/lead/$id': typeof AppLeadIdRoute
   '/whatsapp/automacoes': typeof AppWhatsappAutomacoesRoute
@@ -290,12 +297,14 @@ export interface FileRoutesByFullPath {
   '/configuracoes/': typeof AppConfiguracoesIndexRoute
   '/cs/': typeof AppCsIndexRoute
   '/whatsapp/': typeof AppWhatsappIndexRoute
+  '/configuracoes/hubspot/explorar': typeof AppConfiguracoesHubspotExplorarRoute
   '/whatsapp/campanhas/$id': typeof AppWhatsappCampanhasIdRoute
   '/api/public/hooks/hubspot-import-tick': typeof ApiPublicHooksHubspotImportTickRoute
   '/api/public/hooks/run-fups': typeof ApiPublicHooksRunFupsRoute
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
   '/api/public/rd/callback': typeof ApiPublicRdCallbackRoute
+  '/configuracoes/hubspot/': typeof AppConfiguracoesHubspotIndexRoute
   '/api/public/whatsapp/automations/tick': typeof ApiPublicWhatsappAutomationsTickRoute
   '/api/public/whatsapp/webhook/$accountId': typeof ApiPublicWhatsappWebhookAccountIdRoute
 }
@@ -316,7 +325,6 @@ export interface FileRoutesByTo {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/analytics-chat/$threadId': typeof AppAnalyticsChatThreadIdRoute
-  '/configuracoes/hubspot': typeof AppConfiguracoesHubspotRoute
   '/cs/sinaleira-pda': typeof AppCsSinaleiraPdaRoute
   '/lead/$id': typeof AppLeadIdRoute
   '/whatsapp/automacoes': typeof AppWhatsappAutomacoesRoute
@@ -329,12 +337,14 @@ export interface FileRoutesByTo {
   '/configuracoes': typeof AppConfiguracoesIndexRoute
   '/cs': typeof AppCsIndexRoute
   '/whatsapp': typeof AppWhatsappIndexRoute
+  '/configuracoes/hubspot/explorar': typeof AppConfiguracoesHubspotExplorarRoute
   '/whatsapp/campanhas/$id': typeof AppWhatsappCampanhasIdRoute
   '/api/public/hooks/hubspot-import-tick': typeof ApiPublicHooksHubspotImportTickRoute
   '/api/public/hooks/run-fups': typeof ApiPublicHooksRunFupsRoute
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
   '/api/public/rd/callback': typeof ApiPublicRdCallbackRoute
+  '/configuracoes/hubspot': typeof AppConfiguracoesHubspotIndexRoute
   '/api/public/whatsapp/automations/tick': typeof ApiPublicWhatsappAutomationsTickRoute
   '/api/public/whatsapp/webhook/$accountId': typeof ApiPublicWhatsappWebhookAccountIdRoute
 }
@@ -359,7 +369,6 @@ export interface FileRoutesById {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_app/analytics-chat/$threadId': typeof AppAnalyticsChatThreadIdRoute
-  '/_app/configuracoes/hubspot': typeof AppConfiguracoesHubspotRoute
   '/_app/cs/sinaleira-pda': typeof AppCsSinaleiraPdaRoute
   '/_app/lead/$id': typeof AppLeadIdRoute
   '/_app/whatsapp/automacoes': typeof AppWhatsappAutomacoesRoute
@@ -372,12 +381,14 @@ export interface FileRoutesById {
   '/_app/configuracoes/': typeof AppConfiguracoesIndexRoute
   '/_app/cs/': typeof AppCsIndexRoute
   '/_app/whatsapp/': typeof AppWhatsappIndexRoute
+  '/_app/configuracoes/hubspot/explorar': typeof AppConfiguracoesHubspotExplorarRoute
   '/_app/whatsapp/campanhas/$id': typeof AppWhatsappCampanhasIdRoute
   '/api/public/hooks/hubspot-import-tick': typeof ApiPublicHooksHubspotImportTickRoute
   '/api/public/hooks/run-fups': typeof ApiPublicHooksRunFupsRoute
   '/api/public/hooks/send-weekly-digest': typeof ApiPublicHooksSendWeeklyDigestRoute
   '/api/public/hooks/sync-rd': typeof ApiPublicHooksSyncRdRoute
   '/api/public/rd/callback': typeof ApiPublicRdCallbackRoute
+  '/_app/configuracoes/hubspot/': typeof AppConfiguracoesHubspotIndexRoute
   '/api/public/whatsapp/automations/tick': typeof ApiPublicWhatsappAutomationsTickRoute
   '/api/public/whatsapp/webhook/$accountId': typeof ApiPublicWhatsappWebhookAccountIdRoute
 }
@@ -402,7 +413,6 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/analytics-chat/$threadId'
-    | '/configuracoes/hubspot'
     | '/cs/sinaleira-pda'
     | '/lead/$id'
     | '/whatsapp/automacoes'
@@ -415,12 +425,14 @@ export interface FileRouteTypes {
     | '/configuracoes/'
     | '/cs/'
     | '/whatsapp/'
+    | '/configuracoes/hubspot/explorar'
     | '/whatsapp/campanhas/$id'
     | '/api/public/hooks/hubspot-import-tick'
     | '/api/public/hooks/run-fups'
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
     | '/api/public/rd/callback'
+    | '/configuracoes/hubspot/'
     | '/api/public/whatsapp/automations/tick'
     | '/api/public/whatsapp/webhook/$accountId'
   fileRoutesByTo: FileRoutesByTo
@@ -441,7 +453,6 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/analytics-chat/$threadId'
-    | '/configuracoes/hubspot'
     | '/cs/sinaleira-pda'
     | '/lead/$id'
     | '/whatsapp/automacoes'
@@ -454,12 +465,14 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/cs'
     | '/whatsapp'
+    | '/configuracoes/hubspot/explorar'
     | '/whatsapp/campanhas/$id'
     | '/api/public/hooks/hubspot-import-tick'
     | '/api/public/hooks/run-fups'
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
     | '/api/public/rd/callback'
+    | '/configuracoes/hubspot'
     | '/api/public/whatsapp/automations/tick'
     | '/api/public/whatsapp/webhook/$accountId'
   id:
@@ -483,7 +496,6 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/_app/analytics-chat/$threadId'
-    | '/_app/configuracoes/hubspot'
     | '/_app/cs/sinaleira-pda'
     | '/_app/lead/$id'
     | '/_app/whatsapp/automacoes'
@@ -496,12 +508,14 @@ export interface FileRouteTypes {
     | '/_app/configuracoes/'
     | '/_app/cs/'
     | '/_app/whatsapp/'
+    | '/_app/configuracoes/hubspot/explorar'
     | '/_app/whatsapp/campanhas/$id'
     | '/api/public/hooks/hubspot-import-tick'
     | '/api/public/hooks/run-fups'
     | '/api/public/hooks/send-weekly-digest'
     | '/api/public/hooks/sync-rd'
     | '/api/public/rd/callback'
+    | '/_app/configuracoes/hubspot/'
     | '/api/public/whatsapp/automations/tick'
     | '/api/public/whatsapp/webhook/$accountId'
   fileRoutesById: FileRoutesById
@@ -722,13 +736,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCsSinaleiraPdaRouteImport
       parentRoute: typeof AppCsRoute
     }
-    '/_app/configuracoes/hubspot': {
-      id: '/_app/configuracoes/hubspot'
-      path: '/configuracoes/hubspot'
-      fullPath: '/configuracoes/hubspot'
-      preLoaderRoute: typeof AppConfiguracoesHubspotRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/analytics-chat/$threadId': {
       id: '/_app/analytics-chat/$threadId'
       path: '/$threadId'
@@ -749,6 +756,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/.lovable/oauth/consent'
       preLoaderRoute: typeof DotlovableOauthConsentRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/configuracoes/hubspot/': {
+      id: '/_app/configuracoes/hubspot/'
+      path: '/configuracoes/hubspot'
+      fullPath: '/configuracoes/hubspot/'
+      preLoaderRoute: typeof AppConfiguracoesHubspotIndexRouteImport
+      parentRoute: typeof AppRoute
     }
     '/api/public/rd/callback': {
       id: '/api/public/rd/callback'
@@ -791,6 +805,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/whatsapp/campanhas/$id'
       preLoaderRoute: typeof AppWhatsappCampanhasIdRouteImport
       parentRoute: typeof AppWhatsappCampanhasRoute
+    }
+    '/_app/configuracoes/hubspot/explorar': {
+      id: '/_app/configuracoes/hubspot/explorar'
+      path: '/configuracoes/hubspot/explorar'
+      fullPath: '/configuracoes/hubspot/explorar'
+      preLoaderRoute: typeof AppConfiguracoesHubspotExplorarRouteImport
+      parentRoute: typeof AppRoute
     }
     '/api/public/whatsapp/webhook/$accountId': {
       id: '/api/public/whatsapp/webhook/$accountId'
@@ -880,9 +901,10 @@ interface AppRouteChildren {
   AppNovidadesRoute: typeof AppNovidadesRoute
   AppUsuariosRoute: typeof AppUsuariosRoute
   AppWhatsappRoute: typeof AppWhatsappRouteWithChildren
-  AppConfiguracoesHubspotRoute: typeof AppConfiguracoesHubspotRoute
   AppLeadIdRoute: typeof AppLeadIdRoute
   AppConfiguracoesIndexRoute: typeof AppConfiguracoesIndexRoute
+  AppConfiguracoesHubspotExplorarRoute: typeof AppConfiguracoesHubspotExplorarRoute
+  AppConfiguracoesHubspotIndexRoute: typeof AppConfiguracoesHubspotIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -896,9 +918,10 @@ const AppRouteChildren: AppRouteChildren = {
   AppNovidadesRoute: AppNovidadesRoute,
   AppUsuariosRoute: AppUsuariosRoute,
   AppWhatsappRoute: AppWhatsappRouteWithChildren,
-  AppConfiguracoesHubspotRoute: AppConfiguracoesHubspotRoute,
   AppLeadIdRoute: AppLeadIdRoute,
   AppConfiguracoesIndexRoute: AppConfiguracoesIndexRoute,
+  AppConfiguracoesHubspotExplorarRoute: AppConfiguracoesHubspotExplorarRoute,
+  AppConfiguracoesHubspotIndexRoute: AppConfiguracoesHubspotIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

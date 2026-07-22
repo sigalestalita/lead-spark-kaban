@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_app/configuracoes/hubspot")({
+export const Route = createFileRoute("/_app/configuracoes/hubspot/")({
   head: () => ({ meta: [{ title: "Importar do HubSpot — COMPASS" }] }),
   component: HubSpotImportPage,
 });
@@ -75,12 +75,17 @@ function HubSpotImportPage() {
 
   return (
     <div className="p-6 max-w-4xl space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">Importação do HubSpot</h1>
-        <p className="text-sm text-muted-foreground">
-          Backfill retomável — traz owners, contatos, empresas e negócios criados até 30/dez/2025.
-          Os dados ficam nas tabelas <code>hs_*</code>, separados do COMPASS (sem sobrescrever nada).
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Importação do HubSpot</h1>
+          <p className="text-sm text-muted-foreground">
+            Backfill retomável — traz owners, contatos, empresas e negócios criados até 30/dez/2025.
+            Os dados ficam nas tabelas <code>hs_*</code>, separados do COMPASS (sem sobrescrever nada).
+          </p>
+        </div>
+        <a href="/configuracoes/hubspot/explorar">
+          <Button variant="outline" size="sm">Explorar dados</Button>
+        </a>
       </div>
 
       <Card className="p-4 flex items-center justify-between">
