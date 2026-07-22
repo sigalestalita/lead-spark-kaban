@@ -16,6 +16,9 @@ export function useCurrentRole() {
     role: data?.role ?? null,
     isSuperAdmin: !!data?.isSuperAdmin,
     isGestao: !!data?.isGestao,
+    isComercial: !!data?.isComercial,
+    isCs: !!data?.isCs,
+    isFinanceiro: !!data?.isFinanceiro,
     loading: authLoading || isLoading,
   };
 }
