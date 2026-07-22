@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, Link, useNavigate, useRouter } from "@tanstack
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
+import { useCurrentRole } from "@/lib/use-role";
 import {
   Kanban as KanbanIcon,
   BarChart3,
@@ -13,6 +14,9 @@ import {
   MessageCircle,
   LineChart,
   Bot,
+  Briefcase,
+  HeartHandshake,
+  Wallet,
 } from "lucide-react";
 import lidiLogo from "@/assets/lidi-logo-white.png";
 
@@ -23,6 +27,7 @@ export const Route = createFileRoute("/_app")({
 function AppShell() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { isComercial, isCs, isFinanceiro } = useCurrentRole();
   const router = useRouter();
   const [redirecting, setRedirecting] = useState(false);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -59,14 +64,17 @@ function AppShell() {
 
   const currentPath = router.state.location.pathname;
   const nav = [
-    { to: "/kanban", label: "Kanban", icon: KanbanIcon },
-    { to: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
-    { to: "/dashboard", label: "Dashboard", icon: BarChart3 },
-    { to: "/leads-analytics", label: "Analytics", icon: LineChart },
-    { to: "/analytics-chat", label: "Chat Analytics", icon: Bot },
-    { to: "/novidades", label: "Novidades", icon: Sparkles },
-    { to: "/configuracoes", label: "Configurações", icon: SettingsIcon },
-  ];
+    { to: "/kanban", label: "Kanban", icon: KanbanIcon, show: true },
+    { to: "/whatsapp", label: "WhatsApp", icon: MessageCircle, show: true },
+    { to: "/comercial", label: "Comercial", icon: Briefcase, show: isComercial },
+    { to: "/cs", label: "CS", icon: HeartHandshake, show: isCs },
+    { to: "/financeiro", label: "Financeiro", icon: Wallet, show: isFinanceiro },
+    { to: "/dashboard", label: "Dashboard", icon: BarChart3, show: true },
+    { to: "/leads-analytics", label: "Analytics", icon: LineChart, show: true },
+    { to: "/analytics-chat", label: "Chat Analytics", icon: Bot, show: true },
+    { to: "/novidades", label: "Novidades", icon: Sparkles, show: true },
+    { to: "/configuracoes", label: "Configurações", icon: SettingsIcon, show: true },
+  ].filter((n) => n.show);
 
   return (
     <div className="min-h-screen flex">
