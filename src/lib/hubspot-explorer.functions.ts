@@ -40,7 +40,8 @@ export const listHubspotRecords = createServerFn({ method: "GET" })
       }
     }
 
-    q = q.order("hs_updated_at" as any, { ascending: false, nullsFirst: false }).range(from, to);
+    const sortCol = data.objectType === "owners" ? "updated_at" : "hs_updated_at";
+    q = q.order(sortCol as any, { ascending: false, nullsFirst: false }).range(from, to);
 
     const { data: rows, count, error } = await q;
     if (error) throw error;
