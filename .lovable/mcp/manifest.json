@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "sdk_version": "0.24.0",
+  "path": "/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://evojkwmchosmbylhxbnk.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "compass-mcp",
+      "version": "0.1.0",
+      "title": "COMPASS CRM"
+    },
+    "tools": [
+      {
+        "name": "list_leads",
+        "title": "Listar leads",
+        "description": "Lista os leads do CRM COMPASS visíveis para o usuário autenticado, ordenados por criação (mais recentes primeiro).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "description": "Quantidade máxima de leads a retornar (1-100)."
+            },
+            "stageSlug": {
+              "type": "string",
+              "description": "Filtrar por slug de etapa (ex.: 'novo', 'em_contato', 'qualificacao', 'agendado')."
+            },
+            "search": {
+              "type": "string",
+              "description": "Busca por nome, email ou empresa."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_lead",
+        "title": "Detalhes do lead",
+        "description": "Retorna os detalhes completos de um lead do COMPASS por ID, incluindo etapa e interações recentes.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "ID do lead."
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "dashboard_stats",
+        "title": "Estatísticas do funil",
+        "description": "Resumo do funil COMPASS: total de leads, contagem por etapa e por prioridade em um período (dias).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "days": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365,
+              "default": 30,
+              "description": "Janela em dias (padrão 30)."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
