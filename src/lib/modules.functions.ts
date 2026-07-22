@@ -109,7 +109,9 @@ export const updateCustomerStatus = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ context, data }) => {
-    const patch: Record<string, unknown> = { status: data.status };
+    const patch: { status: "onboarding" | "ativo" | "em_risco" | "churn"; health_score?: number; churned_at?: string } = {
+      status: data.status,
+    };
     if (data.health_score != null) patch.health_score = data.health_score;
     if (data.status === "churn") patch.churned_at = new Date().toISOString().slice(0, 10);
     const { error } = await context.supabase.from("cs_customers").update(patch).eq("id", data.id);
