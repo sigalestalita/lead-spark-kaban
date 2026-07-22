@@ -156,6 +156,45 @@ export type Database = {
           },
         ]
       }
+      compass_hubspot_matches: {
+        Row: {
+          compass_id: string
+          compass_kind: string
+          created_at: string
+          hs_hubspot_id: string
+          hs_type: string
+          id: string
+          match_key: string
+          score: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          compass_id: string
+          compass_kind: string
+          created_at?: string
+          hs_hubspot_id: string
+          hs_type: string
+          id?: string
+          match_key: string
+          score?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          compass_id?: string
+          compass_kind?: string
+          created_at?: string
+          hs_hubspot_id?: string
+          hs_type?: string
+          id?: string
+          match_key?: string
+          score?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cs_customers: {
         Row: {
           churned_at: string | null
@@ -466,6 +505,315 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      hs_associations: {
+        Row: {
+          association_label: string | null
+          created_at: string
+          from_hubspot_id: string
+          from_type: string
+          id: string
+          to_hubspot_id: string
+          to_type: string
+        }
+        Insert: {
+          association_label?: string | null
+          created_at?: string
+          from_hubspot_id: string
+          from_type: string
+          id?: string
+          to_hubspot_id: string
+          to_type: string
+        }
+        Update: {
+          association_label?: string | null
+          created_at?: string
+          from_hubspot_id?: string
+          from_type?: string
+          id?: string
+          to_hubspot_id?: string
+          to_type?: string
+        }
+        Relationships: []
+      }
+      hs_companies: {
+        Row: {
+          cnpj: string | null
+          created_at: string
+          domain: string | null
+          hs_created_at: string | null
+          hs_updated_at: string | null
+          hubspot_id: string
+          id: string
+          industry: string | null
+          name: string | null
+          numberofemployees: number | null
+          owner_hubspot_id: string | null
+          raw: Json | null
+          updated_at: string
+        }
+        Insert: {
+          cnpj?: string | null
+          created_at?: string
+          domain?: string | null
+          hs_created_at?: string | null
+          hs_updated_at?: string | null
+          hubspot_id: string
+          id?: string
+          industry?: string | null
+          name?: string | null
+          numberofemployees?: number | null
+          owner_hubspot_id?: string | null
+          raw?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          cnpj?: string | null
+          created_at?: string
+          domain?: string | null
+          hs_created_at?: string | null
+          hs_updated_at?: string | null
+          hubspot_id?: string
+          id?: string
+          industry?: string | null
+          name?: string | null
+          numberofemployees?: number | null
+          owner_hubspot_id?: string | null
+          raw?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hs_contacts: {
+        Row: {
+          company_name: string | null
+          created_at: string
+          email: string | null
+          first_name: string | null
+          hs_created_at: string | null
+          hs_updated_at: string | null
+          hubspot_id: string
+          id: string
+          jobtitle: string | null
+          last_activity_at: string | null
+          last_name: string | null
+          lifecyclestage: string | null
+          owner_hubspot_id: string | null
+          phone: string | null
+          raw: Json | null
+          updated_at: string
+        }
+        Insert: {
+          company_name?: string | null
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          hs_created_at?: string | null
+          hs_updated_at?: string | null
+          hubspot_id: string
+          id?: string
+          jobtitle?: string | null
+          last_activity_at?: string | null
+          last_name?: string | null
+          lifecyclestage?: string | null
+          owner_hubspot_id?: string | null
+          phone?: string | null
+          raw?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          company_name?: string | null
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          hs_created_at?: string | null
+          hs_updated_at?: string | null
+          hubspot_id?: string
+          id?: string
+          jobtitle?: string | null
+          last_activity_at?: string | null
+          last_name?: string | null
+          lifecyclestage?: string | null
+          owner_hubspot_id?: string | null
+          phone?: string | null
+          raw?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hs_deals: {
+        Row: {
+          amount: number | null
+          created_at: string
+          currency: string | null
+          dealname: string | null
+          dealstage: string | null
+          hs_closed_at: string | null
+          hs_created_at: string | null
+          hs_updated_at: string | null
+          hubspot_id: string
+          id: string
+          outcome: string | null
+          owner_hubspot_id: string | null
+          pipeline: string | null
+          raw: Json | null
+          updated_at: string
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          currency?: string | null
+          dealname?: string | null
+          dealstage?: string | null
+          hs_closed_at?: string | null
+          hs_created_at?: string | null
+          hs_updated_at?: string | null
+          hubspot_id: string
+          id?: string
+          outcome?: string | null
+          owner_hubspot_id?: string | null
+          pipeline?: string | null
+          raw?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          currency?: string | null
+          dealname?: string | null
+          dealstage?: string | null
+          hs_closed_at?: string | null
+          hs_created_at?: string | null
+          hs_updated_at?: string | null
+          hubspot_id?: string
+          id?: string
+          outcome?: string | null
+          owner_hubspot_id?: string | null
+          pipeline?: string | null
+          raw?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hs_engagements: {
+        Row: {
+          body: string | null
+          company_hubspot_ids: string[] | null
+          contact_hubspot_ids: string[] | null
+          created_at: string
+          deal_hubspot_ids: string[] | null
+          engagement_type: string | null
+          hubspot_id: string
+          id: string
+          occurred_at: string | null
+          owner_hubspot_id: string | null
+          raw: Json | null
+          subject: string | null
+        }
+        Insert: {
+          body?: string | null
+          company_hubspot_ids?: string[] | null
+          contact_hubspot_ids?: string[] | null
+          created_at?: string
+          deal_hubspot_ids?: string[] | null
+          engagement_type?: string | null
+          hubspot_id: string
+          id?: string
+          occurred_at?: string | null
+          owner_hubspot_id?: string | null
+          raw?: Json | null
+          subject?: string | null
+        }
+        Update: {
+          body?: string | null
+          company_hubspot_ids?: string[] | null
+          contact_hubspot_ids?: string[] | null
+          created_at?: string
+          deal_hubspot_ids?: string[] | null
+          engagement_type?: string | null
+          hubspot_id?: string
+          id?: string
+          occurred_at?: string | null
+          owner_hubspot_id?: string | null
+          raw?: Json | null
+          subject?: string | null
+        }
+        Relationships: []
+      }
+      hs_import_state: {
+        Row: {
+          cursor_after: string | null
+          fetched_count: number
+          finished_at: string | null
+          id: string
+          last_error: string | null
+          object_type: string
+          started_at: string | null
+          status: string
+          updated_at: string
+          upserted_count: number
+        }
+        Insert: {
+          cursor_after?: string | null
+          fetched_count?: number
+          finished_at?: string | null
+          id?: string
+          last_error?: string | null
+          object_type: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          upserted_count?: number
+        }
+        Update: {
+          cursor_after?: string | null
+          fetched_count?: number
+          finished_at?: string | null
+          id?: string
+          last_error?: string | null
+          object_type?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          upserted_count?: number
+        }
+        Relationships: []
+      }
+      hs_owners: {
+        Row: {
+          active: boolean | null
+          created_at: string
+          email: string | null
+          first_name: string | null
+          hubspot_id: string
+          id: string
+          last_name: string | null
+          raw: Json | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          hubspot_id: string
+          id?: string
+          last_name?: string | null
+          raw?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          hubspot_id?: string
+          id?: string
+          last_name?: string | null
+          raw?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       icp_config: {
         Row: {
