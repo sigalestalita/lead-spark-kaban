@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, Link, useNavigate, useRouter } from "@tanstack
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
+import { useCurrentRole } from "@/lib/use-role";
 import {
   Kanban as KanbanIcon,
   BarChart3,
@@ -13,6 +14,9 @@ import {
   MessageCircle,
   LineChart,
   Bot,
+  Briefcase,
+  HeartHandshake,
+  Wallet,
 } from "lucide-react";
 import lidiLogo from "@/assets/lidi-logo-white.png";
 

@@ -18,7 +18,9 @@ import { Route as AppUsuariosRouteImport } from './routes/_app.usuarios'
 import { Route as AppNovidadesRouteImport } from './routes/_app.novidades'
 import { Route as AppLeadsAnalyticsRouteImport } from './routes/_app.leads-analytics'
 import { Route as AppKanbanRouteImport } from './routes/_app.kanban'
+import { Route as AppFinanceiroRouteImport } from './routes/_app.financeiro'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppCsRouteImport } from './routes/_app.cs'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppComercialRouteImport } from './routes/_app.comercial'
 import { Route as AppAnalyticsChatRouteImport } from './routes/_app.analytics-chat'
@@ -88,9 +90,19 @@ const AppKanbanRoute = AppKanbanRouteImport.update({
   path: '/kanban',
   getParentRoute: () => AppRoute,
 } as any)
+const AppFinanceiroRoute = AppFinanceiroRouteImport.update({
+  id: '/financeiro',
+  path: '/financeiro',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCsRoute = AppCsRouteImport.update({
+  id: '/cs',
+  path: '/cs',
   getParentRoute: () => AppRoute,
 } as any)
 const AppConfiguracoesRoute = AppConfiguracoesRouteImport.update({
@@ -230,7 +242,9 @@ export interface FileRoutesByFullPath {
   '/analytics-chat': typeof AppAnalyticsChatRouteWithChildren
   '/comercial': typeof AppComercialRoute
   '/configuracoes': typeof AppConfiguracoesRoute
+  '/cs': typeof AppCsRoute
   '/dashboard': typeof AppDashboardRoute
+  '/financeiro': typeof AppFinanceiroRoute
   '/kanban': typeof AppKanbanRoute
   '/leads-analytics': typeof AppLeadsAnalyticsRoute
   '/novidades': typeof AppNovidadesRoute
@@ -265,7 +279,9 @@ export interface FileRoutesByTo {
   '/analytics-chat': typeof AppAnalyticsChatRouteWithChildren
   '/comercial': typeof AppComercialRoute
   '/configuracoes': typeof AppConfiguracoesRoute
+  '/cs': typeof AppCsRoute
   '/dashboard': typeof AppDashboardRoute
+  '/financeiro': typeof AppFinanceiroRoute
   '/kanban': typeof AppKanbanRoute
   '/leads-analytics': typeof AppLeadsAnalyticsRoute
   '/novidades': typeof AppNovidadesRoute
@@ -301,7 +317,9 @@ export interface FileRoutesById {
   '/_app/analytics-chat': typeof AppAnalyticsChatRouteWithChildren
   '/_app/comercial': typeof AppComercialRoute
   '/_app/configuracoes': typeof AppConfiguracoesRoute
+  '/_app/cs': typeof AppCsRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/financeiro': typeof AppFinanceiroRoute
   '/_app/kanban': typeof AppKanbanRoute
   '/_app/leads-analytics': typeof AppLeadsAnalyticsRoute
   '/_app/novidades': typeof AppNovidadesRoute
@@ -338,7 +356,9 @@ export interface FileRouteTypes {
     | '/analytics-chat'
     | '/comercial'
     | '/configuracoes'
+    | '/cs'
     | '/dashboard'
+    | '/financeiro'
     | '/kanban'
     | '/leads-analytics'
     | '/novidades'
@@ -373,7 +393,9 @@ export interface FileRouteTypes {
     | '/analytics-chat'
     | '/comercial'
     | '/configuracoes'
+    | '/cs'
     | '/dashboard'
+    | '/financeiro'
     | '/kanban'
     | '/leads-analytics'
     | '/novidades'
@@ -408,7 +430,9 @@ export interface FileRouteTypes {
     | '/_app/analytics-chat'
     | '/_app/comercial'
     | '/_app/configuracoes'
+    | '/_app/cs'
     | '/_app/dashboard'
+    | '/_app/financeiro'
     | '/_app/kanban'
     | '/_app/leads-analytics'
     | '/_app/novidades'
@@ -517,11 +541,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppKanbanRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/financeiro': {
+      id: '/_app/financeiro'
+      path: '/financeiro'
+      fullPath: '/financeiro'
+      preLoaderRoute: typeof AppFinanceiroRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/cs': {
+      id: '/_app/cs'
+      path: '/cs'
+      fullPath: '/cs'
+      preLoaderRoute: typeof AppCsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/configuracoes': {
@@ -747,7 +785,9 @@ interface AppRouteChildren {
   AppAnalyticsChatRoute: typeof AppAnalyticsChatRouteWithChildren
   AppComercialRoute: typeof AppComercialRoute
   AppConfiguracoesRoute: typeof AppConfiguracoesRoute
+  AppCsRoute: typeof AppCsRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppFinanceiroRoute: typeof AppFinanceiroRoute
   AppKanbanRoute: typeof AppKanbanRoute
   AppLeadsAnalyticsRoute: typeof AppLeadsAnalyticsRoute
   AppNovidadesRoute: typeof AppNovidadesRoute
@@ -760,7 +800,9 @@ const AppRouteChildren: AppRouteChildren = {
   AppAnalyticsChatRoute: AppAnalyticsChatRouteWithChildren,
   AppComercialRoute: AppComercialRoute,
   AppConfiguracoesRoute: AppConfiguracoesRoute,
+  AppCsRoute: AppCsRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppFinanceiroRoute: AppFinanceiroRoute,
   AppKanbanRoute: AppKanbanRoute,
   AppLeadsAnalyticsRoute: AppLeadsAnalyticsRoute,
   AppNovidadesRoute: AppNovidadesRoute,
