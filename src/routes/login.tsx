@@ -10,7 +10,7 @@ import lidiLogo from "@/assets/lidi-logo-white.png";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Entrar — SDR GROU" }] }),
+  head: () => ({ meta: [{ title: "Entrar — COMPASS" }] }),
   component: LoginPage,
 });
 
