@@ -228,6 +228,122 @@ export type Database = {
           },
         ]
       }
+      cs_signal_activities: {
+        Row: {
+          activity_type: string
+          client_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          performed_at: string
+          performed_by_user_id: string | null
+          title: string | null
+        }
+        Insert: {
+          activity_type: string
+          client_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          performed_at?: string
+          performed_by_user_id?: string | null
+          title?: string | null
+        }
+        Update: {
+          activity_type?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          performed_at?: string
+          performed_by_user_id?: string | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cs_signal_activities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "cs_signal_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cs_signal_clients: {
+        Row: {
+          assigned_user_id: string | null
+          base_id: string | null
+          comparativo: number | null
+          consumo_ultimo_mes: number | null
+          conta_desabilitada: string | null
+          created_at: string
+          creditos_utilizados_total: number | null
+          data_expiracao_conta: string | null
+          data_expiracao_creditos: string | null
+          id: string
+          kanban_status: string
+          meses_restantes: number | null
+          meta_mensal: number | null
+          motivo_sinaleira: string | null
+          nome: string
+          saldo_atual: number | null
+          sheet_tab: string | null
+          sinaleira: string | null
+          status_dados: string | null
+          synced_at: string
+          tipo_conta: string | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_user_id?: string | null
+          base_id?: string | null
+          comparativo?: number | null
+          consumo_ultimo_mes?: number | null
+          conta_desabilitada?: string | null
+          created_at?: string
+          creditos_utilizados_total?: number | null
+          data_expiracao_conta?: string | null
+          data_expiracao_creditos?: string | null
+          id?: string
+          kanban_status?: string
+          meses_restantes?: number | null
+          meta_mensal?: number | null
+          motivo_sinaleira?: string | null
+          nome: string
+          saldo_atual?: number | null
+          sheet_tab?: string | null
+          sinaleira?: string | null
+          status_dados?: string | null
+          synced_at?: string
+          tipo_conta?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_user_id?: string | null
+          base_id?: string | null
+          comparativo?: number | null
+          consumo_ultimo_mes?: number | null
+          conta_desabilitada?: string | null
+          created_at?: string
+          creditos_utilizados_total?: number | null
+          data_expiracao_conta?: string | null
+          data_expiracao_creditos?: string | null
+          id?: string
+          kanban_status?: string
+          meses_restantes?: number | null
+          meta_mensal?: number | null
+          motivo_sinaleira?: string | null
+          nome?: string
+          saldo_atual?: number | null
+          sheet_tab?: string | null
+          sinaleira?: string | null
+          status_dados?: string | null
+          synced_at?: string
+          tipo_conta?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       finance_contracts: {
         Row: {
           amount: number
