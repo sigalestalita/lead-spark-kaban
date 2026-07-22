@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_app/configuracoes/hubspot")({
+export const Route = createFileRoute("/_app/configuracoes/hubspot/")({
   head: () => ({ meta: [{ title: "Importar do HubSpot — COMPASS" }] }),
   component: HubSpotImportPage,
 });
