@@ -34,6 +34,7 @@ import { Route as AppWhatsappAutomacoesRouteImport } from './routes/_app.whatsap
 import { Route as AppLeadIdRouteImport } from './routes/_app.lead.$id'
 import { Route as AppAnalyticsChatThreadIdRouteImport } from './routes/_app.analytics-chat.$threadId'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as ApiPublicRdCallbackRouteImport } from './routes/api/public/rd/callback'
 import { Route as ApiPublicHooksSyncRdRouteImport } from './routes/api/public/hooks/sync-rd'
 import { Route as ApiPublicHooksSendWeeklyDigestRouteImport } from './routes/api/public/hooks/send-weekly-digest'
@@ -170,6 +171,11 @@ const Char91DotmcpChar93InvokeToolToolRoute =
     path: '/.mcp/invoke-tool/$tool',
     getParentRoute: () => rootRouteImport,
   } as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicRdCallbackRoute = ApiPublicRdCallbackRouteImport.update({
   id: '/api/public/rd/callback',
   path: '/api/public/rd/callback',
@@ -223,6 +229,7 @@ export interface FileRoutesByFullPath {
   '/novidades': typeof AppNovidadesRoute
   '/usuarios': typeof AppUsuariosRoute
   '/whatsapp': typeof AppWhatsappRouteWithChildren
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/analytics-chat/$threadId': typeof AppAnalyticsChatThreadIdRoute
   '/lead/$id': typeof AppLeadIdRoute
@@ -255,6 +262,7 @@ export interface FileRoutesByTo {
   '/leads-analytics': typeof AppLeadsAnalyticsRoute
   '/novidades': typeof AppNovidadesRoute
   '/usuarios': typeof AppUsuariosRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/analytics-chat/$threadId': typeof AppAnalyticsChatThreadIdRoute
   '/lead/$id': typeof AppLeadIdRoute
@@ -290,6 +298,7 @@ export interface FileRoutesById {
   '/_app/novidades': typeof AppNovidadesRoute
   '/_app/usuarios': typeof AppUsuariosRoute
   '/_app/whatsapp': typeof AppWhatsappRouteWithChildren
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_app/analytics-chat/$threadId': typeof AppAnalyticsChatThreadIdRoute
   '/_app/lead/$id': typeof AppLeadIdRoute
@@ -325,6 +334,7 @@ export interface FileRouteTypes {
     | '/novidades'
     | '/usuarios'
     | '/whatsapp'
+    | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/analytics-chat/$threadId'
     | '/lead/$id'
@@ -357,6 +367,7 @@ export interface FileRouteTypes {
     | '/leads-analytics'
     | '/novidades'
     | '/usuarios'
+    | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/analytics-chat/$threadId'
     | '/lead/$id'
@@ -391,6 +402,7 @@ export interface FileRouteTypes {
     | '/_app/novidades'
     | '/_app/usuarios'
     | '/_app/whatsapp'
+    | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/_app/analytics-chat/$threadId'
     | '/_app/lead/$id'
@@ -418,6 +430,7 @@ export interface RootRouteChildren {
   McpRoute: typeof McpRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicHooksRunFupsRoute: typeof ApiPublicHooksRunFupsRoute
   ApiPublicHooksSendWeeklyDigestRoute: typeof ApiPublicHooksSendWeeklyDigestRoute
@@ -604,6 +617,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/rd/callback': {
       id: '/api/public/rd/callback'
       path: '/api/public/rd/callback'
@@ -738,6 +758,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicHooksRunFupsRoute: ApiPublicHooksRunFupsRoute,
   ApiPublicHooksSendWeeklyDigestRoute: ApiPublicHooksSendWeeklyDigestRoute,
