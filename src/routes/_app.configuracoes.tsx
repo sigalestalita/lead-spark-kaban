@@ -102,20 +102,36 @@ function SettingsPage() {
       <h1 className="text-2xl font-bold">Configurações</h1>
 
       {(isSuperAdmin || isGestao) && (
-        <Card className="p-5 flex items-center justify-between">
-          <div>
-            <h2 className="font-semibold">Usuários e papéis</h2>
-            <p className="text-xs text-muted-foreground">
-              Gerencie quem tem acesso à plataforma e ajuste os papéis do time.
-            </p>
-          </div>
-          <Link
-            to="/usuarios"
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Gerenciar usuários
-          </Link>
-        </Card>
+        <>
+          <Card className="p-5 flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold">Usuários e papéis</h2>
+              <p className="text-xs text-muted-foreground">
+                Gerencie quem tem acesso à plataforma e ajuste os papéis do time.
+              </p>
+            </div>
+            <Link
+              to="/usuarios"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Gerenciar usuários
+            </Link>
+          </Card>
+          <Card className="p-5 flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold">Importação do HubSpot</h2>
+              <p className="text-xs text-muted-foreground">
+                Backfill de contatos, empresas e negócios (até 30/dez/2025) do HubSpot para as tabelas espelho.
+              </p>
+            </div>
+            <Link
+              to="/configuracoes/hubspot"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Abrir importação
+            </Link>
+          </Card>
+        </>
       )}
 
       <Card className="p-5 space-y-3 border-destructive/40">
