@@ -37,6 +37,7 @@ import { Route as AppWhatsappCampanhasRouteImport } from './routes/_app.whatsapp
 import { Route as AppWhatsappAutomacoesRouteImport } from './routes/_app.whatsapp.automacoes'
 import { Route as AppLeadIdRouteImport } from './routes/_app.lead.$id'
 import { Route as AppCsSinaleiraPdaRouteImport } from './routes/_app.cs.sinaleira-pda'
+import { Route as AppConfiguracoesHubspotRouteImport } from './routes/_app.configuracoes.hubspot'
 import { Route as AppAnalyticsChatThreadIdRouteImport } from './routes/_app.analytics-chat.$threadId'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
@@ -190,6 +191,11 @@ const AppCsSinaleiraPdaRoute = AppCsSinaleiraPdaRouteImport.update({
   path: '/sinaleira-pda',
   getParentRoute: () => AppCsRoute,
 } as any)
+const AppConfiguracoesHubspotRoute = AppConfiguracoesHubspotRouteImport.update({
+  id: '/hubspot',
+  path: '/hubspot',
+  getParentRoute: () => AppConfiguracoesRoute,
+} as any)
 const AppAnalyticsChatThreadIdRoute =
   AppAnalyticsChatThreadIdRouteImport.update({
     id: '/$threadId',
@@ -260,7 +266,7 @@ export interface FileRoutesByFullPath {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/analytics-chat': typeof AppAnalyticsChatRouteWithChildren
   '/comercial': typeof AppComercialRoute
-  '/configuracoes': typeof AppConfiguracoesRoute
+  '/configuracoes': typeof AppConfiguracoesRouteWithChildren
   '/cs': typeof AppCsRouteWithChildren
   '/dashboard': typeof AppDashboardRoute
   '/financeiro': typeof AppFinanceiroRoute
@@ -272,6 +278,7 @@ export interface FileRoutesByFullPath {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/analytics-chat/$threadId': typeof AppAnalyticsChatThreadIdRoute
+  '/configuracoes/hubspot': typeof AppConfiguracoesHubspotRoute
   '/cs/sinaleira-pda': typeof AppCsSinaleiraPdaRoute
   '/lead/$id': typeof AppLeadIdRoute
   '/whatsapp/automacoes': typeof AppWhatsappAutomacoesRoute
@@ -300,7 +307,7 @@ export interface FileRoutesByTo {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/analytics-chat': typeof AppAnalyticsChatRouteWithChildren
   '/comercial': typeof AppComercialRoute
-  '/configuracoes': typeof AppConfiguracoesRoute
+  '/configuracoes': typeof AppConfiguracoesRouteWithChildren
   '/dashboard': typeof AppDashboardRoute
   '/financeiro': typeof AppFinanceiroRoute
   '/kanban': typeof AppKanbanRoute
@@ -310,6 +317,7 @@ export interface FileRoutesByTo {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/analytics-chat/$threadId': typeof AppAnalyticsChatThreadIdRoute
+  '/configuracoes/hubspot': typeof AppConfiguracoesHubspotRoute
   '/cs/sinaleira-pda': typeof AppCsSinaleiraPdaRoute
   '/lead/$id': typeof AppLeadIdRoute
   '/whatsapp/automacoes': typeof AppWhatsappAutomacoesRoute
@@ -340,7 +348,7 @@ export interface FileRoutesById {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_app/analytics-chat': typeof AppAnalyticsChatRouteWithChildren
   '/_app/comercial': typeof AppComercialRoute
-  '/_app/configuracoes': typeof AppConfiguracoesRoute
+  '/_app/configuracoes': typeof AppConfiguracoesRouteWithChildren
   '/_app/cs': typeof AppCsRouteWithChildren
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/financeiro': typeof AppFinanceiroRoute
@@ -352,6 +360,7 @@ export interface FileRoutesById {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_app/analytics-chat/$threadId': typeof AppAnalyticsChatThreadIdRoute
+  '/_app/configuracoes/hubspot': typeof AppConfiguracoesHubspotRoute
   '/_app/cs/sinaleira-pda': typeof AppCsSinaleiraPdaRoute
   '/_app/lead/$id': typeof AppLeadIdRoute
   '/_app/whatsapp/automacoes': typeof AppWhatsappAutomacoesRoute
@@ -394,6 +403,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/analytics-chat/$threadId'
+    | '/configuracoes/hubspot'
     | '/cs/sinaleira-pda'
     | '/lead/$id'
     | '/whatsapp/automacoes'
@@ -432,6 +442,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/analytics-chat/$threadId'
+    | '/configuracoes/hubspot'
     | '/cs/sinaleira-pda'
     | '/lead/$id'
     | '/whatsapp/automacoes'
@@ -473,6 +484,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/_app/analytics-chat/$threadId'
+    | '/_app/configuracoes/hubspot'
     | '/_app/cs/sinaleira-pda'
     | '/_app/lead/$id'
     | '/_app/whatsapp/automacoes'
@@ -710,6 +722,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCsSinaleiraPdaRouteImport
       parentRoute: typeof AppCsRoute
     }
+    '/_app/configuracoes/hubspot': {
+      id: '/_app/configuracoes/hubspot'
+      path: '/hubspot'
+      fullPath: '/configuracoes/hubspot'
+      preLoaderRoute: typeof AppConfiguracoesHubspotRouteImport
+      parentRoute: typeof AppConfiguracoesRoute
+    }
     '/_app/analytics-chat/$threadId': {
       id: '/_app/analytics-chat/$threadId'
       path: '/$threadId'
@@ -801,6 +820,17 @@ const AppAnalyticsChatRouteChildren: AppAnalyticsChatRouteChildren = {
 const AppAnalyticsChatRouteWithChildren =
   AppAnalyticsChatRoute._addFileChildren(AppAnalyticsChatRouteChildren)
 
+interface AppConfiguracoesRouteChildren {
+  AppConfiguracoesHubspotRoute: typeof AppConfiguracoesHubspotRoute
+}
+
+const AppConfiguracoesRouteChildren: AppConfiguracoesRouteChildren = {
+  AppConfiguracoesHubspotRoute: AppConfiguracoesHubspotRoute,
+}
+
+const AppConfiguracoesRouteWithChildren =
+  AppConfiguracoesRoute._addFileChildren(AppConfiguracoesRouteChildren)
+
 interface AppCsRouteChildren {
   AppCsSinaleiraPdaRoute: typeof AppCsSinaleiraPdaRoute
   AppCsIndexRoute: typeof AppCsIndexRoute
@@ -853,7 +883,7 @@ const AppWhatsappRouteWithChildren = AppWhatsappRoute._addFileChildren(
 interface AppRouteChildren {
   AppAnalyticsChatRoute: typeof AppAnalyticsChatRouteWithChildren
   AppComercialRoute: typeof AppComercialRoute
-  AppConfiguracoesRoute: typeof AppConfiguracoesRoute
+  AppConfiguracoesRoute: typeof AppConfiguracoesRouteWithChildren
   AppCsRoute: typeof AppCsRouteWithChildren
   AppDashboardRoute: typeof AppDashboardRoute
   AppFinanceiroRoute: typeof AppFinanceiroRoute
@@ -868,7 +898,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppAnalyticsChatRoute: AppAnalyticsChatRouteWithChildren,
   AppComercialRoute: AppComercialRoute,
-  AppConfiguracoesRoute: AppConfiguracoesRoute,
+  AppConfiguracoesRoute: AppConfiguracoesRouteWithChildren,
   AppCsRoute: AppCsRouteWithChildren,
   AppDashboardRoute: AppDashboardRoute,
   AppFinanceiroRoute: AppFinanceiroRoute,
