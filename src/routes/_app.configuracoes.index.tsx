@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_app/configuracoes")({
+export const Route = createFileRoute("/_app/configuracoes/")({
   head: () => ({ meta: [{ title: "Configurações — SDR GROU" }] }),
   component: SettingsPage,
 });
