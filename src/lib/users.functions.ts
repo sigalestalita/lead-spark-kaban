@@ -125,5 +125,8 @@ export const getMyRole = createServerFn({ method: "GET" })
       role: roles[0] ?? null,
       isSuperAdmin: roles.includes("super_admin"),
       isGestao: roles.includes("gestao"),
+      isComercial: roles.includes("comercial") || roles.includes("gestao") || roles.includes("super_admin"),
+      isCs: roles.includes("cs") || roles.includes("gestao") || roles.includes("super_admin"),
+      isFinanceiro: roles.includes("financeiro") || roles.includes("gestao") || roles.includes("super_admin"),
     };
   });
