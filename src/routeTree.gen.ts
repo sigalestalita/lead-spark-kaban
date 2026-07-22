@@ -27,6 +27,7 @@ import { Route as AppAnalyticsChatRouteImport } from './routes/_app.analytics-ch
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as AppWhatsappIndexRouteImport } from './routes/_app.whatsapp.index'
+import { Route as AppCsIndexRouteImport } from './routes/_app.cs.index'
 import { Route as AppWhatsappTemplatesRouteImport } from './routes/_app.whatsapp.templates'
 import { Route as AppWhatsappMetricasRouteImport } from './routes/_app.whatsapp.metricas'
 import { Route as AppWhatsappIaRouteImport } from './routes/_app.whatsapp.ia'
@@ -35,6 +36,7 @@ import { Route as AppWhatsappContasRouteImport } from './routes/_app.whatsapp.co
 import { Route as AppWhatsappCampanhasRouteImport } from './routes/_app.whatsapp.campanhas'
 import { Route as AppWhatsappAutomacoesRouteImport } from './routes/_app.whatsapp.automacoes'
 import { Route as AppLeadIdRouteImport } from './routes/_app.lead.$id'
+import { Route as AppCsSinaleiraPdaRouteImport } from './routes/_app.cs.sinaleira-pda'
 import { Route as AppAnalyticsChatThreadIdRouteImport } from './routes/_app.analytics-chat.$threadId'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
@@ -137,6 +139,11 @@ const AppWhatsappIndexRoute = AppWhatsappIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppWhatsappRoute,
 } as any)
+const AppCsIndexRoute = AppCsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppCsRoute,
+} as any)
 const AppWhatsappTemplatesRoute = AppWhatsappTemplatesRouteImport.update({
   id: '/templates',
   path: '/templates',
@@ -176,6 +183,11 @@ const AppLeadIdRoute = AppLeadIdRouteImport.update({
   id: '/lead/$id',
   path: '/lead/$id',
   getParentRoute: () => AppRoute,
+} as any)
+const AppCsSinaleiraPdaRoute = AppCsSinaleiraPdaRouteImport.update({
+  id: '/sinaleira-pda',
+  path: '/sinaleira-pda',
+  getParentRoute: () => AppCsRoute,
 } as any)
 const AppAnalyticsChatThreadIdRoute =
   AppAnalyticsChatThreadIdRouteImport.update({
@@ -242,7 +254,7 @@ export interface FileRoutesByFullPath {
   '/analytics-chat': typeof AppAnalyticsChatRouteWithChildren
   '/comercial': typeof AppComercialRoute
   '/configuracoes': typeof AppConfiguracoesRoute
-  '/cs': typeof AppCsRoute
+  '/cs': typeof AppCsRouteWithChildren
   '/dashboard': typeof AppDashboardRoute
   '/financeiro': typeof AppFinanceiroRoute
   '/kanban': typeof AppKanbanRoute
@@ -253,6 +265,7 @@ export interface FileRoutesByFullPath {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/analytics-chat/$threadId': typeof AppAnalyticsChatThreadIdRoute
+  '/cs/sinaleira-pda': typeof AppCsSinaleiraPdaRoute
   '/lead/$id': typeof AppLeadIdRoute
   '/whatsapp/automacoes': typeof AppWhatsappAutomacoesRoute
   '/whatsapp/campanhas': typeof AppWhatsappCampanhasRouteWithChildren
@@ -261,6 +274,7 @@ export interface FileRoutesByFullPath {
   '/whatsapp/ia': typeof AppWhatsappIaRoute
   '/whatsapp/metricas': typeof AppWhatsappMetricasRoute
   '/whatsapp/templates': typeof AppWhatsappTemplatesRoute
+  '/cs/': typeof AppCsIndexRoute
   '/whatsapp/': typeof AppWhatsappIndexRoute
   '/whatsapp/campanhas/$id': typeof AppWhatsappCampanhasIdRoute
   '/api/public/hooks/run-fups': typeof ApiPublicHooksRunFupsRoute
@@ -279,7 +293,6 @@ export interface FileRoutesByTo {
   '/analytics-chat': typeof AppAnalyticsChatRouteWithChildren
   '/comercial': typeof AppComercialRoute
   '/configuracoes': typeof AppConfiguracoesRoute
-  '/cs': typeof AppCsRoute
   '/dashboard': typeof AppDashboardRoute
   '/financeiro': typeof AppFinanceiroRoute
   '/kanban': typeof AppKanbanRoute
@@ -289,6 +302,7 @@ export interface FileRoutesByTo {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/analytics-chat/$threadId': typeof AppAnalyticsChatThreadIdRoute
+  '/cs/sinaleira-pda': typeof AppCsSinaleiraPdaRoute
   '/lead/$id': typeof AppLeadIdRoute
   '/whatsapp/automacoes': typeof AppWhatsappAutomacoesRoute
   '/whatsapp/campanhas': typeof AppWhatsappCampanhasRouteWithChildren
@@ -297,6 +311,7 @@ export interface FileRoutesByTo {
   '/whatsapp/ia': typeof AppWhatsappIaRoute
   '/whatsapp/metricas': typeof AppWhatsappMetricasRoute
   '/whatsapp/templates': typeof AppWhatsappTemplatesRoute
+  '/cs': typeof AppCsIndexRoute
   '/whatsapp': typeof AppWhatsappIndexRoute
   '/whatsapp/campanhas/$id': typeof AppWhatsappCampanhasIdRoute
   '/api/public/hooks/run-fups': typeof ApiPublicHooksRunFupsRoute
@@ -317,7 +332,7 @@ export interface FileRoutesById {
   '/_app/analytics-chat': typeof AppAnalyticsChatRouteWithChildren
   '/_app/comercial': typeof AppComercialRoute
   '/_app/configuracoes': typeof AppConfiguracoesRoute
-  '/_app/cs': typeof AppCsRoute
+  '/_app/cs': typeof AppCsRouteWithChildren
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/financeiro': typeof AppFinanceiroRoute
   '/_app/kanban': typeof AppKanbanRoute
@@ -328,6 +343,7 @@ export interface FileRoutesById {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_app/analytics-chat/$threadId': typeof AppAnalyticsChatThreadIdRoute
+  '/_app/cs/sinaleira-pda': typeof AppCsSinaleiraPdaRoute
   '/_app/lead/$id': typeof AppLeadIdRoute
   '/_app/whatsapp/automacoes': typeof AppWhatsappAutomacoesRoute
   '/_app/whatsapp/campanhas': typeof AppWhatsappCampanhasRouteWithChildren
@@ -336,6 +352,7 @@ export interface FileRoutesById {
   '/_app/whatsapp/ia': typeof AppWhatsappIaRoute
   '/_app/whatsapp/metricas': typeof AppWhatsappMetricasRoute
   '/_app/whatsapp/templates': typeof AppWhatsappTemplatesRoute
+  '/_app/cs/': typeof AppCsIndexRoute
   '/_app/whatsapp/': typeof AppWhatsappIndexRoute
   '/_app/whatsapp/campanhas/$id': typeof AppWhatsappCampanhasIdRoute
   '/api/public/hooks/run-fups': typeof ApiPublicHooksRunFupsRoute
@@ -367,6 +384,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/analytics-chat/$threadId'
+    | '/cs/sinaleira-pda'
     | '/lead/$id'
     | '/whatsapp/automacoes'
     | '/whatsapp/campanhas'
@@ -375,6 +393,7 @@ export interface FileRouteTypes {
     | '/whatsapp/ia'
     | '/whatsapp/metricas'
     | '/whatsapp/templates'
+    | '/cs/'
     | '/whatsapp/'
     | '/whatsapp/campanhas/$id'
     | '/api/public/hooks/run-fups'
@@ -393,7 +412,6 @@ export interface FileRouteTypes {
     | '/analytics-chat'
     | '/comercial'
     | '/configuracoes'
-    | '/cs'
     | '/dashboard'
     | '/financeiro'
     | '/kanban'
@@ -403,6 +421,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/analytics-chat/$threadId'
+    | '/cs/sinaleira-pda'
     | '/lead/$id'
     | '/whatsapp/automacoes'
     | '/whatsapp/campanhas'
@@ -411,6 +430,7 @@ export interface FileRouteTypes {
     | '/whatsapp/ia'
     | '/whatsapp/metricas'
     | '/whatsapp/templates'
+    | '/cs'
     | '/whatsapp'
     | '/whatsapp/campanhas/$id'
     | '/api/public/hooks/run-fups'
@@ -441,6 +461,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/_app/analytics-chat/$threadId'
+    | '/_app/cs/sinaleira-pda'
     | '/_app/lead/$id'
     | '/_app/whatsapp/automacoes'
     | '/_app/whatsapp/campanhas'
@@ -449,6 +470,7 @@ export interface FileRouteTypes {
     | '/_app/whatsapp/ia'
     | '/_app/whatsapp/metricas'
     | '/_app/whatsapp/templates'
+    | '/_app/cs/'
     | '/_app/whatsapp/'
     | '/_app/whatsapp/campanhas/$id'
     | '/api/public/hooks/run-fups'
@@ -604,6 +626,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppWhatsappIndexRouteImport
       parentRoute: typeof AppWhatsappRoute
     }
+    '/_app/cs/': {
+      id: '/_app/cs/'
+      path: '/'
+      fullPath: '/cs/'
+      preLoaderRoute: typeof AppCsIndexRouteImport
+      parentRoute: typeof AppCsRoute
+    }
     '/_app/whatsapp/templates': {
       id: '/_app/whatsapp/templates'
       path: '/templates'
@@ -659,6 +688,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/lead/$id'
       preLoaderRoute: typeof AppLeadIdRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/_app/cs/sinaleira-pda': {
+      id: '/_app/cs/sinaleira-pda'
+      path: '/sinaleira-pda'
+      fullPath: '/cs/sinaleira-pda'
+      preLoaderRoute: typeof AppCsSinaleiraPdaRouteImport
+      parentRoute: typeof AppCsRoute
     }
     '/_app/analytics-chat/$threadId': {
       id: '/_app/analytics-chat/$threadId'
@@ -744,6 +780,18 @@ const AppAnalyticsChatRouteChildren: AppAnalyticsChatRouteChildren = {
 const AppAnalyticsChatRouteWithChildren =
   AppAnalyticsChatRoute._addFileChildren(AppAnalyticsChatRouteChildren)
 
+interface AppCsRouteChildren {
+  AppCsSinaleiraPdaRoute: typeof AppCsSinaleiraPdaRoute
+  AppCsIndexRoute: typeof AppCsIndexRoute
+}
+
+const AppCsRouteChildren: AppCsRouteChildren = {
+  AppCsSinaleiraPdaRoute: AppCsSinaleiraPdaRoute,
+  AppCsIndexRoute: AppCsIndexRoute,
+}
+
+const AppCsRouteWithChildren = AppCsRoute._addFileChildren(AppCsRouteChildren)
+
 interface AppWhatsappCampanhasRouteChildren {
   AppWhatsappCampanhasIdRoute: typeof AppWhatsappCampanhasIdRoute
 }
@@ -785,7 +833,7 @@ interface AppRouteChildren {
   AppAnalyticsChatRoute: typeof AppAnalyticsChatRouteWithChildren
   AppComercialRoute: typeof AppComercialRoute
   AppConfiguracoesRoute: typeof AppConfiguracoesRoute
-  AppCsRoute: typeof AppCsRoute
+  AppCsRoute: typeof AppCsRouteWithChildren
   AppDashboardRoute: typeof AppDashboardRoute
   AppFinanceiroRoute: typeof AppFinanceiroRoute
   AppKanbanRoute: typeof AppKanbanRoute
@@ -800,7 +848,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAnalyticsChatRoute: AppAnalyticsChatRouteWithChildren,
   AppComercialRoute: AppComercialRoute,
   AppConfiguracoesRoute: AppConfiguracoesRoute,
-  AppCsRoute: AppCsRoute,
+  AppCsRoute: AppCsRouteWithChildren,
   AppDashboardRoute: AppDashboardRoute,
   AppFinanceiroRoute: AppFinanceiroRoute,
   AppKanbanRoute: AppKanbanRoute,
