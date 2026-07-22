@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,11 +11,19 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Entrar — COMPASS" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    next: typeof s.next === "string" ? s.next : undefined,
+  }),
   component: LoginPage,
 });
 
+function isSafeNext(next: string | undefined): next is string {
+  return !!next && next.startsWith("/") && !next.startsWith("//");
+}
+
 function LoginPage() {
-  const navigate = useNavigate();
+  
+  const { next } = Route.useSearch();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,11 +31,13 @@ function LoginPage() {
   const [role, setRole] = useState<"sdr" | "executivo" | "gestao">("sdr");
   const [loading, setLoading] = useState(false);
 
+  const destination = isSafeNext(next) ? next : "/kanban";
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/kanban" });
+      if (data.session) window.location.href = destination;
     });
-  }, [navigate]);
+  }, [destination]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,7 +47,7 @@ function LoginPage() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success("Bem-vindo!");
-        navigate({ to: "/kanban" });
+        window.location.href = destination;
       } else {
         if (!/@grougp\.com\.br$/i.test(email.trim())) {
           throw new Error("Cadastro restrito a emails @grougp.com.br");
@@ -46,7 +56,7 @@ function LoginPage() {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/kanban`,
+            emailRedirectTo: `${window.location.origin}${destination}`,
             data: { full_name: name, role },
           },
         });
