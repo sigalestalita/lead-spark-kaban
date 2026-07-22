@@ -97,6 +97,260 @@ export type Database = {
         }
         Relationships: []
       }
+      commercial_deals: {
+        Row: {
+          amount: number | null
+          closed_at: string | null
+          company_name: string | null
+          created_at: string
+          currency: string
+          expected_close_date: string | null
+          id: string
+          lead_id: string | null
+          lost_reason: string | null
+          notes: string | null
+          owner_user_id: string | null
+          stage: Database["public"]["Enums"]["deal_stage"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number | null
+          closed_at?: string | null
+          company_name?: string | null
+          created_at?: string
+          currency?: string
+          expected_close_date?: string | null
+          id?: string
+          lead_id?: string | null
+          lost_reason?: string | null
+          notes?: string | null
+          owner_user_id?: string | null
+          stage?: Database["public"]["Enums"]["deal_stage"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number | null
+          closed_at?: string | null
+          company_name?: string | null
+          created_at?: string
+          currency?: string
+          expected_close_date?: string | null
+          id?: string
+          lead_id?: string | null
+          lost_reason?: string | null
+          notes?: string | null
+          owner_user_id?: string | null
+          stage?: Database["public"]["Enums"]["deal_stage"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commercial_deals_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cs_customers: {
+        Row: {
+          churned_at: string | null
+          company_name: string
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          cs_user_id: string | null
+          deal_id: string | null
+          health_score: number | null
+          id: string
+          lead_id: string | null
+          mrr: number | null
+          notes: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["cs_status"]
+          updated_at: string
+        }
+        Insert: {
+          churned_at?: string | null
+          company_name: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          cs_user_id?: string | null
+          deal_id?: string | null
+          health_score?: number | null
+          id?: string
+          lead_id?: string | null
+          mrr?: number | null
+          notes?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["cs_status"]
+          updated_at?: string
+        }
+        Update: {
+          churned_at?: string | null
+          company_name?: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          cs_user_id?: string | null
+          deal_id?: string | null
+          health_score?: number | null
+          id?: string
+          lead_id?: string | null
+          mrr?: number | null
+          notes?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["cs_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cs_customers_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cs_customers_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_contracts: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          customer_id: string | null
+          cycle: Database["public"]["Enums"]["contract_cycle"]
+          deal_id: string | null
+          end_date: string | null
+          id: string
+          notes: string | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["contract_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          customer_id?: string | null
+          cycle?: Database["public"]["Enums"]["contract_cycle"]
+          deal_id?: string | null
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["contract_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          customer_id?: string | null
+          cycle?: Database["public"]["Enums"]["contract_cycle"]
+          deal_id?: string | null
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["contract_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_contracts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "cs_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_contracts_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_deals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_invoices: {
+        Row: {
+          amount: number
+          contract_id: string | null
+          created_at: string
+          currency: string
+          customer_id: string | null
+          due_date: string
+          id: string
+          notes: string | null
+          paid_at: string | null
+          reference: string | null
+          status: Database["public"]["Enums"]["invoice_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          contract_id?: string | null
+          created_at?: string
+          currency?: string
+          customer_id?: string | null
+          due_date: string
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          reference?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          contract_id?: string | null
+          created_at?: string
+          currency?: string
+          customer_id?: string | null
+          due_date?: string
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          reference?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_invoices_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "finance_contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "cs_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       icp_config: {
         Row: {
           id: string
@@ -1209,6 +1463,9 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_comercial: { Args: { _user_id: string }; Returns: boolean }
+      is_cs: { Args: { _user_id: string }; Returns: boolean }
+      is_financeiro: { Args: { _user_id: string }; Returns: boolean }
       is_manager: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
@@ -1221,7 +1478,18 @@ export type Database = {
         | "comercial"
         | "cs"
         | "financeiro"
+      contract_cycle: "mensal" | "trimestral" | "anual" | "unico"
+      contract_status: "ativo" | "pausado" | "encerrado"
+      cs_status: "onboarding" | "ativo" | "em_risco" | "churn"
+      deal_stage:
+        | "novo"
+        | "qualificado"
+        | "proposta"
+        | "negociacao"
+        | "ganho"
+        | "perdido"
       enrichment_status: "pending" | "found" | "not_found" | "manual"
+      invoice_status: "pendente" | "pago" | "atrasado" | "cancelado"
       lead_priority: "alta" | "media" | "baixa" | "fora_icp" | "pendente"
     }
     CompositeTypes: {
@@ -1359,7 +1627,19 @@ export const Constants = {
         "cs",
         "financeiro",
       ],
+      contract_cycle: ["mensal", "trimestral", "anual", "unico"],
+      contract_status: ["ativo", "pausado", "encerrado"],
+      cs_status: ["onboarding", "ativo", "em_risco", "churn"],
+      deal_stage: [
+        "novo",
+        "qualificado",
+        "proposta",
+        "negociacao",
+        "ganho",
+        "perdido",
+      ],
       enrichment_status: ["pending", "found", "not_found", "manual"],
+      invoice_status: ["pendente", "pago", "atrasado", "cancelado"],
       lead_priority: ["alta", "media", "baixa", "fora_icp", "pendente"],
     },
   },
